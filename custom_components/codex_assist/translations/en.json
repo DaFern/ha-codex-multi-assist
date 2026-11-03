@@ -42,7 +42,14 @@
     "step": {
       "init": {
         "title": "Codex Assist options",
-        "description": "{model_status}\n\nStart with the everyday settings. Advanced chat and image-generation defaults stay collapsed until you need them. Device control still follows Home Assistant’s Assist exposed-entity settings.",
+        "menu_options": {
+          "settings": "Shared AI Task defaults",
+          "agents": "Manage conversation assistants"
+        }
+      },
+      "settings": {
+        "title": "Shared AI Task defaults",
+        "description": "{model_status}\n\nThese settings continue to apply to AI Task. Each conversation assistant has its own settings.",
         "sections": {
           "chat_settings": {
             "name": "Everyday settings",
@@ -80,10 +87,63 @@
             }
           }
         }
+      },
+      "agents": {
+        "title": "Conversation assistants",
+        "description": "Each assistant has its own personality, model settings, and conversation history. All assistants use this entry’s Codex sign-in and Home Assistant’s exposed-entity controls.",
+        "menu_options": {
+          "add_agent": "Add assistant",
+          "edit_agent": "Edit or rename assistant",
+          "remove_agent": "Remove assistant",
+          "init": "Back to options"
+        }
+      },
+      "add_agent": {
+        "title": "Add assistant",
+        "description": "Choose a distinct name and personality. The assistant will appear as a conversation agent in Voice assistants.",
+        "data": {
+          "name": "Assistant name",
+          "prompt": "Personality and instructions",
+          "model": "Chat model",
+          "reasoning_effort": "Reasoning effort",
+          "reasoning_summary": "Reasoning summary",
+          "text_verbosity": "Response length",
+          "web_search": "Enable hosted web search"
+        }
+      },
+      "edit_agent": {
+        "title": "Choose assistant to edit",
+        "data": {"agent_id": "Assistant"}
+      },
+      "edit_agent_settings": {
+        "title": "Edit assistant",
+        "data": {
+          "name": "Assistant name",
+          "prompt": "Personality and instructions",
+          "model": "Chat model",
+          "reasoning_effort": "Reasoning effort",
+          "reasoning_summary": "Reasoning summary",
+          "text_verbosity": "Response length",
+          "web_search": "Enable hosted web search"
+        }
+      },
+      "remove_agent": {
+        "title": "Choose assistant to remove",
+        "data": {"agent_id": "Assistant"}
+      },
+      "remove_agent_confirm": {
+        "title": "Confirm assistant removal",
+        "description": "Remove {agent_name} from this integration? Any Voice assistant pipeline using it will need another conversation agent.",
+        "data": {"confirm_remove": "Remove this assistant"}
       }
     },
     "error": {
-      "invalid_model": "Choose a listed model or keep your saved model."
+      "invalid_model": "Choose a listed model or keep your saved model.",
+      "invalid_agent_name": "Enter a name for this assistant.",
+      "agent_name_too_long": "Keep the assistant name to 48 characters or fewer.",
+      "invalid_agent_prompt": "Enter personality instructions for this assistant.",
+      "duplicate_agent_name": "Each assistant must have a different name.",
+      "last_agent": "Keep at least one conversation assistant."
     }
   }
 }

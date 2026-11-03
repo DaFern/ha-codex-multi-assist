@@ -114,7 +114,7 @@ async def test_options_submission_preserves_hidden_reasoning_summary(monkeypatch
         options={},
     )
 
-    result = await flow.async_step_init(
+    result = await flow.async_step_settings(
         {
             module.SECTION_CHAT_SETTINGS: {
                 "model": "gpt-5.4",
@@ -134,6 +134,90 @@ async def test_options_submission_preserves_hidden_reasoning_summary(monkeypatch
 
     assert result["type"] == "create_entry"
     assert result["data"]["reasoning_summary"] == "detailed"
+
+
+@pytest.mark.asyncio
+async def test_agent_flow_adds_personality_without_overwriting_existing_options(monkeypatch):
+    install_homeassistant_fakes(monkeypatch)
+    module = importlib.reload(importlib.import_module("custom_components.codex_assist.config_flow"))
+    from custom_components.codex_assist.codex_models import ModelCatalog
+
+    async def catalog(*args, **kwargs):
+        return ModelCatalog(("gpt-5.4",), "live", None)
+
+    monkeypatch.setattr(module, "async_entry_model_catalog", catalog)
+    flow = module.CodexAssistOptionsFlow()
+    flow.config_entry = SimpleNamespace(
+        data={"model": "gpt-5.4"},
+        options={"prompt": "Legacy Ziggy prompt", "web_search": False},
+    )
+    flow.hass = object()
+
+    form = await flow.async_step_add_agent()
+    assert form["type"] == "form"
+    saved = await flow.async_step_add_agent(
+        {
+            "name": "EDITH",
+            "prompt": "Friendly and efficient.",
+            "model": "gpt-5.4",
+            "reasoning_effort": "low",
+            "reasoning_summary": "auto",
+            "text_verbosity": "medium",
+            "web_search": False,
+        }
+    )
+
+    assert saved["type"] == "create_entry"
+    assert saved["data"]["prompt"] == "Legacy Ziggy prompt"
+    agents = saved["data"][module.CONF_AGENTS]
+    assert {agent["name"] for agent in agents} == {
+        "Codex Assist",
+        "JARVIS",
+        "F.R.I.D.A.Y.",
+        "Ultron",
+        "EDITH",
+    }
+    assert len({agent["id"] for agent in agents}) == len(agents)
+
+
+@pytest.mark.asyncio
+async def test_agent_edit_keeps_stable_id_and_remove_requires_confirmation(monkeypatch):
+    install_homeassistant_fakes(monkeypatch)
+    module = importlib.reload(importlib.import_module("custom_components.codex_assist.config_flow"))
+    from custom_components.codex_assist.codex_models import ModelCatalog
+
+    flow = module.CodexAssistOptionsFlow()
+    flow.config_entry = SimpleNamespace(data={}, options={"legacy_option": "keep"})
+    flow._catalog = ModelCatalog(("gpt-5.4",), "live", None)
+    flow._agents = [
+        {"id": "primary", "name": "Codex Assist", "prompt": "Primary", "model": "gpt-5.4"},
+        {"id": "agent-stable-id", "name": "JARVIS", "prompt": "Old", "model": "gpt-5.4"},
+    ]
+    flow._editing_agent_id = "agent-stable-id"
+    edited = await flow.async_step_edit_agent_settings(
+        {
+            "name": "J.A.R.V.I.S.",
+            "prompt": "New prompt",
+            "model": "gpt-5.4",
+            "reasoning_effort": "medium",
+            "reasoning_summary": "auto",
+            "text_verbosity": "medium",
+            "web_search": False,
+        }
+    )
+    assert edited["data"]["legacy_option"] == "keep"
+    assert edited["data"][module.CONF_AGENTS][1]["id"] == "agent-stable-id"
+    assert edited["data"][module.CONF_AGENTS][1]["name"] == "J.A.R.V.I.S."
+
+    flow._agents = edited["data"][module.CONF_AGENTS]
+    flow._removing_agent_id = "agent-stable-id"
+    confirm = await flow.async_step_remove_agent_confirm()
+    assert confirm["type"] == "form"
+    cancelled = await flow.async_step_remove_agent_confirm({"confirm_remove": False})
+    assert cancelled["type"] == "menu"
+    flow._removing_agent_id = "agent-stable-id"
+    removed = await flow.async_step_remove_agent_confirm({"confirm_remove": True})
+    assert [agent["id"] for agent in removed["data"][module.CONF_AGENTS]] == ["primary"]
 
 
 @pytest.mark.parametrize(
@@ -164,12 +248,14 @@ async def test_options_marks_cached_list_and_preserves_absent_saved_model(monkey
     flow = module.CodexAssistOptionsFlow()
     flow.config_entry = SimpleNamespace(data={"model": "saved-model"}, options={})
     flow.hass = object()
-    result = await flow.async_step_init()
+    menu = await flow.async_step_init()
+    assert menu["type"] == "menu"
+    result = await flow.async_step_settings()
     assert "cached list may be outdated" in result["description_placeholders"]["model_status"]
     assert "saved model" in result["description_placeholders"]["model_status"]
-    rejected = await flow.async_step_init({"chat_settings": {"model": "guessed-model"}})
+    rejected = await flow.async_step_settings({"chat_settings": {"model": "guessed-model"}})
     assert rejected["errors"] == {"base": "invalid_model"}
-    saved = await flow.async_step_init({"chat_settings": {"text_verbosity": "low"}})
+    saved = await flow.async_step_settings({"chat_settings": {"text_verbosity": "low"}})
     assert saved["data"]["model"] == "saved-model"
 
 

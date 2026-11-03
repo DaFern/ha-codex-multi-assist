@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from types import SimpleNamespace
 
 import pytest
 
@@ -112,6 +113,72 @@ def test_start_reauth_result_starts_ha_reauth_and_returns_user_message(
     assert entry.reauth_hass is hass
     assert result.conversation_id == "conversation-1"
     assert response.speech == "Codex Assist needs attention in Home Assistant."
+
+
+def test_agent_history_keeps_only_same_agent_turns_and_current_user_turn(
+    conversation_module,
+):
+    content = [
+        SimpleNamespace(role="system", content="system"),
+        SimpleNamespace(role="user", content="old A"),
+        SimpleNamespace(role="assistant", agent_id="conversation.agent_a", content="reply A"),
+        SimpleNamespace(role="tool_result", agent_id="conversation.agent_a"),
+        SimpleNamespace(role="user", content="old B"),
+        SimpleNamespace(role="assistant", agent_id="conversation.agent_b", content="reply B"),
+        SimpleNamespace(role="user", content="current A"),
+    ]
+
+    selected = conversation_module._chat_log_contents_for_agent(
+        content, "conversation.agent_a"
+    )
+
+    assert [item.content for item in selected if hasattr(item, "content")] == [
+        "old A",
+        "reply A",
+        "current A",
+    ]
+    assert all(item is not content[4] and item is not content[5] for item in selected)
+
+
+def test_agent_profiles_keep_legacy_identity_and_isolate_codex_sessions(
+    conversation_module,
+):
+    entry = FakeEntry()
+    entry.options = {
+        "prompt": "Legacy Ziggy prompt",
+        "model": "legacy-model",
+        "reasoning_effort": "high",
+        "text_verbosity": "low",
+        "web_search": True,
+    }
+    profiles = conversation_module.get_agent_profiles(entry)
+
+    assert [profile.name for profile in profiles] == [
+        "Codex Assist",
+        "JARVIS",
+        "F.R.I.D.A.Y.",
+        "Ultron",
+    ]
+    assert conversation_module._codex_session_id_for_profile(
+        entry.entry_id, profiles[0]
+    ) == conversation_module.codex_session_id(entry.entry_id)
+    assert profiles[0].prompt == "Legacy Ziggy prompt"
+    assert profiles[0].model == "legacy-model"
+    assert profiles[0].reasoning_effort == "high"
+    assert profiles[0].text_verbosity == "low"
+    assert profiles[0].web_search is True
+    entities = [
+        conversation_module.CodexAssistConversationEntity(entry, profile)
+        for profile in profiles
+    ]
+    assert entities[0]._attr_unique_id == entry.entry_id
+    assert len({entity._attr_unique_id for entity in entities}) == len(entities)
+    assert len(
+        {
+            conversation_module._codex_session_id_for_profile(entry.entry_id, profile)
+            for profile in profiles
+        }
+    ) == len(profiles)
 
 
 @pytest.mark.asyncio

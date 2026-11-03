@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
+from uuid import uuid4
 
 import voluptuous as vol
 from homeassistant import config_entries
@@ -23,6 +24,11 @@ from .codex_image import (
 )
 from .codex_models import ModelCatalog, ModelDiscoveryCache, fetch_codex_model_ids
 from .codex_runtime import runtime_token_coordinator
+from .agent_profiles import (
+    CONF_AGENTS,
+    AgentProfile,
+    get_agent_profiles,
+)
 from .model_discovery import async_entry_model_catalog
 
 CONF_ACCESS_TOKEN = "access_token"
@@ -223,8 +229,17 @@ def _clear_model_cache(entry) -> None:
 class CodexAssistOptionsFlow(config_entries.OptionsFlow):
     def __init__(self) -> None:
         self._catalog: ModelCatalog | None = None
+        self._agents: list[dict[str, Any]] | None = None
+        self._editing_agent_id: str | None = None
+        self._removing_agent_id: str | None = None
 
     async def async_step_init(self, user_input=None):
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["settings", "agents"],
+        )
+
+    async def async_step_settings(self, user_input=None):
         defaults = {**self.config_entry.data, **self.config_entry.options}
         errors = {}
         if user_input is not None:
@@ -241,19 +256,159 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
                     data[CONF_MODEL] = model
                 if CONF_REASONING_SUMMARY in defaults:
                     data[CONF_REASONING_SUMMARY] = defaults[CONF_REASONING_SUMMARY]
-                return self.async_create_entry(title="", data=data)
+                return self.async_create_entry(
+                    title="",
+                    data={**self.config_entry.options, **data},
+                )
 
         if self._catalog is None:
             self._catalog = await async_entry_model_catalog(
                 self.hass, self.config_entry, force=True
             )
         return self.async_show_form(
-            step_id="init",
+            step_id="settings",
             data_schema=_settings_schema(defaults, model_options=list(self._catalog.models)),
             errors=errors,
             description_placeholders={
                 "model_status": _catalog_description(self._catalog, defaults.get(CONF_MODEL))
             },
+        )
+
+    async def async_step_agents(self, user_input=None):
+        self._agents = [profile.as_dict() for profile in get_agent_profiles(self.config_entry)]
+        return self.async_show_menu(
+            step_id="agents",
+            menu_options=["add_agent", "edit_agent", "remove_agent", "init"],
+        )
+
+    async def async_step_add_agent(self, user_input=None):
+        profile = _new_profile_defaults(self.config_entry)
+        if user_input is not None:
+            error = _validate_agent_input(
+                user_input,
+                self._agent_profiles(),
+                allowed_models=await self._model_options(),
+            )
+            if error:
+                return self.async_show_form(
+                    step_id="add_agent",
+                    data_schema=_agent_profile_schema(profile, await self._model_options()),
+                    errors={"base": error},
+                )
+            self._agent_profiles().append(
+                _profile_from_input(uuid4().hex, user_input).as_dict()
+            )
+            return self._save_agents()
+        return self.async_show_form(
+            step_id="add_agent",
+            data_schema=_agent_profile_schema(profile, await self._model_options()),
+        )
+
+    async def async_step_edit_agent(self, user_input=None):
+        profiles = self._agent_profiles()
+        if not profiles:
+            return self.async_show_menu(step_id="agents", menu_options=["add_agent", "init"])
+        if user_input is not None:
+            self._editing_agent_id = user_input.get("agent_id")
+            return await self.async_step_edit_agent_settings()
+        return self.async_show_form(
+            step_id="edit_agent",
+            data_schema=_agent_choice_schema(profiles),
+        )
+
+    async def async_step_edit_agent_settings(self, user_input=None):
+        profiles = self._agent_profiles()
+        profile_data = next(
+            (item for item in profiles if item["id"] == self._editing_agent_id),
+            None,
+        )
+        if profile_data is None:
+            return self.async_show_menu(
+                step_id="agents",
+                menu_options=["add_agent", "edit_agent", "remove_agent", "init"],
+            )
+        profile = _profile_from_dict(profile_data)
+        if user_input is not None:
+            other_profiles = [item for item in profiles if item["id"] != profile.agent_id]
+            error = _validate_agent_input(
+                user_input,
+                other_profiles,
+                allowed_models=await self._model_options(),
+                saved_model=profile.model,
+            )
+            if error:
+                return self.async_show_form(
+                    step_id="edit_agent_settings",
+                    data_schema=_agent_profile_schema(profile, await self._model_options()),
+                    errors={"base": error},
+                )
+            replacement = _profile_from_input(profile.agent_id, user_input).as_dict()
+            profiles[profiles.index(profile_data)] = replacement
+            return self._save_agents()
+        return self.async_show_form(
+            step_id="edit_agent_settings",
+            data_schema=_agent_profile_schema(profile, await self._model_options()),
+        )
+
+    async def async_step_remove_agent(self, user_input=None):
+        profiles = self._agent_profiles()
+        if len(profiles) <= 1:
+            return self.async_show_menu(step_id="agents", menu_options=["add_agent", "init"])
+        if user_input is not None:
+            self._removing_agent_id = user_input.get("agent_id")
+            return await self.async_step_remove_agent_confirm()
+        return self.async_show_form(
+            step_id="remove_agent",
+            data_schema=_agent_choice_schema(profiles),
+        )
+
+    async def async_step_remove_agent_confirm(self, user_input=None):
+        profiles = self._agent_profiles()
+        profile = next(
+            (item for item in profiles if item["id"] == self._removing_agent_id),
+            None,
+        )
+        if profile is None:
+            return self.async_show_menu(
+                step_id="agents",
+                menu_options=["add_agent", "edit_agent", "remove_agent", "init"],
+            )
+        if user_input is not None:
+            if user_input.get("confirm_remove"):
+                if len(profiles) <= 1:
+                    return self.async_show_form(
+                        step_id="remove_agent_confirm",
+                        data_schema=_remove_confirmation_schema(),
+                        errors={"base": "last_agent"},
+                    )
+                self._agents = [item for item in profiles if item["id"] != profile["id"]]
+                return self._save_agents()
+            return self.async_show_menu(
+                step_id="agents",
+                menu_options=["add_agent", "edit_agent", "remove_agent", "init"],
+            )
+        return self.async_show_form(
+            step_id="remove_agent_confirm",
+            data_schema=_remove_confirmation_schema(),
+            description_placeholders={"agent_name": profile["name"]},
+        )
+
+    def _agent_profiles(self) -> list[dict[str, Any]]:
+        if self._agents is None:
+            self._agents = [profile.as_dict() for profile in get_agent_profiles(self.config_entry)]
+        return self._agents
+
+    async def _model_options(self) -> list[str]:
+        if self._catalog is None:
+            self._catalog = await async_entry_model_catalog(
+                self.hass, self.config_entry, force=True
+            )
+        return list(self._catalog.models)
+
+    def _save_agents(self):
+        return self.async_create_entry(
+            title="",
+            data={**self.config_entry.options, CONF_AGENTS: self._agent_profiles()},
         )
 
 
@@ -360,10 +515,144 @@ def _flatten_settings_input(user_input: Mapping[str, Any]) -> dict[str, Any]:
     return settings
 
 
+def _new_profile_defaults(entry) -> AgentProfile:
+    profiles = get_agent_profiles(entry)
+    base = profiles[0]
+    return AgentProfile(
+        agent_id="",
+        name="New assistant",
+        prompt=base.prompt,
+        model=base.model,
+        reasoning_effort=base.reasoning_effort,
+        reasoning_summary=base.reasoning_summary,
+        text_verbosity=base.text_verbosity,
+        web_search=base.web_search,
+    )
+
+
+def _profile_from_dict(data: Mapping[str, Any]) -> AgentProfile:
+    return AgentProfile(
+        agent_id=str(data.get("id", "")),
+        name=str(data.get("name", "")),
+        prompt=str(data.get("prompt", DEFAULT_PROMPT)),
+        model=data.get("model") if isinstance(data.get("model"), str) else None,
+        reasoning_effort=str(data.get("reasoning_effort", DEFAULT_REASONING_EFFORT)),
+        reasoning_summary=str(data.get("reasoning_summary", DEFAULT_REASONING_SUMMARY)),
+        text_verbosity=str(data.get("text_verbosity", DEFAULT_TEXT_VERBOSITY)),
+        web_search=bool(data.get("web_search", DEFAULT_WEB_SEARCH)),
+    )
+
+
+def _profile_from_input(agent_id: str, user_input: Mapping[str, Any]) -> AgentProfile:
+    return AgentProfile(
+        agent_id=agent_id,
+        name=user_input["name"].strip(),
+        prompt=user_input["prompt"],
+        model=user_input.get("model"),
+        reasoning_effort=user_input.get("reasoning_effort", DEFAULT_REASONING_EFFORT),
+        reasoning_summary=user_input.get("reasoning_summary", DEFAULT_REASONING_SUMMARY),
+        text_verbosity=user_input.get("text_verbosity", DEFAULT_TEXT_VERBOSITY),
+        web_search=bool(user_input.get("web_search", DEFAULT_WEB_SEARCH)),
+    )
+
+
+def _validate_agent_input(
+    user_input: Mapping[str, Any],
+    other_profiles: list[dict[str, Any]],
+    *,
+    allowed_models: list[str] | None = None,
+    saved_model: str | None = None,
+) -> str | None:
+    name = user_input.get("name")
+    prompt = user_input.get("prompt")
+    if not isinstance(name, str) or not name.strip():
+        return "invalid_agent_name"
+    if len(name.strip()) > 48:
+        return "agent_name_too_long"
+    if not isinstance(prompt, str) or not prompt.strip():
+        return "invalid_agent_prompt"
+    model = user_input.get("model")
+    if (
+        model is not None
+        and allowed_models is not None
+        and model not in allowed_models
+        and model != saved_model
+    ):
+        return "invalid_model"
+    if any(
+        name.strip().casefold() == str(item.get("name", "")).strip().casefold()
+        for item in other_profiles
+    ):
+        return "duplicate_agent_name"
+    return None
+
+
+def _agent_profile_schema(
+    profile: AgentProfile,
+    model_options: list[str],
+) -> vol.Schema:
+    model_options = list(dict.fromkeys(model_options))
+    if profile.model and profile.model not in model_options:
+        model_options.append(profile.model)
+    fields: dict[Any, Any] = {
+        vol.Required("name", default=profile.name): selector.TextSelector(),
+        vol.Required("prompt", default=profile.prompt): selector.TextSelector(
+            selector.TextSelectorConfig(multiline=True)
+        ),
+        vol.Required(
+            "reasoning_effort", default=profile.reasoning_effort
+        ): _low_medium_high_selector(),
+        vol.Required(
+            "reasoning_summary", default=profile.reasoning_summary
+        ): _reasoning_summary_selector(profile.reasoning_summary),
+        vol.Required(
+            "text_verbosity", default=profile.text_verbosity
+        ): _low_medium_high_selector(),
+        vol.Required("web_search", default=profile.web_search): bool,
+    }
+    if model_options:
+        fields[vol.Optional("model", default=profile.model or model_options[0])] = (
+            _model_selector(model_options, saved_model=profile.model)
+        )
+    return vol.Schema(fields)
+
+
+def _agent_choice_schema(profiles: list[dict[str, Any]]) -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Required("agent_id"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[
+                        selector.SelectOptionDict(value=item["id"], label=item["name"])
+                        for item in profiles
+                    ],
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            )
+        }
+    )
+
+
+def _remove_confirmation_schema() -> vol.Schema:
+    return vol.Schema({vol.Required("confirm_remove", default=False): bool})
+
+
 def _low_medium_high_selector() -> selector.SelectSelector:
     return selector.SelectSelector(
         selector.SelectSelectorConfig(
             options=["low", "medium", "high"],
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
+    )
+
+
+def _reasoning_summary_selector(saved_value: str = "auto") -> selector.SelectSelector:
+    options = ["auto", "low", "medium", "high"]
+    if saved_value not in options:
+        options.append(saved_value)
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=options,
             mode=selector.SelectSelectorMode.DROPDOWN,
         )
     )

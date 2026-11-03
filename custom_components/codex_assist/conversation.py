@@ -36,13 +36,7 @@ from .codex_client import (
 )
 from .codex_protocol import CodexNativeState, native_state_from_response_items
 from .codex_runtime import runtime_token_coordinator
-from .config_flow import (
-    CONF_WEB_SEARCH,
-    DEFAULT_REASONING_EFFORT,
-    DEFAULT_REASONING_SUMMARY,
-    DEFAULT_TEXT_VERBOSITY,
-    DEFAULT_WEB_SEARCH,
-)
+from .agent_profiles import AgentProfile, PRIMARY_AGENT_ID, get_agent_profiles
 from .schema_compat import to_openapi
 
 MAX_TOOL_ITERATIONS = 5
@@ -75,7 +69,9 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    async_add_entities([CodexAssistConversationEntity(entry)])
+    async_add_entities(
+        [CodexAssistConversationEntity(entry, profile) for profile in get_agent_profiles(entry)]
+    )
 
 
 class CodexAssistConversationEntity(
@@ -83,13 +79,18 @@ class CodexAssistConversationEntity(
     conversation.AbstractConversationAgent,
 ):
     _attr_has_entity_name = True
-    _attr_name = "Codex Assist"
     _attr_supported_features = conversation.ConversationEntityFeature.CONTROL
     _attr_supports_streaming = True
 
-    def __init__(self, entry: ConfigEntry) -> None:
+    def __init__(self, entry: ConfigEntry, profile: AgentProfile | None = None) -> None:
         self.entry = entry
-        self._attr_unique_id = entry.entry_id
+        self.profile = profile or get_agent_profiles(entry)[0]
+        self._attr_name = self.profile.name
+        self._attr_unique_id = (
+            entry.entry_id
+            if self.profile.agent_id == PRIMARY_AGENT_ID
+            else f"{entry.entry_id}_{self.profile.agent_id}"
+        )
 
     @property
     def supported_languages(self) -> list[str] | str:
@@ -97,10 +98,12 @@ class CodexAssistConversationEntity(
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
-        conversation.async_set_agent(self.hass, self.entry, self)
+        if self.profile.agent_id == PRIMARY_AGENT_ID:
+            conversation.async_set_agent(self.hass, self.entry, self)
 
     async def async_will_remove_from_hass(self) -> None:
-        conversation.async_unset_agent(self.hass, self.entry)
+        if self.profile.agent_id == PRIMARY_AGENT_ID:
+            conversation.async_unset_agent(self.hass, self.entry)
         await super().async_will_remove_from_hass()
 
     async def _async_handle_message(
@@ -108,16 +111,12 @@ class CodexAssistConversationEntity(
         user_input: conversation.ConversationInput,
         chat_log: conversation.ChatLog,
     ) -> conversation.ConversationResult:
-        settings = {**self.entry.data, **self.entry.options}
-        model = settings.get("model", "gpt-5.4")
-        prompt = settings.get(
-            "prompt",
-            "You are a concise Home Assistant Assist conversation agent.",
-        )
-        reasoning_effort = settings.get("reasoning_effort", DEFAULT_REASONING_EFFORT)
-        reasoning_summary = settings.get("reasoning_summary", DEFAULT_REASONING_SUMMARY)
-        text_verbosity = settings.get("text_verbosity", DEFAULT_TEXT_VERBOSITY)
-        web_search = bool(settings.get(CONF_WEB_SEARCH, DEFAULT_WEB_SEARCH))
+        model = self.profile.model or "gpt-5.4"
+        prompt = self.profile.prompt
+        reasoning_effort = self.profile.reasoning_effort
+        reasoning_summary = self.profile.reasoning_summary
+        text_verbosity = self.profile.text_verbosity
+        web_search = self.profile.web_search
 
         response = intent.IntentResponse(language=user_input.language)
         try:
@@ -159,7 +158,7 @@ class CodexAssistConversationEntity(
         codex = CodexClient(
             http_client=http_client,
             access_token=tokens.access_token,
-            session_id=codex_session_id(self.entry.entry_id),
+            session_id=_codex_session_id_for_profile(self.entry.entry_id, self.profile),
         )
         try:
             for _iteration in range(MAX_TOOL_ITERATIONS + 1):
@@ -173,7 +172,9 @@ class CodexAssistConversationEntity(
                         instructions=_instructions_for_turn(
                             chat_log, prompt, web_search=web_search
                         ),
-                        input_items=await _codex_input_from_chat_log(self.hass, chat_log),
+                        input_items=await _codex_input_from_chat_log(
+                            self.hass, chat_log, user_input.agent_id
+                        ),
                         tools=(
                             _codex_tools_from_chat_log(chat_log, enable_web_search=web_search)
                             if allow_tools
@@ -218,7 +219,9 @@ class CodexAssistConversationEntity(
                             instructions=_instructions_for_turn(
                                 chat_log, prompt, web_search=web_search
                             ),
-                            input_items=await _codex_input_from_chat_log(self.hass, chat_log),
+                            input_items=await _codex_input_from_chat_log(
+                                self.hass, chat_log, user_input.agent_id
+                            ),
                             tools=(
                                 _codex_tools_from_chat_log(chat_log, enable_web_search=web_search)
                                 if allow_tools
@@ -444,7 +447,9 @@ def _instructions_from_chat_log(
     chat_log: conversation.ChatLog,
     fallback_prompt: str,
 ) -> str:
-    for content in chat_log.content:
+    # HA may retain prior system messages when a conversation switches agents;
+    # use the context just added for this request, not another agent's prompt.
+    for content in reversed(chat_log.content):
         if getattr(content, "role", None) == "system" and isinstance(
             getattr(content, "content", None),
             str,
@@ -470,10 +475,16 @@ def _instructions_for_turn(
 async def _codex_input_from_chat_log(
     hass: HomeAssistant,
     chat_log: conversation.ChatLog,
+    active_agent_id: str | None = None,
 ) -> list[dict[str, Any]]:
     input_items: list[dict[str, Any]] = []
     attachments_by_item: dict[int, Any] = {}
-    for content in chat_log.content:
+    contents = (
+        _chat_log_contents_for_agent(chat_log.content, active_agent_id)
+        if active_agent_id is not None
+        else chat_log.content
+    )
+    for content in contents:
         role = getattr(content, "role", None)
         text = getattr(content, "content", None)
         if role == "system":
@@ -518,6 +529,54 @@ async def _codex_input_from_chat_log(
             images = await _async_image_attachments_for_codex(hass, attachments_by_item[id(item)])
             item["content"] = codex_user_content_with_images(item["content"], images)
     return retained
+
+
+def _chat_log_contents_for_agent(contents: list[Any], agent_id: str) -> list[Any]:
+    """Keep whole turns for one agent and the current unanswered user turn."""
+    turns: list[tuple[str | None, list[Any]]] = []
+    current_turn: list[Any] = []
+    current_agent_id: str | None = None
+
+    def finish_turn() -> None:
+        if current_turn:
+            turns.append((current_agent_id, current_turn.copy()))
+
+    for content in contents:
+        role = getattr(content, "role", None)
+        if role == "system":
+            continue
+        if role == "user":
+            finish_turn()
+            current_turn = [content]
+            current_agent_id = None
+            continue
+        if not current_turn:
+            continue
+        current_turn.append(content)
+        turn_agent_id = getattr(content, "agent_id", None)
+        if current_agent_id is None and isinstance(turn_agent_id, str):
+            current_agent_id = turn_agent_id
+
+    if current_turn:
+        turns.append((current_agent_id, current_turn))
+
+    selected: list[Any] = []
+    for index, (turn_agent_id, turn_contents) in enumerate(turns):
+        is_current_unanswered_turn = (
+            index == len(turns) - 1
+            and turn_agent_id is None
+            and getattr(turn_contents[0], "role", None) == "user"
+        )
+        if turn_agent_id == agent_id or is_current_unanswered_turn:
+            selected.extend(turn_contents)
+    return selected
+
+
+def _codex_session_id_for_profile(entry_id: str, profile: AgentProfile) -> str:
+    """Keep the legacy session for the primary agent; isolate added personalities."""
+    if profile.agent_id == PRIMARY_AGENT_ID:
+        return codex_session_id(entry_id)
+    return codex_session_id(f"{entry_id}:{profile.agent_id}")
 
 
 def _trim_codex_input_items(

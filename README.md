@@ -73,6 +73,23 @@ If something fails, start with [Troubleshooting](https://github.com/itsreverence
 
 **Assist conversations.** Codex Assist registers as a normal Assist conversation agent and streams replies. It reads and controls only the entities you expose to Assist, through Home Assistant's own Assist LLM API.
 
+### Multiple conversation assistants
+
+One Codex Assist config entry can provide several independently configurable
+conversation agents. In the integration's **Configure** options, choose
+**Manage conversation assistants** to add, edit/rename, or remove assistants.
+JARVIS, F.R.I.D.A.Y., and Ultron are created as starter personalities; you can
+change their names, instructions, model, reasoning, response length, and optional
+hosted web search, or create your own. All agents share the entry's Codex sign-in,
+but have separate Codex sessions and only receive their own conversation turns.
+The existing Codex Assist entity keeps its unique ID and serves as the primary
+agent for existing pipelines. AI Task continues to use the shared AI Task defaults.
+
+Existing installations migrate automatically on reload: the existing agent keeps
+its current settings and session identity, while the three starter personalities
+are added. Review [the multi-agent migration and rollback guide](docs/MULTI_AGENT_MIGRATION.md)
+before deploying a development build over an existing installation.
+
 **AI Task.** It generates plain text or structured data, reads supported image attachments (up to four images, 10 MiB each, 20 MiB total), and generates images. See the [AI Task example](https://github.com/itsreverence/ha-codex-assist/wiki/Features-and-Options#run-a-data-task).
 
 **Hosted web search.** Off by default. When on, the model can search for current information. The model is asked to keep raw URLs out of spoken replies, which is not guaranteed.

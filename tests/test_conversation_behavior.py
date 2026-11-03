@@ -270,6 +270,20 @@ def test_web_search_instructions_suppress_spoken_source_urls(conversation_module
     assert "renders structured citations separately" not in instructions
 
 
+def test_instructions_use_current_agent_system_context(conversation_module):
+    chat_log = FakeChatLog(
+        [
+            FakeContent(role="system", content="Previous agent instructions."),
+            FakeContent(role="user", content="Hello"),
+            FakeContent(role="system", content="Current agent instructions."),
+        ]
+    )
+
+    instructions = conversation_module._instructions_from_chat_log(chat_log, "fallback")
+
+    assert instructions == "Current agent instructions."
+
+
 @pytest.mark.asyncio
 async def test_stream_codex_turn_into_chat_log_calls_chat_log_stream_api(
     conversation_module,
