@@ -84,6 +84,9 @@ hosted web search, or create your own. All agents share the entry's Codex sign-i
 but have separate Codex sessions and only receive their own conversation turns.
 The existing Codex Assist entity keeps its unique ID and serves as the primary
 agent for existing pipelines. AI Task continues to use the shared AI Task defaults.
+Edit the shared **AI Task system prompt** under **Shared AI Task defaults → Advanced AI Task settings**;
+edit a conversation agent's prompt under **Manage conversation assistants**. Changing the
+shared prompt does not change saved conversation-agent prompts.
 
 Existing installations migrate automatically on reload: the existing agent keeps
 its current settings and session identity, while the three starter personalities

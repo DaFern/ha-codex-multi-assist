@@ -23,3 +23,16 @@ def test_config_flow_errors_are_translated_for_device_polling():
     assert "authorization_pending" in errors
     assert "device_code_auth_failed" in errors
     assert "device_code_request_failed" in errors
+
+
+def test_shared_prompt_translation_identifies_ai_task_scope():
+    data = json.loads(TRANSLATION.read_text())
+    settings = data["options"]["step"]["settings"]
+    advanced = settings["sections"]["advanced_settings"]
+
+    assert advanced["name"] == "Advanced AI Task settings"
+    assert advanced["data"]["prompt"] == "AI Task system prompt"
+    assert advanced["data_description"]["prompt"] == (
+        "Default instructions used for AI Task requests. "
+        "Conversation agents use their own individual system prompts."
+    )

@@ -111,7 +111,17 @@ async def test_options_submission_preserves_hidden_reasoning_summary(monkeypatch
     flow = module.CodexAssistOptionsFlow()
     flow.config_entry = SimpleNamespace(
         data={"reasoning_summary": "detailed"},
-        options={},
+        options={
+            "prompt": "Old AI Task instructions",
+            module.CONF_AGENTS: [
+                {
+                    "id": "primary",
+                    "name": "Codex Assist",
+                    "prompt": "Saved conversation-agent instructions",
+                    "model": "gpt-5.4",
+                }
+            ],
+        },
     )
 
     result = await flow.async_step_settings(
@@ -134,6 +144,26 @@ async def test_options_submission_preserves_hidden_reasoning_summary(monkeypatch
 
     assert result["type"] == "create_entry"
     assert result["data"]["reasoning_summary"] == "detailed"
+    assert result["data"]["prompt"] == "Be brief."
+    assert result["data"][module.CONF_AGENTS][0]["prompt"] == (
+        "Saved conversation-agent instructions"
+    )
+
+
+@pytest.mark.asyncio
+async def test_options_submission_without_prompt_keeps_saved_ai_task_prompt(monkeypatch):
+    install_homeassistant_fakes(monkeypatch)
+    module = importlib.reload(importlib.import_module("custom_components.codex_assist.config_flow"))
+    flow = module.CodexAssistOptionsFlow()
+    flow.config_entry = SimpleNamespace(
+        data={},
+        options={"prompt": "Existing AI Task prompt"},
+    )
+
+    result = await flow.async_step_settings({})
+
+    assert result["type"] == "create_entry"
+    assert result["data"]["prompt"] == "Existing AI Task prompt"
 
 
 @pytest.mark.asyncio

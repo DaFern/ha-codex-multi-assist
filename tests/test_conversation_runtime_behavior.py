@@ -181,6 +181,26 @@ def test_agent_profiles_keep_legacy_identity_and_isolate_codex_sessions(
     ) == len(profiles)
 
 
+def test_saved_primary_prompt_is_independent_from_ai_task_prompt(conversation_module):
+    entry = FakeEntry()
+    entry.options = {
+        "prompt": "Updated AI Task instructions",
+        "agents": [
+            {
+                "id": "primary",
+                "name": "Codex Assist",
+                "prompt": "Saved primary conversation instructions",
+                "model": "gpt-5.4",
+            }
+        ],
+    }
+
+    profiles = conversation_module.get_agent_profiles(entry)
+
+    assert len(profiles) == 1
+    assert profiles[0].prompt == "Saved primary conversation instructions"
+
+
 @pytest.mark.asyncio
 async def test_handle_message_reports_temporary_auth_failure_without_reauth(
     conversation_module,

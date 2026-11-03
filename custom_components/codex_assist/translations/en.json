@@ -65,13 +65,13 @@
             }
           },
           "advanced_settings": {
-            "name": "Advanced chat settings",
+            "name": "Advanced AI Task settings",
             "data": {
-              "prompt": "System prompt",
+              "prompt": "AI Task system prompt",
               "reasoning_effort": "Reasoning effort"
             },
             "data_description": {
-              "prompt": "Standing instructions applied to Assist conversations.",
+              "prompt": "Default instructions used for AI Task requests. Conversation agents use their own individual system prompts.",
               "reasoning_effort": "How much reasoning supported models should use before answering."
             }
           },

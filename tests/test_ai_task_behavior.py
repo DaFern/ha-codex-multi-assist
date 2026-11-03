@@ -208,6 +208,55 @@ async def test_ai_task_generate_data_reports_temporary_auth_without_reauth(
 
 
 @pytest.mark.asyncio
+async def test_ai_task_uses_shared_prompt_without_overriding_agent_profiles(
+    ai_task_module,
+    monkeypatch,
+):
+    class Entry:
+        entry_id = "abc"
+        data = {"model": "gpt-5.4"}
+        options = {
+            "prompt": "Shared AI Task instructions",
+            "agents": [
+                {
+                    "id": "primary",
+                    "name": "Codex Assist",
+                    "prompt": "Independent conversation instructions",
+                    "model": "gpt-5.4",
+                }
+            ],
+        }
+
+    entry = Entry()
+    entity = ai_task_module.CodexAssistAITaskEntity(entry)
+    entity.hass = type(
+        "Hass",
+        (),
+        {"http_client": object(), "config_entries": object()},
+    )()
+    seen = {}
+
+    class Coordinator:
+        async def resolve(self, *args, **kwargs):
+            return CodexTokenSet("access", "refresh")
+
+    async def stop_after_capture(**kwargs):
+        seen.update(kwargs)
+        raise RuntimeError("stop after prompt capture")
+
+    monkeypatch.setattr(ai_task_module, "get_async_client", lambda hass: object())
+    monkeypatch.setattr(ai_task_module, "runtime_token_coordinator", lambda entry: Coordinator())
+    monkeypatch.setattr(ai_task_module, "_run_codex_ai_task_chat_log", stop_after_capture)
+    chat_log = type("ChatLog", (), {"content": [], "llm_api": None})()
+    task = type("Task", (), {"structure": None})()
+
+    with pytest.raises(RuntimeError, match="stop after prompt capture"):
+        await entity._async_generate_data(task, chat_log)
+
+    assert seen["prompt"] == "Shared AI Task instructions"
+
+
+@pytest.mark.asyncio
 async def test_ai_task_chat_log_retry_propagates_reauth_required(
     ai_task_module,
     monkeypatch,
