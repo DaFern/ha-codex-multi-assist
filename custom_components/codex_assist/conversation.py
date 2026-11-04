@@ -135,9 +135,13 @@ class CodexAssistConversationEntity(
         preferences = ""
         key = getattr(self.entry, "options", {}).get(CONF_VOICE_MATCH_KEY, "")
         try:
-            prepared_request = runtime_for_entry(self.entry).prepare_request(
-                key, getattr(user_input, "text", ""), chat_log.content,
+            runtime = runtime_for_entry(self.entry)
+            input_text = getattr(user_input, "text", "")
+            packet_text = runtime.handoffs.consume(key, input_text)
+            prepared_request = runtime.prepare_request(
+                key, input_text, chat_log.content,
                 user_input.conversation_id, user_input.agent_id,
+                packet_text=packet_text,
             )
             _clean = prepared_request.text
             preferences = prepared_request.instructions

@@ -70,6 +70,12 @@ to use acoustic identity as authorisation.
 
 ### Standard request path
 
+An unregistered development-only [clean STT prototype](CLEAN_SPEAKER_STT_PROTOTYPE.md)
+wraps personalised Wyoming STT and binds its verified packet to an exact clean
+text object/owning pipeline task. The optional consumer uses the same nonce cache
+and request preparation as encrypted transcripts. It has no setup/configuration
+entry point and is not a live deployment or documented HA metadata API.
+
 1. Home Assistant sends a voice or chat request through an Assist pipeline using `conversation.codex_assist`.
 2. Codex Assist refreshes its stored Codex or ChatGPT token if needed.
 3. Codex Assist sends the conversation to the Codex-compatible backend.

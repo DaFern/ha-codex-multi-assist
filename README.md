@@ -86,6 +86,11 @@ adds a **Voice Match sentence** trigger and **Recognised speaker is** condition.
 Reuse one voice profile across automations, without a shared last-speaker sensor.
 It requires separate reviewed deployment and must not authorise sensitive actions.
 
+The current personalised Wyoming endpoint embeds an encrypted header in STT text,
+so it can appear in Assist's user-message bubble even though Codex removes it
+before model processing. A [clean-transcript prototype](docs/CLEAN_SPEAKER_STT_PROTOTYPE.md)
+is under isolated development; it is not yet selectable or deployed.
+
 ### Multiple conversation assistants
 
 One Codex Assist config entry can provide several independently configurable

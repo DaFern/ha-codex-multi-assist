@@ -37,6 +37,12 @@ acoustic rejection is unchanged.
 
 ## Conversation history
 
+**Visible transcript limitation:** the current stock Wyoming path displays the
+encrypted header in Assist's user-message bubble. Codex removes it after HA's STT
+event has already been sent to the frontend. See the unregistered, experimental
+[clean STT adapter prototype](CLEAN_SPEAKER_STT_PROTOTYPE.md); it is not a setting
+that can be enabled on the existing endpoint yet.
+
 When paired, context is bounded to the current speaker/revision and agent within
 the provided HA conversation. Speaker/agent changes, changed preferences/ownership,
 uncertainty, idle expiry or restart reset the scope. An earlier speaker returning

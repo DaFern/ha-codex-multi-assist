@@ -11,3 +11,7 @@ PyTurboJPEG==1.8.3
 
 # Converter used by this Home Assistant version.
 voluptuous-openapi==0.4.1
+
+# Pure-Python TTS imports used by native STT-to-intent pipeline contracts.
+mutagen==1.48.1
+ha-ffmpeg==3.2.2

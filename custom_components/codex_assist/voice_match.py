@@ -12,6 +12,7 @@ from collections import OrderedDict
 from copy import copy
 from dataclasses import dataclass, is_dataclass, replace
 
+from .speaker_handoff import RequestHandoffs
 from .speaker_packet import TTL, WIRE_PREFIX, PacketError, decode
 
 CONF_VOICE_MATCH_KEY = "voice_match_pairing_key"
@@ -43,6 +44,7 @@ class SpeakerRuntime:
         self.seen = OrderedDict()
         self.scopes = OrderedDict()
         self.managed = False
+        self.handoffs = RequestHandoffs()
 
     def invalidate(self, conversation_id):
         self.scopes.pop(conversation_id, None)
@@ -51,7 +53,8 @@ class SpeakerRuntime:
         request = self.prepare_request(key, text, contents, conversation_id, agent_id, now=now)
         return request.text, request.instructions, request.boundary, request.scope
 
-    def prepare_request(self, key, text, contents, conversation_id, agent_id, *, now=None):
+    def prepare_request(self, key, text, contents, conversation_id, agent_id, *, now=None,
+                        packet_text=None):
         if not isinstance(text, str) or not isinstance(key, str):
             raise PacketError()
         if key:
@@ -63,8 +66,11 @@ class SpeakerRuntime:
         clean = text
         verified = False
         voice = None
-        if text.startswith(WIRE_PREFIX):
-            clean, packet, issued = decode(key, text, now=now)
+        transport = text if packet_text is None else packet_text
+        if transport.startswith(WIRE_PREFIX):
+            clean, packet, issued = decode(key, transport, now=now)
+            if packet_text is not None and clean != text:
+                raise PacketError()
             for nonce, expiry in list(self.seen.items()):
                 if expiry < now:
                     del self.seen[nonce]

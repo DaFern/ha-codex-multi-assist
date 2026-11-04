@@ -1,5 +1,29 @@
 # Testing
 
+## Clean STT request handoff (unregistered prototype)
+
+See [CLEAN_SPEAKER_STT_PROTOTYPE.md](CLEAN_SPEAKER_STT_PROTOTYPE.md). New tests
+first failed collection because the handoff module did not exist. The final local
+fast suite passed **699 tests**. Full real-HA contracts passed **244 tests** each
+on **2026.6.0** and **2026.10.0**; Ruff passed. Intermediate HA lanes and CI for
+this prototype remain pending. No production deployment/restart was performed.
+
+`tests/test_speaker_handoff.py` covers exact-object/task/entry/key binding, one-shot
+consumption, identical transcripts, JSON/copy boundaries, forgery, expiry, capacity
+and cancellation cleanup. `tests_ha/test_clean_speaker_stt.py` runs native HA
+STT-to-intent pipelines and real speaker conditions. It verifies clean frontend
+event/JSON text with intact model preferences, simultaneous identical commands,
+invalid/replayed/uncertain/empty results, cancellation before a model turn,
+STT-only cleanup, unchanged audio properties, disabled/changed pairing and native
+sentence overrides that do not inherit speaker identity.
+
+External STT/model outputs are synthetic and unused DSP imports are guarded
+test doubles (constructing a processor fails the test). VAD/enhancement is off;
+local processor installation was blocked by the absent C++ compiler. TTS native
+imports use each HA version's declared pure-Python dependencies, but pipelines
+stop at intent. These results do not establish microphone/recognition/Piper
+performance, native frontend rendering or a supported HA metadata API.
+
 ## Speaker-aware automation conditions (development)
 
 `tests/test_speaker_automation.py` covers per-request immutable identity capture,
