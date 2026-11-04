@@ -5,6 +5,7 @@ personalisation hint, not a login. No historical conversation is fetched by voic
 """
 
 import hashlib
+import logging
 import secrets
 import time
 import weakref
@@ -13,10 +14,11 @@ from copy import copy
 from dataclasses import dataclass, is_dataclass, replace
 
 from .speaker_handoff import RequestHandoffs
-from .speaker_packet import TTL, WIRE_PREFIX, PacketError, decode
+from .speaker_packet import TTL, WIRE_PREFIX, PacketError, decode, diagnostic_tag
 
 CONF_VOICE_MATCH_KEY = "voice_match_pairing_key"
 _RUNTIMES = weakref.WeakKeyDictionary()
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,7 @@ class PreparedRequest:
     scope: str | None
     verified: bool = False
     voice: str | None = None
+    diagnostic_tag: str | None = None
 
 
 def replace_text(value, text):
@@ -66,11 +69,13 @@ class SpeakerRuntime:
         clean = text
         verified = False
         voice = None
+        tag = None
         transport = text if packet_text is None else packet_text
         if transport.startswith(WIRE_PREFIX):
             clean, packet, issued = decode(key, transport, now=now)
             if packet_text is not None and clean != text:
                 raise PacketError()
+            tag = diagnostic_tag(transport)
             for nonce, expiry in list(self.seen.items()):
                 if expiry < now:
                     del self.seen[nonce]
@@ -115,7 +120,7 @@ class SpeakerRuntime:
         while len(self.scopes) > 256:
             self.scopes.popitem(last=False)
         return PreparedRequest(clean, instructions, previous["boundary"], previous["scope"],
-                               verified, voice)
+                               verified, voice, tag)
 
 
 def runtime_for_entry(entry):
@@ -152,7 +157,12 @@ def scoped_contents(contents, boundary, request_turn=None):
     return selected
 
 
-def personal_instructions(base, personal):
+def personal_instructions(base, personal, *, request_tag=None):
+    if request_tag:
+        LOGGER.info(
+            "Voice Match prompt: request=%s stage=prompt_prepared instructions_applied=%s",
+            request_tag, bool(personal),
+        )
     if not personal:
         return base
     return (base + "\n\nPersonal response preferences (not authentication or permission):\n"

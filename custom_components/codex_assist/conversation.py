@@ -134,9 +134,10 @@ class CodexAssistConversationEntity(
         speaker_scope = None
         preferences = ""
         key = getattr(self.entry, "options", {}).get(CONF_VOICE_MATCH_KEY, "")
+        packet_text = None
+        input_text = getattr(user_input, "text", "")
         try:
             runtime = runtime_for_entry(self.entry)
-            input_text = getattr(user_input, "text", "")
             packet_text = runtime.handoffs.consume(key, input_text)
             prepared_request = runtime.prepare_request(
                 key, input_text, chat_log.content,
@@ -147,6 +148,13 @@ class CodexAssistConversationEntity(
             preferences = prepared_request.instructions
             boundary = prepared_request.boundary
             speaker_scope = prepared_request.scope
+            if prepared_request.verified:
+                LOGGER.info(
+                    "Voice Match receive: request=%s result=%s instructions_present=%s",
+                    prepared_request.diagnostic_tag,
+                    "recognised" if prepared_request.voice is not None else "neutral",
+                    bool(preferences),
+                )
             if _clean != getattr(user_input, "text", ""):
                 if is_dataclass(user_input):
                     user_input = replace(user_input, text=_clean)
@@ -159,6 +167,12 @@ class CodexAssistConversationEntity(
                     if getattr(item, "role", None) == "user"
                 )
         except PacketError:
+            from .speaker_packet import diagnostic_tag
+
+            LOGGER.info(
+                "Voice Match receive: request=%s result=rejected instructions_present=False",
+                diagnostic_tag(packet_text or input_text) or "unavailable",
+            )
             runtime_for_entry(self.entry).invalidate(user_input.conversation_id)
             chat_log.async_add_assistant_content_without_tools(conversation.AssistantContent(
                 agent_id=user_input.agent_id,
@@ -242,7 +256,7 @@ class CodexAssistConversationEntity(
                         model=model,
                         instructions=personal_instructions(_instructions_for_turn(
                             chat_log, prompt, web_search=web_search
-                        ), preferences),
+                        ), preferences, request_tag=prepared_request.diagnostic_tag),
                         input_items=await _codex_input_from_chat_log(
                             self.hass, chat_log, user_input.agent_id, boundary, request_turn
                         ),
@@ -289,7 +303,7 @@ class CodexAssistConversationEntity(
                             model=model,
                             instructions=personal_instructions(_instructions_for_turn(
                                 chat_log, prompt, web_search=web_search
-                            ), preferences),
+                            ), preferences, request_tag=prepared_request.diagnostic_tag),
                             input_items=await _codex_input_from_chat_log(
                                 self.hass, chat_log, user_input.agent_id, boundary, request_turn
                             ),

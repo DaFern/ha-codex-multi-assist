@@ -91,6 +91,11 @@ so it can appear in Assist's user-message bubble even though Codex removes it
 before model processing. A [clean-transcript prototype](docs/CLEAN_SPEAKER_STT_PROTOTYPE.md)
 is under isolated development; it is not yet selectable or deployed.
 
+Development [request diagnostics](docs/VOICE_MATCH.md#minimal-request-diagnostics-development)
+can distinguish neutral matches, missing preferences and local prompt application
+without logging names, keys, transcripts or instruction text. Deployment and any
+targeted logging-level changes require separate approval.
+
 ### Multiple conversation assistants
 
 One Codex Assist config entry can provide several independently configurable

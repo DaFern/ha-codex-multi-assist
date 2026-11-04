@@ -54,6 +54,13 @@ starts fresh. Missing or forged metadata never selects another person's prompt.
 Pairing keys are redacted from integration diagnostics. This is response
 personalisation, not authentication, confidentiality or authorisation by voice.
 
+Development diagnostics correlate the sender, receiver and prompt composition by
+a short hash of the random encrypted header. They report fixed outcomes/reasons,
+numeric match metrics and instruction presence/application flags, never names,
+profile IDs, keys, tokens, transcript or prompt text. A `prompt_prepared` record
+does not establish provider receipt or model compliance. No runtime logging level
+is changed; see [VOICE_MATCH.md](VOICE_MATCH.md#minimal-request-diagnostics-development).
+
 ### Optional speaker-aware automation dispatch (development)
 
 See [SPEAKER_AUTOMATIONS.md](SPEAKER_AUTOMATIONS.md). Verified request preparation

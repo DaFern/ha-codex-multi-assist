@@ -6,6 +6,7 @@ External STT and model replies are synthetic; no microphone/TTS accuracy claim.
 
 import asyncio
 import json
+import logging
 import sys
 from dataclasses import asdict
 from types import ModuleType, SimpleNamespace
@@ -124,7 +125,10 @@ def event_data(events, name):
     return next(event.data for event in events if event.type == name)
 
 
-async def test_pipeline_frontend_text_is_clean_and_preferences_still_arrive(prototype):
+async def test_pipeline_frontend_text_is_clean_and_preferences_still_arrive(prototype, caplog):
+    from custom_components.codex_assist.speaker_packet import diagnostic_tag
+
+    caplog.set_level(logging.INFO, logger="custom_components.codex_assist")
     p = prototype
     p.responses[1] = packet(p.key)
     events = await p.run(1)
@@ -139,6 +143,15 @@ async def test_pipeline_frontend_text_is_clean_and_preferences_still_arrive(prot
     assert "Private style preference" in p.calls[-1]["instructions"]
     assert [item["content"] for item in p.calls[-1]["input_items"]] == ["hello"]
     assert not runtime_for_entry(p.entry).handoffs.pending
+    tag = diagnostic_tag(p.responses[1])
+    messages = [record.getMessage() for record in caplog.records
+                if record.getMessage().startswith("Voice Match")]
+    assert any(f"receive: request={tag} result=recognised instructions_present=True"
+               in message for message in messages)
+    assert any(f"prompt: request={tag} stage=prompt_prepared instructions_applied=True"
+               in message for message in messages)
+    for private in (p.key, p.responses[1], "hello", "alice", "Private style preference"):
+        assert private not in "\n".join(messages)
 
 
 async def test_identical_parallel_phrases_select_the_right_native_condition(hass, prototype):

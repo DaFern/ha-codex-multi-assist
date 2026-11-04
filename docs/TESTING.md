@@ -1,5 +1,24 @@
 # Testing
 
+## Minimal Voice Match request diagnostics (development)
+
+The local fast suite passed **701 tests**. Full real-HA contracts passed **244
+tests each** on **2026.6.0** and **2026.10.0**; Ruff passed. The paired add-on
+passed **65 tests**, with **4 upstream-engine/container tests skipped** outside
+the image. CI, new image builds and live request evidence remain pending.
+
+Regression tests initially failed because the diagnostic tag did not exist and
+the sender emitted no decision logs. New assertions cover matched/neutral/rejected
+receipt, local prompt composition (including the unregistered clean-STT path),
+identical sender/receiver tags, malformed Unicode/oversize inputs, and exclusion
+of keys, tokens, voice/account names/IDs, revisions, transcript and prompt text.
+Sender tests also retain packet-selection assertions for every fallback reason.
+Both shared codec copies remain identical; the packet format is unchanged.
+
+These diagnostics only show local selection, verification and composition; they
+cannot establish provider delivery or compliance. No live logging levels, audio
+thresholds, preferences or ownership were changed. Neither checkout was deployed.
+
 ## Clean STT request handoff (unregistered prototype)
 
 See [CLEAN_SPEAKER_STT_PROTOTYPE.md](CLEAN_SPEAKER_STT_PROTOTYPE.md). New tests

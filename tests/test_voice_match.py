@@ -133,6 +133,41 @@ def test_personal_instructions_are_literal_and_do_not_replace_base():
     assert "not authentication or permission" in result
 
 
+def test_diagnostic_tag_contains_no_text_and_survives_valid_packet_transport():
+    from custom_components.codex_assist.speaker_packet import diagnostic_tag
+
+    key = Fernet.generate_key().decode()
+    wire = packet(key)
+    tag = diagnostic_tag(wire)
+    assert len(tag) == 16 and all(char in "0123456789abcdef" for char in tag)
+    runtime = SpeakerRuntime()
+    request = runtime.prepare_request(key, wire, [user(wire)], "chat", "agent", now=1000)
+    assert request.diagnostic_tag == tag
+    clean_request = SpeakerRuntime().prepare_request(
+        key, "hello", [user("hello")], "chat", "agent", now=1000, packet_text=wire,
+    )
+    assert clean_request.diagnostic_tag == tag
+    assert diagnostic_tag("private spoken plain text") is None
+    assert diagnostic_tag("[[voice-match:v1:bad") is None
+    assert diagnostic_tag("[[voice-match:v1:\ud800]]\nhello") is None
+    assert diagnostic_tag("[[voice-match:v1:" + "x" * 40000 + "]]\nhello") is None
+
+
+def test_prompt_diagnostics_log_only_tag_and_application_flag(caplog):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="custom_components.codex_assist.voice_match")
+    result = personal_instructions("Private base prompt", "Private personal preference",
+                                   request_tag="a" * 16)
+    assert "Private personal preference" in result
+    result = personal_instructions("Private base prompt", "", request_tag="b" * 16)
+    assert result == "Private base prompt"
+    output = "\n".join(record.getMessage() for record in caplog.records)
+    assert "request=" + "a" * 16 in output and "instructions_applied=True" in output
+    assert "request=" + "b" * 16 in output and "instructions_applied=False" in output
+    assert "Private base prompt" not in output and "Private personal preference" not in output
+
+
 def test_live_replay_cache_never_evicts_records_to_accept_more_requests():
     runtime = SpeakerRuntime()
     runtime.seen.update({str(index): 2000 for index in range(4096)})

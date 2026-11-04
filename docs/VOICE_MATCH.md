@@ -72,6 +72,28 @@ after restart with fresh history. Payloads expire after 120 seconds (with Fernet
 clock-skew allowance). No guarantee of redaction across all HA/debug/provider logs
 is made, and possession of a pairing key permits metadata creation/decryption.
 
+## Minimal request diagnostics (development)
+
+The add-on's sender decision, this receiver and prompt composition now have
+correlatable INFO diagnostics in the development code. See
+[the sender's diagnostic guide](https://github.com/DaFern/wyoming-voice-match-ha/blob/main/docs/PERSONALIZATION.md#request-diagnostics-development-not-deployed)
+after both reviewed changes are pushed. A short hash of ciphertext correlates a
+single request without logging its key, token, transcript, name/profile ID,
+personal instructions or base prompt. Normal log timing/outcome privacy still
+applies; tags are not authentication or a last-speaker API.
+
+`receive` reports recognised/neutral/rejected and `instructions_present`.
+`prompt_prepared` reports `instructions_applied` for each composition attempt;
+it does not prove provider delivery or model compliance. The unregistered clean
+STT prototype uses the same tag as its original encrypted packet. Plain/unpaired
+requests do not inherit an older tag or produce a recognised-person diagnostic.
+
+Allow INFO only for `custom_components.codex_assist.conversation` and
+`custom_components.codex_assist.voice_match` when diagnosing, with separate
+approval for runtime logging changes. The implementation changes no live logging
+levels. New deployment and a fresh utterance are required; prior requests have no
+retained diagnostic snapshots. No pairing rotation or protocol change is needed.
+
 ## Deployment and rollback
 
 The development-only [speaker automation extension](SPEAKER_AUTOMATIONS.md) adds

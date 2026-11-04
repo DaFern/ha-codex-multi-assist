@@ -16,6 +16,25 @@ MAX_TOKEN = 16384
 MAX_TEXT = 16384
 
 
+def diagnostic_tag(wire):
+    """Correlate a request using ciphertext only; never log the token or words.
+
+    A tag is not proof of validation or speaker identity. Encryption randomness
+    makes it request-specific rather than a persistent person identifier.
+    """
+    if (not isinstance(wire, str) or not wire.startswith(PREFIX)
+            or len(wire) > MAX_TOKEN + MAX_TEXT + 64):
+        return None
+    header, separator, _command = wire.partition("]]\n")
+    if not separator or not len(PREFIX) < len(header) <= len(PREFIX) + MAX_TOKEN:
+        return None
+    try:
+        encoded = header.encode("ascii")
+    except UnicodeError:
+        return None
+    return hashlib.sha256(encoded).hexdigest()[:16]
+
+
 class PacketError(ValueError):
     def __init__(self):
         super().__init__("Voice Match pairing or request verification failed")
