@@ -155,6 +155,7 @@ def install_homeassistant_fakes(monkeypatch):
     @dataclass
     class TextSelectorConfig:
         multiline: bool = False
+        type: str = "text"
 
     @dataclass
     class TextSelector:

@@ -37,6 +37,25 @@ flowchart LR
 
 ## Assist conversation flow
 
+### Optional Voice Match request context
+
+See [VOICE_MATCH.md](VOICE_MATCH.md). An opt-in separate STT endpoint emits a
+Fernet-encrypted context header bound to the utterance. The conversation owner
+verifies expiry, nonce replay and exact current-turn association synchronously,
+strips the header, and retains the original HA caller/permissions. Preferences
+are appended literally after native base-prompt rendering on every model/tool
+round; they are never executed as Jinja or applied to AI Task.
+
+The bounded entry-scoped in-memory speaker runtime retains only current-scope
+boundaries, not a private-history database. Model input is filtered by boundary
+and agent, excluding later concurrent user turns; provider session/cache IDs vary
+with scope. Switching speaker/agent/revision, uncertainty, expiry or loss of state
+starts fresh. Missing or forged metadata never selects another person's prompt.
+Pairing keys are redacted from integration diagnostics. This is response
+personalisation, not authentication, confidentiality or authorisation by voice.
+
+### Standard request path
+
 1. Home Assistant sends a voice or chat request through an Assist pipeline using `conversation.codex_assist`.
 2. Codex Assist refreshes its stored Codex or ChatGPT token if needed.
 3. Codex Assist sends the conversation to the Codex-compatible backend.
@@ -223,6 +242,10 @@ as JSON in `function_call_output`, not the Home Assistant wrapper. Both paths
 use Home Assistant's serializer for values such as states and timestamps.
 
 ## Prompt caching and usage
+
+With the optional Voice Match connector enabled, active conversation scope salts
+the provider session/cache ID as described above. Scope changes may reduce cache
+hits; no live cost/cache benchmark is claimed for that experimental path.
 
 Like Codex CLI, every Responses request carries a `session_id` header and a
 matching `prompt_cache_key`. The value is a UUID derived from the config entry

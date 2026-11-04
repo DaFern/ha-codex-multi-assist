@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
+from copy import copy
+from dataclasses import is_dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +19,7 @@ from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.json import json_dumps
 
 from . import DOMAIN
+from .agent_profiles import PRIMARY_AGENT_ID, AgentProfile, get_agent_profiles
 from .codex_auth import (
     CodexAuthClient,
     CodexAuthTemporaryError,
@@ -36,8 +39,15 @@ from .codex_client import (
 )
 from .codex_protocol import CodexNativeState, native_state_from_response_items
 from .codex_runtime import runtime_token_coordinator
-from .agent_profiles import AgentProfile, PRIMARY_AGENT_ID, get_agent_profiles
 from .schema_compat import to_openapi
+from .speaker_packet import WIRE_PREFIX
+from .voice_match import (
+    CONF_VOICE_MATCH_KEY,
+    PacketError,
+    personal_instructions,
+    runtime_for_entry,
+    scoped_contents,
+)
 
 MAX_TOOL_ITERATIONS = 5
 MAX_IMAGE_ATTACHMENT_BYTES = 10 * 1024 * 1024
@@ -119,6 +129,34 @@ class CodexAssistConversationEntity(
         web_search = self.profile.web_search
 
         response = intent.IntentResponse(language=user_input.language)
+        boundary = None
+        request_turn = None
+        speaker_scope = None
+        preferences = ""
+        key = getattr(self.entry, "options", {}).get(CONF_VOICE_MATCH_KEY, "")
+        try:
+            _clean, preferences, boundary, speaker_scope = runtime_for_entry(self.entry).prepare(
+                key, getattr(user_input, "text", ""), chat_log.content,
+                user_input.conversation_id, user_input.agent_id,
+            )
+            if _clean != getattr(user_input, "text", ""):
+                if is_dataclass(user_input):
+                    user_input = replace(user_input, text=_clean)
+                else:
+                    user_input = copy(user_input)
+                    user_input.text = _clean
+            if boundary is not None:
+                request_turn = next(
+                    item for item in reversed(chat_log.content)
+                    if getattr(item, "role", None) == "user"
+                )
+        except PacketError:
+            runtime_for_entry(self.entry).invalidate(user_input.conversation_id)
+            chat_log.async_add_assistant_content_without_tools(conversation.AssistantContent(
+                agent_id=user_input.agent_id,
+                content="Voice Match pairing needs attention. Please check its settings.",
+            ))
+            return conversation.async_get_result_from_chat_log(user_input, chat_log)
         try:
             await chat_log.async_provide_llm_data(
                 user_input.as_llm_context(DOMAIN),
@@ -158,7 +196,9 @@ class CodexAssistConversationEntity(
         codex = CodexClient(
             http_client=http_client,
             access_token=tokens.access_token,
-            session_id=_codex_session_id_for_profile(self.entry.entry_id, self.profile),
+            session_id=_codex_session_id_for_profile(
+                self.entry.entry_id, self.profile, speaker_scope
+            ),
         )
         try:
             for _iteration in range(MAX_TOOL_ITERATIONS + 1):
@@ -169,11 +209,11 @@ class CodexAssistConversationEntity(
                         codex=codex,
                         entity_id=self.entity_id or "",
                         model=model,
-                        instructions=_instructions_for_turn(
+                        instructions=personal_instructions(_instructions_for_turn(
                             chat_log, prompt, web_search=web_search
-                        ),
+                        ), preferences),
                         input_items=await _codex_input_from_chat_log(
-                            self.hass, chat_log, user_input.agent_id
+                            self.hass, chat_log, user_input.agent_id, boundary, request_turn
                         ),
                         tools=(
                             _codex_tools_from_chat_log(chat_log, enable_web_search=web_search)
@@ -216,11 +256,11 @@ class CodexAssistConversationEntity(
                             codex=codex,
                             entity_id=self.entity_id or "",
                             model=model,
-                            instructions=_instructions_for_turn(
+                            instructions=personal_instructions(_instructions_for_turn(
                                 chat_log, prompt, web_search=web_search
-                            ),
+                            ), preferences),
                             input_items=await _codex_input_from_chat_log(
-                                self.hass, chat_log, user_input.agent_id
+                                self.hass, chat_log, user_input.agent_id, boundary, request_turn
                             ),
                             tools=(
                                 _codex_tools_from_chat_log(chat_log, enable_web_search=web_search)
@@ -476,13 +516,16 @@ async def _codex_input_from_chat_log(
     hass: HomeAssistant,
     chat_log: conversation.ChatLog,
     active_agent_id: str | None = None,
+    history_boundary: Any = None,
+    request_turn: Any = None,
 ) -> list[dict[str, Any]]:
     input_items: list[dict[str, Any]] = []
     attachments_by_item: dict[int, Any] = {}
+    available = scoped_contents(chat_log.content, history_boundary, request_turn)
     contents = (
-        _chat_log_contents_for_agent(chat_log.content, active_agent_id)
+        _chat_log_contents_for_agent(available, active_agent_id)
         if active_agent_id is not None
-        else chat_log.content
+        else available
     )
     for content in contents:
         role = getattr(content, "role", None)
@@ -562,6 +605,10 @@ def _chat_log_contents_for_agent(contents: list[Any], agent_id: str) -> list[Any
 
     selected: list[Any] = []
     for index, (turn_agent_id, turn_contents) in enumerate(turns):
+        if str(getattr(turn_contents[0], "content", "")).startswith(WIRE_PREFIX):
+            # Rejected/unsupported packets can remain in HA logs, but may not
+            # leak into a later model turn after pairing is changed/disabled.
+            continue
         is_current_unanswered_turn = (
             index == len(turns) - 1
             and turn_agent_id is None
@@ -572,8 +619,12 @@ def _chat_log_contents_for_agent(contents: list[Any], agent_id: str) -> list[Any
     return selected
 
 
-def _codex_session_id_for_profile(entry_id: str, profile: AgentProfile) -> str:
+def _codex_session_id_for_profile(
+    entry_id: str, profile: AgentProfile, speaker_scope: str | None = None
+) -> str:
     """Keep the legacy session for the primary agent; isolate added personalities."""
+    if speaker_scope is not None:
+        return codex_session_id(f"{entry_id}:{profile.agent_id}:{speaker_scope}")
     if profile.agent_id == PRIMARY_AGENT_ID:
         return codex_session_id(entry_id)
     return codex_session_id(f"{entry_id}:{profile.agent_id}")

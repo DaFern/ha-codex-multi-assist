@@ -229,6 +229,7 @@ async def test_ai_task_uses_shared_prompt_without_overriding_agent_profiles(
 
     entry = Entry()
     entity = ai_task_module.CodexAssistAITaskEntity(entry)
+    entity.entity_id = "ai_task.codex_assist_ai_task"
     entity.hass = type(
         "Hass",
         (),

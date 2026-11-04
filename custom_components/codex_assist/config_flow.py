@@ -11,6 +11,11 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.httpx_client import get_async_client
 
 from . import DOMAIN
+from .agent_profiles import (
+    CONF_AGENTS,
+    AgentProfile,
+    get_agent_profiles,
+)
 from .codex_auth import (
     CODEX_DEVICE_VERIFICATION_URL,
     CodexAuthClient,
@@ -24,12 +29,9 @@ from .codex_image import (
 )
 from .codex_models import ModelCatalog, ModelDiscoveryCache, fetch_codex_model_ids
 from .codex_runtime import runtime_token_coordinator
-from .agent_profiles import (
-    CONF_AGENTS,
-    AgentProfile,
-    get_agent_profiles,
-)
 from .model_discovery import async_entry_model_catalog
+from .speaker_packet import valid_key
+from .voice_match import CONF_VOICE_MATCH_KEY
 
 CONF_ACCESS_TOKEN = "access_token"
 CONF_PROMPT = "prompt"
@@ -236,7 +238,32 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         return self.async_show_menu(
             step_id="init",
-            menu_options=["settings", "agents"],
+            menu_options=["settings", "agents", "voice_match"],
+        )
+
+    async def async_step_voice_match(self, user_input=None):
+        saved = self.config_entry.options.get(CONF_VOICE_MATCH_KEY, "")
+        errors = {}
+        if user_input is not None:
+            options = dict(self.config_entry.options)
+            if not user_input.get("enabled"):
+                options.pop(CONF_VOICE_MATCH_KEY, None)
+                return self.async_create_entry(title="", data=options)
+            key = user_input.get(CONF_VOICE_MATCH_KEY, "").strip() or saved
+            if valid_key(key):
+                options[CONF_VOICE_MATCH_KEY] = key
+                return self.async_create_entry(title="", data=options)
+            errors["base"] = "invalid_voice_match_pairing_key"
+        return self.async_show_form(
+            step_id="voice_match",
+            data_schema=vol.Schema({
+                vol.Required("enabled", default=bool(saved)): bool,
+                # Deliberately no saved/default key in the form payload.
+                vol.Optional(CONF_VOICE_MATCH_KEY): selector.TextSelector(
+                    selector.TextSelectorConfig(type="password")
+                ),
+            }),
+            errors=errors,
         )
 
     async def async_step_settings(self, user_input=None):

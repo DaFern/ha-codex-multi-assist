@@ -44,7 +44,16 @@
         "title": "Codex Assist options",
         "menu_options": {
           "settings": "Shared AI Task defaults",
-          "agents": "Manage conversation assistants"
+          "agents": "Manage conversation assistants",
+          "voice_match": "Voice Match personal preferences"
+        }
+      },
+      "voice_match": {
+        "title": "Voice Match personal preferences",
+        "description": "Optional pairing with Wyoming Voice Match. Create a key in its administrator page, paste it here, then use its personalised STT endpoint only with this integration. Leave the key blank to keep an existing pairing. Disabling removes this pairing. A matched voice changes response preferences, never Home Assistant permissions. Do not use shared speakers for confidential conversations.",
+        "data": {
+          "enabled": "Enable personal preferences",
+          "voice_match_pairing_key": "Pairing key"
         }
       },
       "settings": {
@@ -143,7 +152,8 @@
       "agent_name_too_long": "Keep the assistant name to 48 characters or fewer.",
       "invalid_agent_prompt": "Enter personality instructions for this assistant.",
       "duplicate_agent_name": "Each assistant must have a different name.",
-      "last_agent": "Keep at least one conversation assistant."
+      "last_agent": "Keep at least one conversation assistant.",
+      "invalid_voice_match_pairing_key": "Paste a valid pairing key from the Voice Match administrator page."
     }
   }
 }

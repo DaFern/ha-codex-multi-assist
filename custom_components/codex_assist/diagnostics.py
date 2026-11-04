@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 REDACTED = "**REDACTED**"
-TO_REDACT = {"access_token", "refresh_token", "prompt"}
+TO_REDACT = {"access_token", "refresh_token", "prompt", "voice_match_pairing_key"}
 
 
 async def async_get_config_entry_diagnostics(

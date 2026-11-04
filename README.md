@@ -73,6 +73,14 @@ If something fails, start with [Troubleshooting](https://github.com/itsreverence
 
 **Assist conversations.** Codex Assist registers as a normal Assist conversation agent and streams replies. It reads and controls only the entities you expose to Assist, through Home Assistant's own Assist LLM API.
 
+### Optional personal response preferences
+
+The experimental Voice Match connector can add a recognised person's response
+preferences to the selected agent without changing its personality or HA
+permissions. It is off by default and requires paired add-on/integration updates.
+See [setup, privacy boundaries and rollback](docs/VOICE_MATCH.md). It does not
+authenticate speakers or retrieve private conversations by recognised identity.
+
 ### Multiple conversation assistants
 
 One Codex Assist config entry can provide several independently configurable

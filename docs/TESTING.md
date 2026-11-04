@@ -1,5 +1,32 @@
 # Testing
 
+## Experimental Voice Match preferences (0.7.0)
+
+New fast tests cover authenticated/encrypted packet parsing, replay/expiry/body
+tampering, per-speaker/agent/conversation scope, neutral resets, later-concurrent-
+turn exclusion, diagnostic key redaction, literal preference composition and
+pairing options that preserve agent and AI Task settings. A fake-backed conversation
+test verifies clean text/model input and unchanged HA caller identity.
+
+Local Python 3.14 result: **688 passed**. An existing failure in
+`test_ai_task_uses_shared_prompt_without_overriding_agent_profiles` was reproduced
+in an isolated archive of unmodified HEAD: its fake entity lacked `entity_id`.
+After explicit user approval, one fixture assignment supplied that ID; production
+AI Task code was not changed. Ruff passes and the lockfile was refreshed. This is
+the fast/fake-backed suite, not a real-HA contract run or a production deployment.
+
+`tests_ha/test_voice_match.py` exercises real HA conversation/ChatLog types with
+synthetic paired packets and a stubbed external provider. It checks speaker
+switches, neutral fallback, literal non-rendered preferences and duplicate nonce
+rejection. It is written but **unrun** here; run all supported HA contract lanes
+before release. The existing auth model-check tests remain unchanged.
+
+The paired add-on has local tests but no new container/live end-to-end run yet.
+Real Ingress/role pairing, two people's voices, simultaneous devices, neutral
+confidence handling, model-response behaviour and rollback still require testing.
+Source/setup docs are in [VOICE_MATCH.md](VOICE_MATCH.md); external wiki publication
+is pending until the reviewed repository changes are committed and pushed.
+
 ## Automated checks
 
 ```bash

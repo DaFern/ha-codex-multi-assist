@@ -140,6 +140,16 @@ def test_agent_history_keeps_only_same_agent_turns_and_current_user_turn(
     assert all(item is not content[4] and item is not content[5] for item in selected)
 
 
+def test_rejected_wire_packets_never_enter_later_model_history(conversation_module):
+    contents = [
+        SimpleNamespace(role="user", content="[[voice-match:v2:bad]]\nrejected"),
+        SimpleNamespace(role="assistant", agent_id="agent", content="pairing error"),
+        SimpleNamespace(role="user", content="normal request"),
+    ]
+    selected = conversation_module._chat_log_contents_for_agent(contents, "agent")
+    assert [item.content for item in selected] == ["normal request"]
+
+
 def test_agent_profiles_keep_legacy_identity_and_isolate_codex_sessions(
     conversation_module,
 ):
@@ -285,3 +295,46 @@ async def test_handle_message_reports_friendly_usage_limit_without_status_code(
     )
     assert "status 429" not in chat_log.added[0].content
     assert "Codex request failed" not in chat_log.added[0].content
+
+
+@pytest.mark.asyncio
+async def test_paired_preferences_reach_only_this_turn_without_impersonating_user(
+    conversation_module, monkeypatch,
+):
+    from cryptography.fernet import Fernet
+
+    from custom_components.codex_assist.speaker_packet import encode
+
+    key = Fernet.generate_key().decode()
+    entry = FakeEntry()
+    entry.options = {"voice_match_pairing_key": key}
+    entity = conversation_module.CodexAssistConversationEntity(entry)
+    entity.hass = type("Hass", (), {"http_client": None, "config_entries": FakeConfigEntries()})()
+    entity.entity_id = "conversation.codex_assist"
+    user_input = FakeUserInput()
+    user_input.context = SimpleNamespace(user_id="actual-ha-caller")
+    user_input.text = encode(key, "hello", voice="alice", revision="a" * 32,
+                             instructions="Be brief. {{ states('private') }}")
+    chat_log = FakeHandleMessageChatLog()
+    chat_log.content = [SimpleNamespace(role="system", content="Rendered base personality"),
+                        SimpleNamespace(role="user", content="Old unrelated private turn"),
+                        SimpleNamespace(role="user", content=user_input.text)]
+    class Coordinator:
+        async def resolve(self, *args, **kwargs):
+            return CodexTokenSet("access-1", "refresh-1")
+    seen = {}
+    async def capture(**kwargs):
+        seen.update(kwargs)
+        return False
+    monkeypatch.setattr(
+        conversation_module, "runtime_token_coordinator", lambda entry: Coordinator()
+    )
+    monkeypatch.setattr(conversation_module, "_stream_codex_turn_into_chat_log", capture)
+    result = await entity._async_handle_message(user_input, chat_log)
+    assert seen["instructions"].startswith("Rendered base personality")
+    assert "Be brief. {{ states('private') }}" in seen["instructions"]
+    assert [item["content"] for item in seen["input_items"]] == ["hello"]
+    assert result[0].context is user_input.context
+    assert result[0].context.user_id == "actual-ha-caller"
+    assert result[0].text == "hello"
+    assert "Be brief" not in chat_log.provided_args[2]
