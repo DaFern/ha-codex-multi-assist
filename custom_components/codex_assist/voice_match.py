@@ -10,12 +10,24 @@ import time
 import weakref
 from collections import OrderedDict
 from copy import copy
-from dataclasses import is_dataclass, replace
+from dataclasses import dataclass, is_dataclass, replace
 
 from .speaker_packet import TTL, WIRE_PREFIX, PacketError, decode
 
 CONF_VOICE_MATCH_KEY = "voice_match_pairing_key"
 _RUNTIMES = weakref.WeakKeyDictionary()
+
+
+@dataclass(frozen=True)
+class PreparedRequest:
+    """Verified identity belongs to this turn, never the last speaker."""
+
+    text: str
+    instructions: str
+    boundary: object
+    scope: str | None
+    verified: bool = False
+    voice: str | None = None
 
 
 def replace_text(value, text):
@@ -36,6 +48,10 @@ class SpeakerRuntime:
         self.scopes.pop(conversation_id, None)
 
     def prepare(self, key, text, contents, conversation_id, agent_id, *, now=None):
+        request = self.prepare_request(key, text, contents, conversation_id, agent_id, now=now)
+        return request.text, request.instructions, request.boundary, request.scope
+
+    def prepare_request(self, key, text, contents, conversation_id, agent_id, *, now=None):
         if not isinstance(text, str) or not isinstance(key, str):
             raise PacketError()
         if key:
@@ -45,6 +61,8 @@ class SpeakerRuntime:
         identity = ("plain", hashlib.sha256(key.encode()).hexdigest(), agent_id)
         uncertain = False
         clean = text
+        verified = False
+        voice = None
         if text.startswith(WIRE_PREFIX):
             clean, packet, issued = decode(key, text, now=now)
             for nonce, expiry in list(self.seen.items()):
@@ -56,6 +74,8 @@ class SpeakerRuntime:
             # Store through the accepted time window; never evict a live replay
             # record merely to accept more traffic. Full cache fails closed.
             self.seen[nonce] = issued + TTL + 60
+            verified = True
+            voice = packet["voice"]
             instructions = packet["instructions"]
             uncertain = packet["voice"] is None
             identity = (
@@ -63,7 +83,7 @@ class SpeakerRuntime:
                 packet["revision"], agent_id,
             )
         if not key and not self.managed and not text.startswith(WIRE_PREFIX):
-            return clean, "", None, None
+            return PreparedRequest(clean, "", None, None)
         # The current user turn is the boundary after a switch/uncertain result.
         positions = [
             index for index, item in enumerate(contents)
@@ -88,7 +108,8 @@ class SpeakerRuntime:
         self.scopes.move_to_end(scope_key)
         while len(self.scopes) > 256:
             self.scopes.popitem(last=False)
-        return clean, instructions, previous["boundary"], previous["scope"]
+        return PreparedRequest(clean, instructions, previous["boundary"], previous["scope"],
+                               verified, voice)
 
 
 def runtime_for_entry(entry):

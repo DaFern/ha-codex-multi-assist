@@ -135,10 +135,14 @@ class CodexAssistConversationEntity(
         preferences = ""
         key = getattr(self.entry, "options", {}).get(CONF_VOICE_MATCH_KEY, "")
         try:
-            _clean, preferences, boundary, speaker_scope = runtime_for_entry(self.entry).prepare(
+            prepared_request = runtime_for_entry(self.entry).prepare_request(
                 key, getattr(user_input, "text", ""), chat_log.content,
                 user_input.conversation_id, user_input.agent_id,
             )
+            _clean = prepared_request.text
+            preferences = prepared_request.instructions
+            boundary = prepared_request.boundary
+            speaker_scope = prepared_request.scope
             if _clean != getattr(user_input, "text", ""):
                 if is_dataclass(user_input):
                     user_input = replace(user_input, text=_clean)
@@ -155,6 +159,29 @@ class CodexAssistConversationEntity(
             chat_log.async_add_assistant_content_without_tools(conversation.AssistantContent(
                 agent_id=user_input.agent_id,
                 content="Voice Match pairing needs attention. Please check its settings.",
+            ))
+            return conversation.async_get_result_from_chat_log(user_input, chat_log)
+
+        from .speaker_automation import DATA_SPEAKER_AUTOMATIONS, DispatchResult
+
+        try:
+            automation_result = DispatchResult()
+            if (prepared_request.verified
+                    and (bridge := self.hass.data.get(DATA_SPEAKER_AUTOMATIONS)) is not None):
+                automation_result = await bridge.dispatch(prepared_request, user_input)
+        except Exception:
+            # An action may already have run. Do not fall through to the model
+            # or replay it, and never expose automation exception payloads.
+            chat_log.async_add_assistant_content_without_tools(conversation.AssistantContent(
+                agent_id=user_input.agent_id,
+                content="Sorry, I couldn't complete that voice automation.",
+            ))
+            return conversation.async_get_result_from_chat_log(user_input, chat_log)
+        if automation_result.matched:
+            chat_log.async_add_assistant_content_without_tools(conversation.AssistantContent(
+                agent_id=user_input.agent_id,
+                content=(automation_result.response
+                         or "There isn't a configured response for that voice request."),
             ))
             return conversation.async_get_result_from_chat_log(user_input, chat_log)
         try:

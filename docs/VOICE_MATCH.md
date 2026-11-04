@@ -68,6 +68,11 @@ is made, and possession of a pairing key permits metadata creation/decryption.
 
 ## Deployment and rollback
 
+The development-only [speaker automation extension](SPEAKER_AUTOMATIONS.md) adds
+a Voice Match sentence trigger and a reusable Recognised speaker is condition.
+It needs separate review/deployment; personal instructions alone cannot supply
+an automation's speaker identity.
+
 This source change is not a live deployment. Updating integration Python requires
 an explicitly approved full Core restart; update/back up the add-on separately.
 Keep current personalities and AI Task defaults. Disable this connector and switch

@@ -81,6 +81,11 @@ permissions. It is off by default and requires paired add-on/integration updates
 See [setup, privacy boundaries and rollback](docs/VOICE_MATCH.md). It does not
 authenticate speakers or retrieve private conversations by recognised identity.
 
+The development-only [speaker automation extension](docs/SPEAKER_AUTOMATIONS.md)
+adds a **Voice Match sentence** trigger and **Recognised speaker is** condition.
+Reuse one voice profile across automations, without a shared last-speaker sensor.
+It requires separate reviewed deployment and must not authorise sensitive actions.
+
 ### Multiple conversation assistants
 
 One Codex Assist config entry can provide several independently configurable

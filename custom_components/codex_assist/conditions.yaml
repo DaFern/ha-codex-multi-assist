@@ -1,0 +1,6 @@
+speaker_is:
+  fields:
+    voice:
+      required: true
+      selector:
+        text:

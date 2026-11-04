@@ -38,6 +38,30 @@
       "no_models": "Your account returned no visible models. Try again later or restart setup with another account."
     }
   },
+  "conditions": {
+    "speaker_is": {
+      "name": "Recognised speaker is",
+      "description": "Check the voice profile on this Voice Match sentence trigger. Recognition is not authentication.",
+      "fields": {
+        "voice": {
+          "name": "Voice profile ID",
+          "description": "Use the same profile ID from Manage voices in every automation. Uncertain or unrelated triggers never match."
+        }
+      }
+    }
+  },
+  "triggers": {
+    "voice_sentence": {
+      "name": "Voice Match sentence",
+      "description": "A literal sentence received by a paired Codex agent through the personalised Voice Match endpoint.",
+      "fields": {
+        "sentence": {
+          "name": "Sentences",
+          "description": "Exact phrases, ignoring case, repeated whitespace and final sentence punctuation. No wildcards or templates."
+        }
+      }
+    }
+  },
   "options": {
     "step": {
       "init": {

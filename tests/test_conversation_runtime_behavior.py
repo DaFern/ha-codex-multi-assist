@@ -309,7 +309,9 @@ async def test_paired_preferences_reach_only_this_turn_without_impersonating_use
     entry = FakeEntry()
     entry.options = {"voice_match_pairing_key": key}
     entity = conversation_module.CodexAssistConversationEntity(entry)
-    entity.hass = type("Hass", (), {"http_client": None, "config_entries": FakeConfigEntries()})()
+    entity.hass = type("Hass", (), {
+        "http_client": None, "config_entries": FakeConfigEntries(), "data": {},
+    })()
     entity.entity_id = "conversation.codex_assist"
     user_input = FakeUserInput()
     user_input.context = SimpleNamespace(user_id="actual-ha-caller")

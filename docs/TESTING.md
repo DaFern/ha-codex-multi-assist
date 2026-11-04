@@ -1,5 +1,24 @@
 # Testing
 
+## Speaker-aware automation conditions (development)
+
+`tests/test_speaker_automation.py` covers per-request immutable identity capture,
+reusing one profile across phrases, neutral/plain/manual inputs, forged trace
+copies, mutable template fields, native Mapping variables, concurrent devices,
+capacity, cancellation, exceptions and unsubscribe. Regression collection first
+failed because the new speaker automation module did not exist.
+
+`tests_ha/test_speaker_automation.py` uses native HA automation/trigger/condition
+discovery, `choose`, caller context and conversation responses with only the model
+stubbed. It covers replay/forgery rejection, plain requests not borrowing the last
+speaker, simultaneous conversation requests, and no model replay after an action
+failure. No live automation, production integration, add-on or Core was changed.
+See [SPEAKER_AUTOMATIONS.md](SPEAKER_AUTOMATIONS.md) for operation and limits.
+
+Local full contracts on HA **2026.6.0** and **2026.10.0** each passed **237 tests**.
+Fast suite passed **694 tests**. This is not CI, editor/satellite acceptance,
+speaker-accuracy measurement, or deployment. Intermediate HA lanes still need CI.
+
 ## Experimental Voice Match preferences (0.7.0)
 
 New fast tests cover authenticated/encrypted packet parsing, replay/expiry/body

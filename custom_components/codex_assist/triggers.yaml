@@ -1,0 +1,7 @@
+voice_sentence:
+  fields:
+    sentence:
+      required: true
+      selector:
+        text:
+          multiple: true

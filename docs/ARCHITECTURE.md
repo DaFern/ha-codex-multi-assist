@@ -54,6 +54,20 @@ starts fresh. Missing or forged metadata never selects another person's prompt.
 Pairing keys are redacted from integration diagnostics. This is response
 personalisation, not authentication, confidentiality or authorisation by voice.
 
+### Optional speaker-aware automation dispatch (development)
+
+See [SPEAKER_AUTOMATIONS.md](SPEAKER_AUTOMATIONS.md). Verified request preparation
+also returns an immutable per-turn profile snapshot. Explicitly configured native
+`codex_assist.voice_sentence` triggers match literal sentences before model/tool
+processing. HA runs the automation with the original caller context and can return
+its conversation response directly. An exact-object, callback-lifetime registry
+backs `codex_assist.speaker_is`; no global speaker sensor, public event, model
+argument, user impersonation or direct service bridge is involved. Invalid packets
+never dispatch; neutral packets cannot match a person. Matching action failure
+does not fall through to the model or replay actions. Unmatched requests and AI
+Task retain their prior paths. This code is not a live deployment or permission
+to use acoustic identity as authorisation.
+
 ### Standard request path
 
 1. Home Assistant sends a voice or chat request through an Assist pipeline using `conversation.codex_assist`.
