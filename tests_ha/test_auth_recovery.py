@@ -247,6 +247,10 @@ async def test_options_retains_cached_models_when_refresh_transport_fails(hass, 
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
 
+    assert result["type"] is FlowResultType.MENU
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step_id": "settings"}
+    )
     assert result["type"] is FlowResultType.FORM
     status = result["description_placeholders"]["model_status"]
     assert "cached list may be outdated" in status

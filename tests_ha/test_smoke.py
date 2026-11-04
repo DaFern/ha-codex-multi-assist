@@ -499,8 +499,12 @@ async def test_options_flow_uses_real_home_assistant_contract(
     )
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.MENU
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step_id": "settings"}
+    )
     assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "init"
+    assert result["step_id"] == "settings"
     assert [key.schema for key in result["data_schema"].schema] == [
         SECTION_CHAT_SETTINGS,
         SECTION_ADVANCED_SETTINGS,
@@ -735,6 +739,10 @@ async def test_options_preserves_saved_model_when_account_list_changes(hass, mon
         "custom_components.codex_assist.config_flow.async_entry_model_catalog", catalog
     )
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.MENU
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input={"next_step_id": "settings"}
+    )
     section = next(
         v for k, v in result["data_schema"].schema.items() if k.schema == SECTION_CHAT_SETTINGS
     )
