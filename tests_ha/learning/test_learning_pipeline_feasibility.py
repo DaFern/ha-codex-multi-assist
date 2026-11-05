@@ -20,7 +20,8 @@ MARKER = "voice learning probe input"
 
 
 @pytest.fixture
-async def phone_probe(hass, hass_ws_client, monkeypatch):
+async def pipeline_components(hass, monkeypatch):
+    """Prepare real components/DSP boundaries without opening a test HTTP server."""
     class UnusedProcessor:
         def __init__(self, *args, **kwargs):
             raise AssertionError("Real DSP is outside this identity probe")
@@ -31,7 +32,6 @@ async def phone_probe(hass, hass_ws_client, monkeypatch):
         monkeypatch.setitem(sys.modules, name, module)
 
     from homeassistant.components.assist_pipeline import default_pipeline
-    from homeassistant.components.websocket_api.connection import current_connection
 
     class SyntheticEnhancer:
         def __init__(self, *args, **kwargs):
@@ -44,6 +44,15 @@ async def phone_probe(hass, hass_ws_client, monkeypatch):
     assert await async_setup_component(hass, "homeassistant", {})
     assert await async_setup_component(hass, "stt", {})
     assert await async_setup_component(hass, "assist_pipeline", {})
+    # Combined tests may add a Codex entry after the phone client opens. Register
+    # AI Task's media-source routes first, without creating any Codex entities.
+    assert await async_setup_component(hass, "ai_task", {})
+
+
+@pytest.fixture
+async def phone_probe(hass, hass_ws_client, pipeline_components):
+    from homeassistant.components.websocket_api.connection import current_connection
+
     pending, received = {}, []
     gate = {"expected": 0, "arrived": 0, "waiting": asyncio.Event(), "release": asyncio.Event()}
 

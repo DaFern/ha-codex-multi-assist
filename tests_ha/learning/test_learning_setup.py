@@ -20,7 +20,7 @@ from custom_components.codex_assist.codex_runtime import runtime_token_coordinat
 from custom_components.codex_assist.learning.learning_bridge_protocol import BridgeError
 
 phone = phone_fixtures.phone
-phone_probe = phone_fixtures.phone_probe
+pipeline_components = phone_fixtures.pipeline_components
 speech = phone_fixtures.speech
 
 

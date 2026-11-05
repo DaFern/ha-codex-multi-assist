@@ -2,6 +2,7 @@
 
 import ast
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -29,3 +30,12 @@ def test_wire_codec_is_identical_to_paired_addon_release():
     assert hashlib.sha256((ROOT / "learning_bridge_protocol.py").read_bytes()).hexdigest() == (
         "0c893356c519c83a7a0fb341cf4ecc7e572afc45d620530b28d2e6a0faf7bd4b"
     )
+
+
+def test_native_learning_dependencies_remain_optional_and_declared():
+    manifest = json.loads((ROOT.parent / "manifest.json").read_text())
+    assert {
+        "assist_pipeline", "http", "frontend", "panel_custom", "stt", "websocket_api"
+    } <= set(manifest["after_dependencies"])
+    # Fixing import declarations must not require voice/frontend setup for Codex.
+    assert not manifest.get("dependencies")

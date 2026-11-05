@@ -42,8 +42,38 @@ Local phase 2 results: 727 fast tests plus 20 subtests passed; HA 2026.10 passed
 252 contracts and skipped the 90 newer-only learning cases. All 53 cross-repository
 encrypted bridge/controller tests passed without dependency skips. The Node
 launcher boundary fixture and Ruff passed; the fast mutation checks caught all
-ten recorded token/tool mutations. Phase 2 remote CI and real-phone acceptance
-remain pending.
+ten recorded token/tool mutations. These were local results at publication;
+remote CI subsequently failed as described below. Real-phone acceptance remains
+pending.
+
+### Phase 2 CI follow-up
+
+Remote run `42085676218` at `2466814` failed Hassfest because `assist_pipeline`
+and `http` were missing from optional dependency declarations. It also failed
+four native HA 2026.10 tests even though the initial local native suite passed.
+
+The HTTP difference was reproduced in a fresh environment installed from the
+same requirements/override files. Pytest plugin discovery order can choose HA's
+client fixture, which permits late route registration, or aiohttp's strict client
+fixture, which freezes the router at the first connection. Explicit ordering
+reproduced exactly the four remote failures:
+
+```bash
+python -m pytest -p homeassistant -p aiohttp tests_ha/learning -q
+```
+
+The fix declares both imports as `after_dependencies`, keeping them optional for
+Codex. The pipeline/DSP fixture is separated from the probe WebSocket client, so
+actual learning setup registers its real launcher before any client opens.
+AI Task/media-source components used by combined tests are also prepared before
+that connection; no Codex entities, credentials or provider replies are faked by
+this preparation. The feasibility probe remains independently tested.
+
+The strict client is not patched to unfreeze routes, and no assertion is removed
+or skipped to hide the failure. CI now runs the learning suite with explicit
+strict ordering as well as the normal full suite. Publishing and rerunning remote
+CI for this follow-up are separate from the initial failed phase 2 run; neither
+the local fix nor its tests imply deployment or real-phone acceptance.
 
 ## Combined integration phase 1 foundation (historical development slice)
 

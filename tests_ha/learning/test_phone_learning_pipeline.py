@@ -15,7 +15,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 # Reuse only the isolated pipeline/DSP fixture, never its fake learning entities
 # as the implementation under test. Production learning entities are loaded below.
-from test_learning_pipeline_feasibility import phone_probe  # noqa: F401 - pytest fixture
+from test_learning_pipeline_feasibility import pipeline_components  # noqa: F401 - pytest fixture
 
 from custom_components.codex_assist.learning import DOMAIN
 from custom_components.codex_assist.learning.phone_flow import (
@@ -97,7 +97,7 @@ class Backend:
 
 
 @pytest.fixture
-async def phone(hass, hass_ws_client, hass_admin_user, phone_probe):  # noqa: F811 - imported pytest fixture
+async def phone(hass, hass_ws_client, hass_admin_user, pipeline_components):  # noqa: F811 - imported pytest fixture
     source_calls = []
 
     class Whisper(stt.SpeechToTextEntity):

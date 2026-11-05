@@ -89,6 +89,11 @@ jobs:
       - name: Verify current Home Assistant
         run: .venv-ha/bin/python -m pytest tests_ha -q
 
+      - name: Verify learning with strict aiohttp fixture ordering
+        # pytest entry-point discovery order can otherwise select HA's permissive
+        # client fixture, hiding routes registered after the first client opens.
+        run: .venv-ha/bin/python -m pytest -p homeassistant -p aiohttp tests_ha/learning -q
+
       - name: Check that tests catch recorded AI Task mutations
         run: .venv-ha/bin/python scripts/check_mutations.py --suite ha
 

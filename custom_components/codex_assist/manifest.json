@@ -1,7 +1,7 @@
 {
   "domain": "codex_assist",
   "name": "Codex Assist",
-  "after_dependencies": ["ai_task", "conversation", "frontend", "panel_custom", "stt", "websocket_api"],
+  "after_dependencies": ["ai_task", "assist_pipeline", "conversation", "frontend", "http", "panel_custom", "stt", "websocket_api"],
   "codeowners": ["@DaFern"],
   "config_flow": true,
   "documentation": "https://github.com/DaFern/ha-codex-multi-assist",

@@ -16,7 +16,7 @@ from custom_components.codex_assist.learning.learning_bridge_protocol import (
 )
 
 phone = phone_fixtures.phone
-phone_probe = phone_fixtures.phone_probe
+pipeline_components = phone_fixtures.pipeline_components
 
 
 async def discover(phone, **extra):
