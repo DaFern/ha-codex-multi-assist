@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
     from .entry_modules import ModuleConfigEntry
 
-from .entry_modules import EntryModule, entry_module
+from .entry_modules import EntryModule, entry_module, learning_supported
 
 DOMAIN = "codex_assist"
 
@@ -24,8 +24,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ModuleConfigEntry) -> bo
         from .codex_entry import async_setup_codex
 
         return await async_setup_codex(hass, entry)
-    # Phase 1 reserves the boundary, not a working learning implementation.
-    raise ConfigEntryError("Voice Match learning is not available in this development stage")
+    if not learning_supported():
+        raise ConfigEntryError("Voice Match learning requires Home Assistant 2026.10 or later")
+    from .learning.lifecycle import async_setup_learning
+
+    return await async_setup_learning(hass, entry)
 
 
 async def async_update_listener(hass: HomeAssistant, entry: ModuleConfigEntry) -> None:
@@ -39,4 +42,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ModuleConfigEntry) -> b
         from .codex_entry import async_unload_codex
 
         return await async_unload_codex(hass, entry)
+    if entry.runtime_data.module is EntryModule.VOICE_MATCH:
+        from .learning.lifecycle import async_unload_learning
+
+        return await async_unload_learning(hass, entry)
     return False

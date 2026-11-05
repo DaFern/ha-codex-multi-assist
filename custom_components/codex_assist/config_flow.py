@@ -30,6 +30,7 @@ from .codex_image import (
 from .codex_models import ModelCatalog, ModelDiscoveryCache, fetch_codex_model_ids
 from .codex_runtime import runtime_token_coordinator
 from .entry_modules import CONF_MODULE, EntryModule, entry_module
+from .learning.config_flow import LearningConfigFlowMixin, LearningOptionsFlow
 from .model_discovery import async_entry_model_catalog
 from .speaker_packet import valid_key
 from .voice_match import CONF_VOICE_MATCH_KEY
@@ -54,14 +55,15 @@ DEFAULT_TEXT_VERBOSITY = "medium"
 DEFAULT_WEB_SEARCH = False
 
 
-class CodexAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class CodexAssistConfigFlow(LearningConfigFlowMixin, config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     @staticmethod
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
-    ) -> CodexAssistOptionsFlow:
-        del config_entry
+    ) -> CodexAssistOptionsFlow | LearningOptionsFlow:
+        if entry_module(config_entry) is EntryModule.VOICE_MATCH:
+            return LearningOptionsFlow()
         return CodexAssistOptionsFlow()
 
     def __init__(self) -> None:
@@ -73,10 +75,6 @@ class CodexAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input=None):
         return self.async_show_menu(step_id="user", menu_options=["codex", "voice_learning"])
-
-    async def async_step_voice_learning(self, user_input=None):
-        """Do not create inert entries or request cloud credentials for learning."""
-        return self.async_abort(reason="voice_learning_not_available")
 
     async def async_step_codex(self, user_input=None):
         if any(
@@ -171,7 +169,7 @@ class CodexAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_reconfigure(self, user_input=None):
         if entry_module(self._get_reconfigure_entry()) is not EntryModule.CODEX:
-            return self.async_abort(reason="voice_learning_not_available")
+            return await self.async_step_voice_learning(user_input)
         if user_input is not None:
             self._setup_input = {}
             try:
@@ -191,7 +189,7 @@ class CodexAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]):
         if entry_data.get(CONF_MODULE, EntryModule.CODEX) != EntryModule.CODEX:
-            return self.async_abort(reason="voice_learning_not_available")
+            return self.async_abort(reason="learning_reconfigure_required")
         self._setup_input = {
             key: entry_data[key]
             for key in (
@@ -254,7 +252,7 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         if entry_module(self.config_entry) is not EntryModule.CODEX:
-            return self.async_abort(reason="voice_learning_not_available")
+            return self.async_abort(reason="learning_reconfigure_required")
         return self.async_show_menu(
             step_id="init",
             menu_options=["settings", "agents", "voice_match"],

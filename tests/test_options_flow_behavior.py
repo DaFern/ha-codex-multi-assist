@@ -46,7 +46,9 @@ def test_config_flow_returns_options_flow_instance(monkeypatch):
     install_homeassistant_fakes(monkeypatch)
     module = importlib.reload(importlib.import_module("custom_components.codex_assist.config_flow"))
 
-    options_flow = module.CodexAssistConfigFlow.async_get_options_flow(object())
+    options_flow = module.CodexAssistConfigFlow.async_get_options_flow(
+        SimpleNamespace(data={}, options={})
+    )
 
     assert isinstance(options_flow, module.CodexAssistOptionsFlow)
 

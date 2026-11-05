@@ -3,15 +3,25 @@
     "step": {
       "user": {
         "title": "Choose what to set up",
-        "description": "Codex works without the Voice Match add-on. Voice learning does not require a Codex account, but is not yet available in this development stage.",
+        "description": "Set up Codex assistants, Voice Match learning, or both as separate entries. Voice learning requires the Voice Match add-on, not a Codex account.",
         "menu_options": {
           "codex": "Codex assistants",
-          "voice_learning": "Voice Match learning (not yet available)"
+          "voice_learning": "Voice Match learning"
         }
       },
       "codex": {
         "title": "Codex Assist",
         "description": "Sign in with your ChatGPT/Codex account first. You will choose a chat model from your account’s model list after signing in."
+      },
+      "voice_learning": {
+        "title": "Pair Voice Match learning",
+        "description": "Enable the learning bridge in the add-on's administrator page. Enter its internal HTTP(S) origin and learning key here—not its personalisation key. This verifies pairing only; it does not grant recording consent. When reconfiguring, leave the key blank to keep the existing key.",
+        "data": {"url": "Internal add-on origin", "key": "Learning bridge key"}
+      },
+      "learning_phone": {
+        "title": "Phone voice learning",
+        "description": "Phone learning is off by default. To enable it, select your ordinary Wyoming Whisper source, not Voice Match's filtered or personalised endpoint. Afterwards, create a separate Voice Learning assistant using both new Voice Learning entities and your usual TTS. Do not change your default assistant. Each account must have its own assigned voice profile and give separate spoken consent.",
+        "data": {"phone_enabled": "Enable phone learning", "control_stt_engine": "Ordinary Wyoming Whisper source"}
       },
       "device": {
         "title": "Sign in with Codex",
@@ -34,12 +44,15 @@
       }
     },
     "abort": {
-      "voice_learning_not_available": "Voice Match learning has not moved into this integration yet. No entry was created and no recording started. Continue using the separately installed learning companion for now.",
+      "learning_requires_current_ha": "Voice Match learning requires Home Assistant 2026.10 or later. Codex assistants remain available on this version.",
+      "learning_reconfigure_required": "Use Reconfigure on the Voice Match learning entry to repair its pairing. Codex sign-in is not used for learning.",
       "reconfigure_successful": "Codex Assist was reconfigured and signed in again.",
       "reauth_successful": "Codex Assist signed in again.",
       "already_configured": "Codex Assist is already configured."
     },
     "error": {
+      "cannot_connect": "Could not verify the learning bridge. Check its internal origin and learning key. Nothing has been recorded.",
+      "invalid_stt_source": "Select an available ordinary Wyoming Whisper source with English support, not the learning entity.",
       "authorization_pending": "That code has not been approved yet. Finish signing in in your browser, wait a few seconds, then continue again.",
       "device_code_auth_failed": "Codex sign-in failed. Restart setup and try again.",
       "device_code_request_failed": "Could not request a Codex device code. Check network access from Home Assistant and try again.",
@@ -72,7 +85,16 @@
     }
   },
   "options": {
+    "abort": {
+      "learning_requires_current_ha": "Voice Match learning requires Home Assistant 2026.10 or later. Codex assistants remain available on this version.",
+      "learning_reconfigure_required": "Use the Voice Match learning entry's own configuration."
+    },
     "step": {
+      "learning_phone": {
+        "title": "Phone voice learning",
+        "description": "Enable only for a dedicated Voice Learning assistant. Use ordinary Wyoming Whisper, not a Voice Match endpoint. Disabling or reloading learning tries to pause its bound unfinished session; unverified cleanup needs attention. It does not delete saved samples or the installed voiceprint. Repair pairing with Reconfigure. Codex settings and your default assistant are unchanged.",
+        "data": {"phone_enabled": "Enable phone learning", "control_stt_engine": "Ordinary Wyoming Whisper source"}
+      },
       "init": {
         "title": "Codex Assist options",
         "menu_options": {
@@ -180,6 +202,7 @@
       }
     },
     "error": {
+      "invalid_stt_source": "Select an available ordinary Wyoming Whisper source with English support, not the learning entity.",
       "invalid_model": "Choose a listed model or keep your saved model.",
       "invalid_agent_name": "Enter a name for this assistant.",
       "agent_name_too_long": "Keep the assistant name to 48 characters or fewer.",

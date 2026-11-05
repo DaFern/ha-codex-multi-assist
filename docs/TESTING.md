@@ -1,6 +1,51 @@
 # Testing
 
-## Combined integration phase 1 (development only)
+## Combined integration phase 2 (development only)
+
+The moved learning suite is under `tests_ha/learning/`. It uses native HA
+authentication, entities, registry, panel/HTTP APIs and Assist pipeline execution;
+Whisper, DSP and backend replies are synthetic. Only the missing frontend asset
+directory is substituted. Android/native opening is not simulated as a phone
+acceptance result. The source backend fixture uses two samples for speed; the
+add-on's real 30-phrase protocol/target is not changed.
+
+Learning remains HA 2026.10+; older matrix entries skip these pipelines and run an
+explicit unsupported-learning contract while retaining the full Codex contracts.
+Setup tests cover learning without Codex, with Codex, bridge retry/recovery,
+missing Whisper, separate reconfiguration, failed shutdown and Codex reauth or
+unload during an active learning session. The launcher retains the original
+browser/native-boundary fixture:
+
+```bash
+node tests/frontend_native_launcher.cjs
+```
+
+For a paired checkout and the add-on's isolated test dependencies:
+
+```bash
+python scripts/check_learning_addon_contract.py /path/to/wyoming-voice-match-ha
+```
+
+This test-only runner uses the moved client/controller against the add-on's real
+encrypted bridge/voice-store implementation with synthetic DSP. It refuses to
+count missing-dependency skips as success, changes neither checkout and includes
+no production compatibility aliases. The fast suite separately pins the wire
+codec byte-for-byte and the AST of unchanged safety-critical moved logic to the
+reviewed source release.
+
+No phase 2 deployment, data reset, restart, public release or real-phone
+acceptance is implied by these development tests. Phase 1 remote CI passed at
+`d80eef2` (run `42081553911`); that is not CI evidence for uncommitted phase 2.
+
+Local phase 2 results: 727 fast tests plus 20 subtests passed; HA 2026.10 passed
+341 contracts with one older-version-only negative test skipped. HA 2026.6 passed
+252 contracts and skipped the 90 newer-only learning cases. All 53 cross-repository
+encrypted bridge/controller tests passed without dependency skips. The Node
+launcher boundary fixture and Ruff passed; the fast mutation checks caught all
+ten recorded token/tool mutations. Phase 2 remote CI and real-phone acceptance
+remain pending.
+
+## Combined integration phase 1 foundation (historical development slice)
 
 The module foundation adds first-run menu selection before OAuth, a Codex-specific
 duplicate-account guard, explicit rejection of unavailable/unknown modules,
@@ -15,9 +60,8 @@ Codex setup do not create or replace the token coordinator. Its weak entry-keyed
 lock survives reload, as verified by the real-HA reload/removal contract. The
 runtime/auth implementation and the model-checker actors were not changed.
 
-This is not a learning-only or combined-install acceptance result. Learning
-remains in the separate companion until phase 2. No live deployment, voice-data
-reset, restart, CI run or beta release is part of this development slice.
+That slice did not move learning or deploy it. Phase 2's separate development
+coverage and remaining acceptance limits are described above.
 
 ## Minimal Voice Match request diagnostics (development)
 

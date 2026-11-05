@@ -25,12 +25,13 @@ def test_config_flow_errors_are_translated_for_device_polling():
     assert "device_code_request_failed" in errors
 
 
-def test_module_menu_and_unavailable_learning_are_explicit_and_translated():
+def test_module_menu_and_learning_setup_are_explicit_and_translated():
     for path in (TRANSLATION, TRANSLATION.parent.parent / "strings.json"):
         config = json.loads(path.read_text())["config"]
         assert set(config["step"]["user"]["menu_options"]) == {"codex", "voice_learning"}
-        assert "not yet available" in config["step"]["user"]["menu_options"]["voice_learning"]
-        assert "No entry was created" in config["abort"]["voice_learning_not_available"]
+        assert config["step"]["user"]["menu_options"]["voice_learning"] == "Voice Match learning"
+        assert "recording consent" in config["step"]["voice_learning"]["description"]
+        assert "off by default" in config["step"]["learning_phone"]["description"]
         assert "Sign in" in config["step"]["codex"]["description"]
 
 

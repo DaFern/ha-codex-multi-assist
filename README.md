@@ -47,12 +47,14 @@ If sign-in does not start or the code page reports an error, device-code login m
 
 Codex Assist supports one sign-in. To change accounts or sign in again, use **Reconfigure** on the existing entry.
 
-**Development checkout — combined integration foundation:** setup now separates
-Codex from the planned Voice Match learning module. The learning choice is clearly
-marked unavailable and creates no entry; continue using the existing separate
-learning companion until the move is implemented and tested. Codex needs neither
-the add-on nor voice setup. This is not a combined-integration release or a live
-deployment. See [the phased design](docs/COMBINED_INTEGRATION.md).
+**Development checkout — optional Voice Match learning:** setup now offers a
+separate learning entry with verified bridge pairing and an explicit phone opt-in.
+Learning requires HA **2026.10+**, the add-on and ordinary Wyoming Whisper—not a
+Codex account. Codex still needs neither the add-on nor voice setup. The learning
+entities and native launcher now live inside this integration; no second custom
+integration is needed for a clean development install. This is **not** a released
+combined beta or approval to replace an existing live companion. See
+[setup, boundaries and the separate cutover gate](docs/COMBINED_INTEGRATION.md).
 
 ### 3. Choose Codex Assist in your pipeline
 

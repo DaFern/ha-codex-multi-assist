@@ -22,6 +22,8 @@ def install_homeassistant_fakes(monkeypatch):
     config_entries = types.ModuleType("homeassistant.config_entries")
     data_entry_flow = types.ModuleType("homeassistant.data_entry_flow")
     const = types.ModuleType("homeassistant.const")
+    const.MAJOR_VERSION = 2026
+    const.MINOR_VERSION = 10
     core = types.ModuleType("homeassistant.core")
     exceptions = types.ModuleType("homeassistant.exceptions")
     helpers = types.ModuleType("homeassistant.helpers")

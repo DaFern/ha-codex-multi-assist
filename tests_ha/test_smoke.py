@@ -130,7 +130,7 @@ async def test_token_coordinator_survives_reload_but_not_removal(hass: HomeAssis
     assert runtime_token_coordinator(await _setup_entry(hass)) is not coordinator
 
 
-@pytest.mark.parametrize("module", ["voice_match", "unknown", None, {}])
+@pytest.mark.parametrize("module", ["unknown", None, {}])
 async def test_unavailable_module_cannot_start_codex_or_disrupt_existing_entry(
     hass, monkeypatch, module
 ):
@@ -174,8 +174,14 @@ async def test_voice_learning_menu_never_requests_oauth_or_creates_entry(hass, m
         result["flow_id"], {"next_step_id": "voice_learning"}
     )
 
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "voice_learning_not_available"
+    from custom_components.codex_assist.entry_modules import learning_supported
+
+    if learning_supported():
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "voice_learning"
+    else:
+        assert result["type"] is FlowResultType.ABORT
+        assert result["reason"] == "learning_requires_current_ha"
     assert hass.config_entries.async_entries(DOMAIN) == before
     auth.assert_not_called()
 

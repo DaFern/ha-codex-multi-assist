@@ -119,11 +119,13 @@ async def test_first_run_module_choice_does_not_request_cloud_credentials(config
 
 async def test_voice_learning_choice_creates_no_entry_or_cloud_requests(config_flow_module):
     flow = config_flow_module.CodexAssistConfigFlow()
+    flow.source = "user"
     flow._auth_client = lambda: pytest.fail("Voice learning must not start OAuth")
 
     result = await flow.async_step_voice_learning()
 
-    assert result == {"type": "abort", "reason": "voice_learning_not_available"}
+    assert result["type"] == "form"
+    assert result["step_id"] == "voice_learning"
     assert config_flow_module.fetch_codex_model_ids.await_count == 0
 
 
@@ -153,15 +155,15 @@ async def test_voice_entry_cannot_enter_codex_options_or_reauth(config_flow_modu
     options = config_flow_module.CodexAssistOptionsFlow()
     options.config_entry = entry
     flow = config_flow_module.CodexAssistConfigFlow()
-    flow.reconfigure_entry = entry
     flow._auth_client = lambda: pytest.fail("Voice entries must not start OAuth")
 
     for result in (
         await options.async_step_init(),
         await flow.async_step_reauth(entry.data),
-        await flow.async_step_reconfigure({}),
     ):
-        assert result == {"type": "abort", "reason": "voice_learning_not_available"}
+        assert result == {"type": "abort", "reason": "learning_reconfigure_required"}
+    voice_options = config_flow_module.CodexAssistConfigFlow.async_get_options_flow(entry)
+    assert isinstance(voice_options, config_flow_module.LearningOptionsFlow)
 
 
 @pytest.mark.asyncio

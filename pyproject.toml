@@ -29,3 +29,9 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Preserve reviewed consent/recovery speech and byte-identical paired protocol.
+# Both are pinned to the source release by test_learning_move_contract.py.
+"custom_components/codex_assist/learning/phone_flow.py" = ["E501"]
+"custom_components/codex_assist/learning/learning_bridge_protocol.py" = ["E501"]

@@ -13,6 +13,13 @@ if TYPE_CHECKING:
 CONF_MODULE = "module"
 
 
+def learning_supported() -> bool:
+    """Keep the existing companion's HA floor without raising Codex's floor."""
+    from homeassistant.const import MAJOR_VERSION, MINOR_VERSION
+
+    return (MAJOR_VERSION, MINOR_VERSION) >= (2026, 10)
+
+
 class EntryModule(StrEnum):
     """Independently configured modules within the single integration domain."""
 

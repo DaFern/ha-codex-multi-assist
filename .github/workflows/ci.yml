@@ -38,6 +38,9 @@ jobs:
       - name: Run tests
         run: uv run pytest -q
 
+      - name: Check native learning launcher boundary
+        run: node tests/frontend_native_launcher.cjs
+
       - name: Check that tests catch recorded mutations
         run: uv run python scripts/check_mutations.py --suite fast
 

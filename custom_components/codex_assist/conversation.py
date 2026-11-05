@@ -79,6 +79,13 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
+    from .entry_modules import EntryModule, entry_module
+
+    if entry_module(entry) is EntryModule.VOICE_MATCH:
+        from .learning.conversation import async_setup_entry as setup_learning_agent
+
+        await setup_learning_agent(hass, entry, async_add_entities)
+        return
     async_add_entities(
         [CodexAssistConversationEntity(entry, profile) for profile in get_agent_profiles(entry)]
     )
