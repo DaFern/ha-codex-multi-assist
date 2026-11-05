@@ -1,5 +1,40 @@
 # Testing
 
+## Combined integration phase 4 (development distribution preparation)
+
+`python scripts/check_distribution.py` performs read-only checks of the single
+HACS integration directory, required learning Python/frontend/repair/brand assets,
+fork manifest identity, English translation parity and manifest/project/lockfile
+version alignment. It reports a deterministic source-projection digest, not a
+built archive, HACS download or deployed version. Negative tests cover missing
+assets, extra domains, symlinks, unexpected data files and metadata drift. This
+check is part of the existing tests/lint CI job, not a publishing workflow.
+
+Fork install links now target DaFern's custom repository; upstream wiki material
+is explicitly shared-feature background. The separate add-on repository retains
+the standalone companion path and tests its static setup guide link and baseline
+version documentation. Source versions remain `0.7.0` (integration) and `0.4.5`
+(add-on), not new release announcements. See [installation policy](INSTALLATION.md)
+and the **unexecuted** [beta acceptance/rollback checklist](BETA_ACCEPTANCE.md).
+
+Phase 3 exact-commit remote CI `42101173078` passed all seven jobs at `2f91599`.
+It is historical evidence, not CI for the uncommitted phase 4 preparation. New
+public documentation URLs cannot be accepted as published until commit/push;
+HACS/Marketplace transport, clean HAOS installs and real-phone combined operation
+remain separate gates. No release, deployment, restart, pairing or data reset is
+part of phase 4.
+
+Local phase 4 results: **771 fast tests plus 20 subtests passed**; native HA
+2026.10 strict-order suite **365 passed / 1 skipped** (existing aiohttp rewrite
+warning), and HA 2026.6 **252 passed / 114 newer-only skips**. All **53** paired
+bridge/controller tests passed; all **10** recorded fast mutations were caught.
+The distribution projection contains **51 runtime files** and is byte-identical
+to the phase 3 runtime. Ruff, Node launcher and diff checks passed. The add-on
+suite passed **203 tests with 4 built-engine-only skips**; synthetic Chromium
+mobile/desktop checks passed, including the static setup guide with no horizontal
+overflow or pairing/recording request. These results do not execute the clean
+HAOS/HACS transport or actual Android acceptance checklist.
+
 ## Combined integration phase 3 (development only)
 
 New contracts cover cached Supervisor metadata projection, explicit endpoint

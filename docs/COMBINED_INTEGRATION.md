@@ -1,4 +1,4 @@
-# Combined integration — development phases 1 to 3
+# Combined integration — development phases 1 to 4
 
 Umbrella: [Voice Match issue #5](https://github.com/DaFern/wyoming-voice-match-ha/issues/5).
 This document describes development work, not a released combined integration.
@@ -126,7 +126,19 @@ does not show/copy it and does not claim it is verified. No Codex entry means
 learning can continue without one; the guide does not start OAuth. Actual packet
 verification and prompt composition remain per turn in the existing Codex path.
 
-## Remaining phases (not implemented here)
+## Distribution preparation (phase 4 development)
+
+The [installation guide](INSTALLATION.md) now identifies this fork's custom HACS
+repository, the independent add-on and per-module support requirements. The
+[beta acceptance and rollback checklist](BETA_ACCEPTANCE.md) is deliberately
+uncompleted: package preparation is not HACS transport, clean-install or phone
+acceptance. A read-only distribution check verifies the runtime source projection,
+assets, one-domain layout and manifest/project/lockfile parity. Source `0.7.0` is
+unchanged; identify development builds by SHA until a distinct candidate is approved.
+The add-on baseline is `0.4.5`; it is versioned separately. Retain standalone
+companion instructions while combined replacement acceptance is pending.
+
+## Remaining phase (not implemented here)
 
 Secure automatic adoption/key exchange is still not implemented. Metadata
 suggestions and manual cryptographically verified learning pairing must not be
@@ -134,9 +146,6 @@ described as zero-touch pairing. The learning wizard gives pipeline guidance,
 not automatic pipeline creation. Speaker-aware automation configuration remains
 a separate explicit opt-in, with no general recording/service-call API.
 
-4. Reconcile HACS/install links, versions and beta support policy. HA 2026.10+
-   is proposed for the eventual combined beta. Current support remains per-feature
-   as described above; this move does not raise Codex's existing support floor.
 5. Separately approve backups, live cutover, restart and real-phone acceptance.
    Do not delete voices, voiceprints or samples just because a clean reset is
    permitted. Identify every proposed deletion before approval. Remove obsolete

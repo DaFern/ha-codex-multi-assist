@@ -2,7 +2,19 @@
 
 ## Questions and setup help
 
-Start with the [user guide](https://github.com/itsreverence/ha-codex-assist/wiki), especially its [Installation](https://github.com/itsreverence/ha-codex-assist/wiki/Installation), [Troubleshooting](https://github.com/itsreverence/ha-codex-assist/wiki/Troubleshooting), [Compatibility and Limitations](https://github.com/itsreverence/ha-codex-assist/wiki/Compatibility-and-Limitations), [Choosing a Model](https://github.com/itsreverence/ha-codex-assist/wiki/Choosing-a-Model), and [Safe Entity Exposure](https://github.com/itsreverence/ha-codex-assist/wiki/Safe-Entity-Exposure) pages.
+Start with this fork's [installation and support matrix](docs/INSTALLATION.md),
+[combined learning guide](docs/COMBINED_INTEGRATION.md) and
+[acceptance/rollback checklist](docs/BETA_ACCEPTANCE.md). Upstream wiki pages
+are background for shared Codex features, not this fork's install instructions.
+
+There is **no published combined beta**. Development builds are identified by
+commit SHA as well as source version `0.7.0`; identical version strings do not
+prove identical code. Codex retains HA **2026.6+** support, while learning requires
+**2026.10+**. The planned combined beta acceptance baseline is HA 2026.10+ on
+amd64 HAOS; that does not raise the Codex-only floor or certify untested releases.
+HA 2026.11/Marketplace installation and other hardware require separate evidence.
+No support claim extends to satellite capture, accountless Echo enrolment or
+automatic previous-assistant restoration. Report fork-specific bugs here, not upstream.
 
 For a quick first check:
 
@@ -14,7 +26,10 @@ For a quick first check:
 
 ## Bugs and feature requests
 
-Use the repository's [issue forms](https://github.com/itsreverence/ha-codex-assist/issues/new/choose). Include the Home Assistant and Codex Assist versions, clear reproduction steps, and only relevant redacted logs.
+Use this fork's [issues](https://github.com/DaFern/ha-codex-multi-assist/issues).
+Coordinate cross-component work in [Voice Match issue #5](https://github.com/DaFern/wyoming-voice-match-ha/issues/5).
+Include the Home Assistant version, integration commit/version, add-on version if
+used, selected module and minimal reproduction steps with only redacted logs.
 
 Do not post tokens, device codes, cookies, Home Assistant secrets, private URLs, config entries, or unredacted screenshots.
 

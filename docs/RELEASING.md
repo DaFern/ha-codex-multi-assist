@@ -2,6 +2,29 @@
 
 This checklist is for maintainers.
 
+## Combined integration gate (development fork)
+
+**No combined beta is published by phases 1–4.** Follow
+[INSTALLATION.md](INSTALLATION.md) for the fork/custom-repository identity and
+per-feature support floors. Source `0.7.0` remains aligned across manifest,
+project and lockfile; it is not a unique development-build identifier. Record
+the exact commit SHA. Do not tag that version merely to reconcile documentation.
+
+Before choosing/publishing a distinct candidate version, complete the
+[clean-install, real-phone and rollback gates](BETA_ACCEPTANCE.md), including
+HACS download of non-Python assets. Obtain separate release approval; do not
+raise Codex's global HACS floor above 2026.6 just because learning needs 2026.10.
+The separate add-on retains its own version and publication approval. Do not
+remove standalone companion instructions until replacement acceptance passes.
+
+Run `python scripts/check_distribution.py` to check one integration directory,
+required learning/frontend/repair assets, fork identity and version parity.
+It is read-only and emits a content-projection digest, not a release archive or
+HACS installation result. HACS currently consumes the repository directory
+(`zip_release` is not enabled); do not upload an arbitrary ZIP as a new install path.
+Tests exercise missing assets, version drift, extra domains, symlinks and unexpected
+data files. Exact-commit HACS/Hassfest CI remains required in addition to this check.
+
 ## Prepare
 
 1. Update the version in `custom_components/codex_assist/manifest.json` and `pyproject.toml`, then refresh `uv.lock`.
@@ -36,7 +59,7 @@ This checklist is for maintainers.
 6. Run all checks in [TESTING.md](TESTING.md).
 7. Commit the scoped release change, open a pull request, and wait for every required check to pass.
 8. Merge through the protected `main` branch and verify the post-merge `main` checks before tagging.
-9. If the release changes user-facing behavior, publish the matching wiki updates after the reviewed repository docs and screenshots are on `main`. Open every changed wiki page once to confirm its links and images resolve.
+9. If the release changes user-facing behavior, publish matching fork documentation after review. Upstream wiki pages are background, not this fork's install/release channel; do not edit the upstream wiki for fork features. Open every changed public guide/link once to confirm it resolves.
 10. When the wiki carries an upcoming-release notice, remove it as part of this release and rewrite any wording that depends on it. Search the wiki for "Next release" and for the behavior the notice describes, such as `response.card`. Do not leave a notice for a change that has shipped.
 
 ## Publish

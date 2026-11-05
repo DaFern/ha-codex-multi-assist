@@ -38,6 +38,9 @@ jobs:
       - name: Run tests
         run: uv run pytest -q
 
+      - name: Check combined integration distribution boundary
+        run: uv run python scripts/check_distribution.py
+
       - name: Check native learning launcher boundary
         run: node tests/frontend_native_launcher.cjs
 

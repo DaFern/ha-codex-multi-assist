@@ -1,13 +1,18 @@
-# Codex Assist for Home Assistant
+# Codex Multi Assist for Home Assistant
+
+**Development fork — not a published combined beta.** This repository is
+`DaFern/ha-codex-multi-assist`, not the upstream HACS default-catalog integration.
+It contains one `codex_assist` integration with independent Codex and optional
+Voice Match learning entries. See the [installation and beta policy](docs/INSTALLATION.md)
+and [acceptance/rollback checklist](docs/BETA_ACCEPTANCE.md) before installing.
 
 <p align="center">
   <img src="assets/codex-assist-icon.png" alt="Codex Assist icon" width="128" height="128">
 </p>
 
 <p align="center">
-  <a href="https://github.com/itsreverence/ha-codex-assist/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/itsreverence/ha-codex-assist?style=for-the-badge"></a>
-  <a href="https://github.com/itsreverence/ha-codex-assist/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/itsreverence/ha-codex-assist/ci.yml?branch=main&style=for-the-badge&label=CI"></a>
-  <a href="https://www.hacs.xyz/docs/use/repositories/dashboard/"><img alt="Available in HACS" src="https://img.shields.io/badge/HACS-Default-41BDF5?style=for-the-badge"></a>
+  <a href="https://github.com/DaFern/ha-codex-multi-assist/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/DaFern/ha-codex-multi-assist/ci.yml?branch=main&style=for-the-badge&label=CI"></a>
+  <a href="docs/INSTALLATION.md"><img alt="HACS custom repository; development only" src="https://img.shields.io/badge/HACS-Custom%20repository-41BDF5?style=for-the-badge"></a>
 </p>
 
 Use OpenAI Codex / ChatGPT as a Home Assistant Assist conversation agent and AI Task provider.
@@ -18,22 +23,40 @@ Codex Assist signs in with Codex-style ChatGPT device-code auth. It keeps device
 
 ## Quick start
 
-You need Home Assistant `2026.6.0` or newer, [HACS](https://www.hacs.xyz/docs/use/download/download/), and a ChatGPT account or plan with Codex access.
+For Codex you need Home Assistant `2026.6.0` or newer and a ChatGPT account or
+plan with Codex access. Optional voice learning requires **HA 2026.10+**, the
+separate [Voice Match add-on](https://github.com/DaFern/wyoming-voice-match-ha),
+ordinary Wyoming Whisper and TTS, but **no ChatGPT account**.
 
-[![Open HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=itsreverence&repository=ha-codex-assist&category=integration)
+[![Open fork in HACS (development only)](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=DaFern&repository=ha-codex-multi-assist&category=integration)
 [![Add the Codex Assist integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=codex_assist)
 
 ### 1. Install
 
-Codex Assist is in the HACS default catalog, so you do not add a custom repository.
+Use a disposable test installation until the combined beta passes its acceptance
+gates. This fork needs a **custom repository**, not the upstream default entry.
+Do not install upstream and this fork together: both own `codex_assist`.
 
-1. In the Home Assistant sidebar, open **HACS**.
-2. Search for **Codex Assist**, open it, and select **Download**.
-3. Restart Home Assistant.
+1. Open **HACS → ⋮ → Custom repositories** (labels may differ in Marketplace).
+2. Add `https://github.com/DaFern/ha-codex-multi-assist`, type **Integration**.
+3. Open **Codex Multi Assist**, confirm the repository owner is **DaFern**, and
+   review the selected revision before **Download**. With no releases, HACS uses
+   the default branch; moving `main` is not a pinned beta.
+4. Restart Home Assistant after approved installation. Search **Codex Assist**
+   under Devices & services; that is the integration's display name.
 
-If it does not appear after a new release or a catalog change, try again later.
+The button above opens a repository, not an installer or recording-consent flow.
+Existing upstream or standalone-companion installations need a separately reviewed
+cutover, not these fresh-install steps. See [the full guide](docs/INSTALLATION.md).
 
-### 2. Sign in
+### 2. Choose a module
+
+For **learning only**, select **Voice Match learning**, not Codex assistants, and
+follow [learning setup](docs/COMBINED_INTEGRATION.md#clean-development-setup-not-a-live-cutover-instruction).
+Skip the Codex sign-in and agent-selection steps below. Personalisation is optional
+and uses a separate key only if you later add Codex.
+
+For **Codex**, follow these sign-in steps:
 
 Sign-in uses a device code, so you approve it in a browser. The browser can be on any device.
 
@@ -153,7 +176,11 @@ The [security policy](SECURITY.md) has the full data and control boundaries.
 
 ## User guide
 
-The [GitHub Wiki](https://github.com/itsreverence/ha-codex-assist/wiki) is the user manual.
+This fork's [installation guide](docs/INSTALLATION.md), [combined design](docs/COMBINED_INTEGRATION.md)
+and [support policy](SUPPORT.md) are authoritative for fork-specific features.
+The following [upstream wiki](https://github.com/itsreverence/ha-codex-assist/wiki)
+is background for shared Codex features only; its installation/release guidance
+does not install this fork or describe optional learning.
 
 - [Installation](https://github.com/itsreverence/ha-codex-assist/wiki/Installation)
 - [Safe Entity Exposure](https://github.com/itsreverence/ha-codex-assist/wiki/Safe-Entity-Exposure)
