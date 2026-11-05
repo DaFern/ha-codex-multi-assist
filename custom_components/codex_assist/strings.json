@@ -18,6 +18,15 @@
         "description": "Enable the learning bridge in the add-on's administrator page. Enter its internal HTTP(S) origin and learning key here—not its personalisation key. This verifies pairing only; it does not grant recording consent. When reconfiguring, leave the key blank to keep the existing key.",
         "data": {"url": "Internal add-on origin", "key": "Learning bridge key"}
       },
+      "learning_discovery": {
+        "title": "Choose the Voice Match add-on",
+        "description": "These internal addresses came from Home Assistant's cached app metadata. Select one or enter an address manually. A suggestion is not trusted pairing: the next step still requires your separate learning key and an encrypted verification. Nothing will start or record here.",
+        "data": {"origin": "Add-on address"}
+      },
+      "learning_finish": {
+        "title": "Finish learning setup",
+        "description": "Encrypted learning pairing was verified. Phone learning: **{phone_status}**.\n\nIf enabled, create a separate Voice Learning assistant using both Voice Learning entities from this entry and your usual TTS in [Voice assistants](/config/voice-assistants/assistants). Keep your default assistant unchanged.\n\nEach person needs their own account-assigned profile and separate spoken recording consent. Opening the launcher is not consent. After saving, use Configure → Check setup to verify the assistant. Personal response preferences are a separate optional setup; no Codex account is needed for learning. Submit to save these settings, not to record."
+      },
       "learning_phone": {
         "title": "Phone voice learning",
         "description": "Phone learning is off by default. To enable it, select your ordinary Wyoming Whisper source, not Voice Match's filtered or personalised endpoint. Afterwards, create a separate Voice Learning assistant using both new Voice Learning entities and your usual TTS. Do not change your default assistant. Each account must have its own assigned voice profile and give separate spoken consent.",
@@ -44,6 +53,7 @@
       }
     },
     "abort": {
+      "learning_setup_required": "Start learning setup from the module menu and verify pairing first.",
       "learning_requires_current_ha": "Voice Match learning requires Home Assistant 2026.10 or later. Codex assistants remain available on this version.",
       "learning_reconfigure_required": "Use Reconfigure on the Voice Match learning entry to repair its pairing. Codex sign-in is not used for learning.",
       "reconfigure_successful": "Codex Assist was reconfigured and signed in again.",
@@ -51,6 +61,7 @@
       "already_configured": "Codex Assist is already configured."
     },
     "error": {
+      "invalid_origin": "Choose a suggested address or enter it manually in the next step.",
       "cannot_connect": "Could not verify the learning bridge. Check its internal origin and learning key. Nothing has been recorded.",
       "invalid_stt_source": "Select an available ordinary Wyoming Whisper source with English support, not the learning entity.",
       "authorization_pending": "That code has not been approved yet. Finish signing in in your browser, wait a few seconds, then continue again.",
@@ -58,6 +69,63 @@
       "device_code_request_failed": "Could not request a Codex device code. Check network access from Home Assistant and try again.",
       "invalid_model": "Choose a model from the displayed list.",
       "no_models": "Your account returned no visible models. Try again later or restart setup with another account."
+    }
+  },
+  "issues": {
+    "voice_learning_bridge": {
+      "title": "Voice learning pairing needs attention",
+      "fix_flow": {
+        "step": {
+          "confirm": {"title": "Check learning pairing", "description": "Check that the add-on is running and the internal origin and learning key are correct. Submit opens Reconfigure for this learning entry. It does not rotate keys, start recording or change Codex. Saving reconfiguration may reload learning and attempt to pause its bound unfinished session; unverified cleanup still needs attention."},
+          "check": {"title": "Check setup again", "description": "Correct the learning settings, then Submit for a read-only check. Nothing will be recorded or deleted."}
+        },
+        "error": {"not_resolved": "The problem is still present or could not be verified. Nothing was changed."},
+        "abort": {"learning_reconfigure": "Continue in learning reconfiguration. The repair stays until recovery is verified.", "learning_options": "Continue in learning settings. The repair stays until recovery is verified.", "learning_entry_unavailable": "This learning entry is missing, disabled or unsupported. No configuration was changed."}
+      }
+    },
+    "voice_learning_source": {
+      "title": "Voice learning needs an available Whisper source",
+      "fix_flow": {
+        "step": {
+          "confirm": {"title": "Choose ordinary Whisper", "description": "Submit opens this learning entry's settings. Choose an available ordinary Wyoming Whisper source with English support, not a Voice Match or learning endpoint. Changing settings reloads only learning. Opening settings changes nothing by itself."},
+          "check": {"title": "Check source again", "description": "Correct the source settings, then Submit for a read-only check. Nothing will be recorded or deleted."}
+        },
+        "error": {"not_resolved": "The problem is still present or could not be verified. Nothing was changed."},
+        "abort": {"learning_reconfigure": "Continue in learning reconfiguration. The repair stays until recovery is verified.", "learning_options": "Continue in learning settings. The repair stays until recovery is verified.", "learning_entry_unavailable": "This learning entry is missing, disabled or unsupported. No configuration was changed."}
+      }
+    },
+    "voice_learning_entities": {
+      "title": "Voice Learning entities are unavailable",
+      "fix_flow": {
+        "step": {
+          "confirm": {"title": "Check the learning entry", "description": "Check that this learning entry is loaded and phone learning is enabled. Check its Whisper source and entity availability on the integration page. Do not delete profiles or enable unrelated entities. Submit continues to a read-only recheck."},
+          "check": {"title": "Recheck learning entities", "description": "After correcting the [learning settings](/config/integrations/integration/codex_assist), Submit to check again. If unload or cleanup failed, inspect that problem before retrying; this flow does not retry recording, delete data or reload anything."}
+        },
+        "error": {"not_resolved": "The problem is still present or could not be verified. Nothing was changed."},
+        "abort": {"learning_reconfigure": "Continue in learning reconfiguration. The repair stays until recovery is verified.", "learning_options": "Continue in learning settings. The repair stays until recovery is verified.", "learning_entry_unavailable": "This learning entry is missing, disabled or unsupported. No configuration was changed."}
+      }
+    },
+    "voice_learning_pipeline": {
+      "title": "Voice learning needs one matching assistant",
+      "fix_flow": {
+        "step": {
+          "confirm": {"title": "Check the dedicated learning assistant", "description": "Use both Voice Learning entities from this entry in exactly one dedicated assistant, with your usual TTS. A missing, duplicated or mixed engine pair cannot be selected safely. Keep the default assistant unchanged. Submit continues to a read-only recheck."},
+          "check": {"title": "Recheck the assistant", "description": "Correct the pair in [Voice assistants](/config/voice-assistants/assistants), then Submit to check again. This flow will not create, delete, select or change a pipeline for you."}
+        },
+        "error": {"not_resolved": "The problem is still present or could not be verified. Nothing was changed."},
+        "abort": {"learning_reconfigure": "Continue in learning reconfiguration. The repair stays until recovery is verified.", "learning_options": "Continue in learning settings. The repair stays until recovery is verified.", "learning_entry_unavailable": "This learning entry is missing, disabled or unsupported. No configuration was changed."}
+      }
+    },
+    "voice_learning_launcher": {
+      "title": "The Voice Learning launcher is unavailable or conflicts",
+      "fix_flow": {
+        "step": {
+          "confirm": {"title": "Check the launcher without overwriting another panel", "description": "The launcher may be missing, or another integration may own /voice-match-learning. Do not overwrite a user panel. Running the old companion and the combined learning module together is not a supported final setup; any cutover needs its own plan and approval. Use manual Assist selection meanwhile. Submit continues to a read-only recheck."},
+          "check": {"title": "Recheck the launcher", "description": "After the panel conflict or setup failure is resolved, Submit to check again. This flow does not remove panels, start a microphone, switch assistants or change the default."}
+        },
+        "error": {"not_resolved": "The problem is still present or could not be verified. Nothing was changed."},
+        "abort": {"learning_reconfigure": "Continue in learning reconfiguration. The repair stays until recovery is verified.", "learning_options": "Continue in learning settings. The repair stays until recovery is verified.", "learning_entry_unavailable": "This learning entry is missing, disabled or unsupported. No configuration was changed."}
+      }
     }
   },
   "conditions": {
@@ -90,6 +158,37 @@
       "learning_reconfigure_required": "Use the Voice Match learning entry's own configuration."
     },
     "step": {
+      "learning_menu": {
+        "title": "Voice Match learning",
+        "menu_options": {
+          "learning_status": "Check setup",
+          "learning_phone": "Phone learning settings",
+          "learning_pairing": "Repair learning pairing",
+          "learning_personalisation": "Optional personal response preferences"
+        }
+      },
+      "learning_status": {
+        "title": "Learning setup check",
+        "description": "Learning bridge: **{bridge}**\n\nWhisper source: **{source}**\n\nLearning entities: **{entities}**\n\nDedicated assistant: **{pipeline}**\n\nLauncher: **{launcher}**\n\nThese are technical checks, not profile ownership, recording consent or voice recognition. Correct the relevant settings, then check again. [Voice assistants](/config/voice-assistants/assistants) · [Repairs](/config/repairs). Leave Check again off and Submit to return to the menu.",
+        "data": {"recheck": "Check again (read-only)"}
+      },
+      "learning_pairing": {
+        "title": "Repair learning pairing",
+        "description": "On this learning entry, open **Reconfigure** from the entry menu on the [integration page](/config/integrations/integration/codex_assist). Enter the internal origin and learning bridge key; a blank key keeps the existing key. Do not use the personalisation key. An observed bridge problem also offers this route from Repairs.\n\nReconfiguration reloads only learning and attempts to pause bound unfinished work. It does not delete recordings or change Codex. Unverified cleanup needs attention. Submit returns to this menu without changing anything."
+      },
+      "learning_personalisation": {
+        "title": "Choose a Codex entry for personal preferences",
+        "description": "Optional: choose explicitly which existing Codex entry you intend to configure. This guide does not copy keys, change that entry or start Codex sign-in.",
+        "data": {"entry_id": "Codex entry"}
+      },
+      "learning_personalisation_missing": {
+        "title": "Personal preferences are optional",
+        "description": "No enabled Codex entry is configured. Voice learning works without one. If you want personal response preferences, add Codex assistants separately from the integration module menu, then return here. Nothing has been enabled. Submit returns to the learning menu."
+      },
+      "learning_personalisation_guide": {
+        "title": "Set up preferences on the selected Codex entry",
+        "description": "Pairing status: **{pairing_status}**.\n\nOn the [integration page](/config/integrations/integration/codex_assist), open Configure on the Codex entry you selected → Voice Match personal preferences. Use the add-on's separate **personalisation** key, never the learning key. Keep it off unless you explicitly want it. Use a separate personalised STT connection on port 10352 only with that Codex entry; the ordinary 10350 endpoint stays separate.\n\nThis guide cannot verify a key by its shape or prove a received voice packet. Recognition changes response preferences, not HA permissions. Existing personalities, tools and AI Task settings stay unchanged. Submit returns without changing either entry."
+      },
       "learning_phone": {
         "title": "Phone voice learning",
         "description": "Enable only for a dedicated Voice Learning assistant. Use ordinary Wyoming Whisper, not a Voice Match endpoint. Disabling or reloading learning tries to pause its bound unfinished session; unverified cleanup needs attention. It does not delete saved samples or the installed voiceprint. Repair pairing with Reconfigure. Codex settings and your default assistant are unchanged.",
@@ -202,6 +301,7 @@
       }
     },
     "error": {
+      "invalid_target": "Choose an enabled Codex entry from the displayed list.",
       "invalid_stt_source": "Select an available ordinary Wyoming Whisper source with English support, not the learning entity.",
       "invalid_model": "Choose a listed model or keep your saved model.",
       "invalid_agent_name": "Enter a name for this assistant.",

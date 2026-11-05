@@ -12,17 +12,20 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 
 from . import DOMAIN
+from .const import MODULE_URL, PANEL_PATH
 from .learning_bridge_protocol import BridgeError
 from .lifecycle import loaded_runtime
 
-PANEL_PATH = "voice-match-learning"
-MODULE_URL = "/codex_assist/voice-learning-launch-v1.js"
 _LOGGER = logging.getLogger(__name__)
 schema = getattr(cv, "probatio", vol)
 
 
 async def register_panel(hass):
     if frontend.async_panel_exists(hass, PANEL_PATH):
+        from .readiness import panel_status
+
+        if panel_status(hass) == "ready":
+            return
         # Never replace a panel belonging to the user or another integration.
         _LOGGER.warning(
             "Voice learning launcher path is already registered; use the manual learning steps"

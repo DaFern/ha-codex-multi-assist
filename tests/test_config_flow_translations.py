@@ -35,6 +35,25 @@ def test_module_menu_and_learning_setup_are_explicit_and_translated():
         assert "Sign in" in config["step"]["codex"]["description"]
 
 
+def test_guidance_and_all_repair_flows_have_matching_translations():
+    strings = json.loads((TRANSLATION.parent.parent / "strings.json").read_text())
+    assert strings == json.loads(TRANSLATION.read_text())
+    for kind in ("bridge", "source", "entities", "pipeline", "launcher"):
+        flow = strings["issues"]["voice_learning_" + kind]["fix_flow"]
+        assert {"confirm", "check"} <= set(flow["step"])
+        assert "not_resolved" in flow["error"]
+        assert {"learning_entry_unavailable", "learning_reconfigure", "learning_options"} <= set(
+            flow["abort"]
+        )
+    menu = strings["options"]["step"]["learning_menu"]["menu_options"]
+    assert set(menu) == {
+        "learning_status",
+        "learning_phone",
+        "learning_pairing",
+        "learning_personalisation",
+    }
+
+
 def test_shared_prompt_translation_identifies_ai_task_scope():
     data = json.loads(TRANSLATION.read_text())
     settings = data["options"]["step"]["settings"]

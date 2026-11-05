@@ -389,6 +389,10 @@ async def test_phone_options_reject_no_source_and_the_learning_engine(hass, phon
     entry = MockConfigEntry(domain=DOMAIN, data=phone["entry"].data)
     entry.add_to_hass(hass)
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["step_id"] == "learning_menu"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "learning_phone"}
+    )
     assert result["step_id"] == "learning_phone"
     for source in (None, phone["engine"].entity_id):
         data = {"phone_enabled": True}
@@ -402,6 +406,9 @@ async def test_phone_options_reject_no_source_and_the_learning_engine(hass, phon
 
 async def test_phone_options_retain_existing_source_when_omitted(hass, phone):
     result = await hass.config_entries.options.async_init(phone["entry"].entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "learning_phone"}
+    )
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], user_input={"phone_enabled": True}
     )

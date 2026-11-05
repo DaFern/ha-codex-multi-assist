@@ -47,3 +47,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ModuleConfigEntry) -> b
 
         return await async_unload_learning(hass, entry)
     return False
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ModuleConfigEntry) -> None:
+    if entry.data.get("module") == EntryModule.VOICE_MATCH:
+        from .learning.health_issues import remove_entry_issues
+
+        remove_entry_issues(hass, entry)

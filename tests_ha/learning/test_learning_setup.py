@@ -90,6 +90,9 @@ async def test_pairing_and_phone_opt_in_need_no_codex_account(hass, monkeypatch,
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {"phone_enabled": False}
         )
+        assert result["step_id"] == "learning_finish"
+        assert key not in str(result)
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
         await hass.async_block_till_done()
     assert result["type"] is FlowResultType.CREATE_ENTRY
     entry = result["result"]
@@ -184,6 +187,9 @@ async def test_learning_options_disable_pauses_without_discard_or_codex_reload(h
     for marker in (1, 2, 3):
         await phone["run"](marker)
     result = await hass.config_entries.options.async_init(phone["entry"].entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "learning_phone"}
+    )
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"phone_enabled": False}
     )

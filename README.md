@@ -56,6 +56,14 @@ integration is needed for a clean development install. This is **not** a release
 combined beta or approval to replace an existing live companion. See
 [setup, boundaries and the separate cutover gate](docs/COMBINED_INTEGRATION.md).
 
+The development learning wizard can suggest an internal add-on address from
+Home Assistant's cached Supervisor metadata, but still requires your learning key
+and verified pairing. It ends with a separate review before saving. **Configure →
+Check setup** reports technical readiness; **Repairs** explains observed problems
+without resetting data or changing pipelines. Optional personalisation guidance
+explicitly selects an existing Codex entry and never copies the learning key.
+These are development features, not an announcement of a combined beta release.
+
 ### 3. Choose Codex Assist in your pipeline
 
 1. Go to **Settings → Voice assistants**.

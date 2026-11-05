@@ -1,4 +1,4 @@
-# Combined integration — development phases 1 and 2
+# Combined integration — development phases 1 to 3
 
 Umbrella: [Voice Match issue #5](https://github.com/DaFern/wyoming-voice-match-ha/issues/5).
 This document describes development work, not a released combined integration.
@@ -48,13 +48,18 @@ including mappings inside lists and tuples, without modifying configuration.
 1. Use HA 2026.10+ with the separate Voice Match add-on and an ordinary Wyoming
    Whisper source. This checkout contains one integration domain. Do not install
    both learning implementations against the same launcher/pipeline.
-2. Add **Codex Assist → Voice Match learning**. Enter the internal add-on origin
+2. Add **Codex Assist → Voice Match learning**. Where supported, choose an address
+   suggested from cached Supervisor metadata, or enter it manually. A suggestion
+   grants no trust and causes no connection until you submit the separate key.
+   Enter the internal add-on origin
    and its **learning** bridge key from its administrator page. This manually
-   verifies encrypted pairing; it is not secure automatic discovery/adoption.
+   verifies encrypted pairing; it is not zero-touch adoption or key transfer.
 3. Leave phone learning off, or explicitly enable it and select ordinary Whisper.
    Do not select the add-on's filtering/personalisation endpoints as the control
    transcription source. The selector checks the Wyoming provider and language;
    administrators must still choose the correct ordinary Whisper connection.
+   Review the final setup guidance and explicitly submit to save. No entry is
+   created merely by selecting an endpoint or viewing the final review.
 4. In Voice assistants, create a dedicated **Voice Learning** assistant with both
    new Voice Learning entities from this entry and your usual TTS. Do not change
    the default assistant. The integration does not silently create a pipeline.
@@ -82,14 +87,53 @@ device/account IDs cannot grant recording authority. They are not a general phon
 recording API. Global WS/panel registrations retain no entry credentials; handlers
 accept only loaded learning runtimes, not a Codex entry or a failed/removed entry.
 
-## Next phases (not implemented here)
+## Guided checks and repairs (phase 3 development)
 
-3. Guided pairing, Whisper/pipeline guidance, optional personalisation and repairs.
-   Endpoint discovery is not trust. Keep learning and personalisation credentials
-   separate; do not advertise zero-touch adoption without an authorised protocol.
-   Select the personalisation-to-Codex association explicitly rather than using
-   a global last-speaker or arbitrary first-entry lookup. Do not create a general
-   recording or arbitrary service-call endpoint.
+The learning options menu separates **Check setup**, phone settings, pairing
+repair instructions and optional personalisation guidance. Checks report the
+bridge, source, learning entities, dedicated assistant and launcher separately.
+They do not verify account ownership, a voiceprint, recording consent or an actual
+phone handoff. A provider/language check cannot prove that a Wyoming connection
+is ordinary Whisper rather than a filtered endpoint; the UI says so.
+
+Checks occur during observed setup transitions and on explicit request, not by
+continuous network polling. A manual check makes a fresh bounded encrypted
+`hello` only. It does not use `begin`, `permit`, `sample`, `resume`, `cancel` or
+`discard`. A configuration change during that await returns **not checked** and
+cannot clear issues for the newer configuration.
+
+Repairs use stable IDs per learning entry. Bridge failure offers that entry's
+Reconfigure flow after confirmation; source failure opens its own learning
+options. Missing/unavailable entities, missing/duplicated/mixed assistants and
+launcher conflicts offer instructions and a read-only recheck. An unresolved or
+unknown result does not count as fixed. Reload retains unresolved issues and
+their dismissal state; entry removal cleans only its own known issue IDs. The
+implementation uses the pinned HA 2026.10 issue API rather than assuming newer
+entry-ownership arguments are available. Disabled, missing, Codex or mismatched
+entry/issue targets are not accepted by the repair flow.
+
+The launcher recognises its own existing panel on reload, but never overwrites
+another panel at the shared URL. No repair installs an add-on, starts a server,
+rotates a key, submits a clip, deletes recordings, reassigns a profile, switches
+assistants or creates/changes a pipeline. Failed unload is not displayed as
+successful disablement. Correcting pairing or settings still uses its existing
+explicit confirmation and reload path, including refusal of unverified cleanup.
+
+Optional personalisation is a **guide**, not automatic pairing: explicitly choose
+an enabled Codex entry, then use its existing personal-preferences options and a
+separate personalisation key. The guide reads only whether a key is configured,
+does not show/copy it and does not claim it is verified. No Codex entry means
+learning can continue without one; the guide does not start OAuth. Actual packet
+verification and prompt composition remain per turn in the existing Codex path.
+
+## Remaining phases (not implemented here)
+
+Secure automatic adoption/key exchange is still not implemented. Metadata
+suggestions and manual cryptographically verified learning pairing must not be
+described as zero-touch pairing. The learning wizard gives pipeline guidance,
+not automatic pipeline creation. Speaker-aware automation configuration remains
+a separate explicit opt-in, with no general recording/service-call API.
+
 4. Reconcile HACS/install links, versions and beta support policy. HA 2026.10+
    is proposed for the eventual combined beta. Current support remains per-feature
    as described above; this move does not raise Codex's existing support floor.

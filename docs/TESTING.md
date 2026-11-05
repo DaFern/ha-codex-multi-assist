@@ -1,5 +1,37 @@
 # Testing
 
+## Combined integration phase 3 (development only)
+
+New contracts cover cached Supervisor metadata projection, explicit endpoint
+selection before key submission, manual fallback, the final review before entry
+creation and the learning options menu. Readiness and repair contracts use real
+HA issue/flow managers, registry/pipeline APIs and the strict HTTP fixture order.
+They verify read-only hello-only checks during active learning; missing/mixed/
+duplicate assistants; source/launcher failures; stale configuration results;
+entry isolation, dismissal retention and cleanup on removal; bound repair-flow
+handoff; and explicit Codex selection without key copying or cloud sign-in.
+
+The protocol, sample controller and exact-turn handoff remain pinned to the
+reviewed source implementation. A check or repair is not recording consent and
+does not exercise an actual Android microphone. Supervisor discovery is tested
+with synthetic cached metadata, not a live Supervisor adoption transaction.
+
+The earlier CI repair remains covered by the strict HTTP lane. Remote phase 2
+follow-up run `42091269843` passed all seven jobs at `8408322`, including HACS,
+Hassfest and the strict ordering check. That is not remote CI evidence for this
+uncommitted phase 3 work. No release, live deployment, restart or data reset is
+included in this development slice.
+
+Final local phase 3 results: **744 fast tests plus 20 subtests passed**;
+HA 2026.10 passed **365 tests with one older-version-only skip** in both
+default and strict HTTP plugin orders. The strict order also emitted pytest's
+existing aiohttp assertion-rewrite warning. HA 2026.6 passed **252 tests with
+114 newer-only skips**. All **53** cross-repository encrypted bridge/controller
+tests passed without dependency skips. The Node native-launcher boundary fixture,
+Ruff and diff checks passed, and mutation checks caught all **10** recorded
+token/tool mutations. These are isolated local development results, not remote
+CI, live Supervisor discovery, Android acceptance or deployment evidence.
+
 ## Combined integration phase 2 (development only)
 
 The moved learning suite is under `tests_ha/learning/`. It uses native HA

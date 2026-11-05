@@ -14,6 +14,7 @@ from ..entry_modules import EntryModule, ModuleRuntime
 from .bridge_client import BridgeClient
 from .const import CONF_CONTROL_STT, CONF_PHONE_ENABLED
 from .coordinator import Coordinator
+from .health_issues import apply_report, observe
 from .learning_bridge_protocol import BridgeError
 from .phone_runtime import PhoneRuntime
 
@@ -37,12 +38,26 @@ def loaded_runtime(hass, entry_id):
 
 
 async def async_setup_learning(hass, entry):
-    bridge = BridgeClient(entry.data["url"], entry.data["key"], async_get_clientsession(hass))
+    data, options = entry.data, entry.options
+    bridge = BridgeClient(data["url"], data["key"], async_get_clientsession(hass))
     try:
         if await bridge.call("hello", None, {}) != {"ready": True}:
             raise BridgeError("Learning bridge unavailable")
     except BridgeError:
+        if (
+            hass.config_entries.async_get_entry(entry.entry_id) is entry
+            and entry.data is data
+            and entry.options is options
+        ):
+            observe(hass, entry, "bridge", "unavailable")
         raise ConfigEntryNotReady("Learning bridge pairing is unavailable") from None
+    if (
+        hass.config_entries.async_get_entry(entry.entry_id) is not entry
+        or entry.data is not data
+        or entry.options is not options
+    ):
+        raise ConfigEntryNotReady("Learning setup changed; pairing must be checked again")
+    observe(hass, entry, "bridge", "verified")
 
     phone = None
     if entry.options.get(CONF_PHONE_ENABLED, False):
@@ -51,10 +66,12 @@ async def async_setup_learning(hass, entry):
         try:
             control_source(hass, entry.options.get(CONF_CONTROL_STT))
         except ValueError:
+            observe(hass, entry, "source", "unavailable")
             raise ConfigEntryNotReady(
                 "Phone learning needs an ordinary Wyoming Whisper STT source"
             ) from None
         phone = PhoneRuntime(hass, entry, bridge, entry.options[CONF_CONTROL_STT])
+        observe(hass, entry, "source", "available")
 
     coordinator = Coordinator(
         bridge,
@@ -78,6 +95,19 @@ async def async_setup_learning(hass, entry):
     if platforms:
         await hass.config_entries.async_forward_entry_setups(entry, platforms)
     entry.async_on_unload(entry.add_update_listener(async_update_listener))
+
+    def check_loaded():
+        if entry.state is ConfigEntryState.LOADED:
+            from .readiness import technical_report
+
+            report = technical_report(hass, entry)
+            # Platform entities can still be finishing their initial add jobs.
+            # Check setup can diagnose missing entities once loading has settled.
+            if report["entities"] not in {"ready", "disabled"}:
+                report["entities"] = report["pipeline"] = "not_checked"
+            apply_report(hass, entry, report)
+
+    entry.async_on_unload(entry.async_on_state_change(check_loaded))
     return True
 
 

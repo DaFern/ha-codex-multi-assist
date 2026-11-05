@@ -5,6 +5,12 @@ an explicit module choice and entry-scoped lifecycle. Optional learning now live
 under `learning/`, with its own paired entry, STT/agent dispatch and native launcher.
 Codex runtime, token locks, request personalisation and AI Task remain separate.
 
+Phase 3 adds metadata-only endpoint suggestions, a final setup review, technical
+readiness checks and entry-specific native Repairs flows. These administrative
+surfaces do not enter the phone recording controller or transfer learning
+authority to Codex. See the combined design for the pinned repair-API ownership
+rules, stale-check protection and explicit personalisation guidance.
+
 Codex Assist is a Home Assistant custom integration backed by Codex / ChatGPT access. It registers a native Assist conversation agent and a native AI Task provider.
 
 ```mermaid
