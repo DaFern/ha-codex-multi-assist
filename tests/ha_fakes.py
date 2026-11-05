@@ -43,6 +43,12 @@ def install_homeassistant_fakes(monkeypatch):
         def async_show_form(self, **kwargs):
             return {"type": "form", **kwargs}
 
+        def async_show_menu(self, **kwargs):
+            return {"type": "menu", **kwargs}
+
+        def async_abort(self, **kwargs):
+            return {"type": "abort", **kwargs}
+
         def async_create_entry(self, **kwargs):
             return {"type": "create_entry", **kwargs}
 
@@ -51,6 +57,9 @@ def install_homeassistant_fakes(monkeypatch):
 
         def _abort_if_unique_id_configured(self):
             self.duplicate_checked = True
+
+        def _async_current_entries(self):
+            return getattr(self, "current_entries", [])
 
         def async_update_reload_and_abort(self, entry, data_updates):
             reason = (
@@ -72,6 +81,9 @@ def install_homeassistant_fakes(monkeypatch):
             return getattr(self, "reconfigure_entry", object())
 
     class OptionsFlow:
+        def async_abort(self, **kwargs):
+            return {"type": "abort", **kwargs}
+
         @property
         def config_entry(self):
             return self._config_entry

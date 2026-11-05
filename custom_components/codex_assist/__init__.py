@@ -3,45 +3,40 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
+
+    from .entry_modules import ModuleConfigEntry
+
+from .entry_modules import EntryModule, entry_module
 
 DOMAIN = "codex_assist"
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    from datetime import timedelta
+async def async_setup_entry(hass: HomeAssistant, entry: ModuleConfigEntry) -> bool:
+    """Dispatch by module before importing any provider-specific lifecycle."""
+    from homeassistant.exceptions import ConfigEntryError
 
-    from homeassistant.const import Platform
-    from homeassistant.helpers.event import async_track_time_interval
+    try:
+        module = entry_module(entry)
+    except (ValueError, TypeError):
+        raise ConfigEntryError("Unsupported integration module") from None
+    if module is EntryModule.CODEX:
+        from .codex_entry import async_setup_codex
 
-    from .codex_models import MODEL_CACHE_SECONDS
-    from .model_discovery import async_entry_model_catalog
-
-    await hass.config_entries.async_forward_entry_setups(
-        entry,
-        (Platform.CONVERSATION, Platform.AI_TASK),
-    )
-    entry.async_on_unload(entry.add_update_listener(async_update_listener))
-
-    async def refresh_models(_now) -> None:
-        await async_entry_model_catalog(hass, entry)
-
-    entry.async_on_unload(
-        async_track_time_interval(hass, refresh_models, timedelta(seconds=MODEL_CACHE_SECONDS))
-    )
-    return True
+        return await async_setup_codex(hass, entry)
+    # Phase 1 reserves the boundary, not a working learning implementation.
+    raise ConfigEntryError("Voice Match learning is not available in this development stage")
 
 
-async def async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload entities when agent settings change."""
+async def async_update_listener(hass: HomeAssistant, entry: ModuleConfigEntry) -> None:
+    """Reload only the entry whose settings changed."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    from homeassistant.const import Platform
+async def async_unload_entry(hass: HomeAssistant, entry: ModuleConfigEntry) -> bool:
+    """A module cannot unload another module's platforms."""
+    if entry.runtime_data.module is EntryModule.CODEX:
+        from .codex_entry import async_unload_codex
 
-    return await hass.config_entries.async_unload_platforms(
-        entry,
-        (Platform.CONVERSATION, Platform.AI_TASK),
-    )
+        return await async_unload_codex(hass, entry)
+    return False

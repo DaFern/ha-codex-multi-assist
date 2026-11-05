@@ -57,7 +57,7 @@ async def test_config_flow_requests_device_code_before_showing_pairing_form(
     auth = FakeAuthClient()
     flow._auth_client = lambda: auth
 
-    result = await flow.async_step_user({"model": "gpt-5.4"})
+    result = await flow.async_step_codex({})
 
     assert auth.requested == 1
     assert result["type"] == "form"
@@ -99,8 +99,69 @@ async def test_config_flow_creates_entry_only_after_device_token_exchange(
             "model": "account-model",
             "access_token": "access-1",
             "refresh_token": "refresh-1",
+            "module": "codex",
         },
     }
+
+
+async def test_first_run_module_choice_does_not_request_cloud_credentials(config_flow_module):
+    flow = config_flow_module.CodexAssistConfigFlow()
+    flow._auth_client = lambda: pytest.fail("Module selection must not start OAuth")
+
+    result = await flow.async_step_user()
+
+    assert result == {
+        "type": "menu", "step_id": "user", "menu_options": ["codex", "voice_learning"]
+    }
+    assert (await flow.async_step_codex())["step_id"] == "codex"
+    assert config_flow_module.fetch_codex_model_ids.await_count == 0
+
+
+async def test_voice_learning_choice_creates_no_entry_or_cloud_requests(config_flow_module):
+    flow = config_flow_module.CodexAssistConfigFlow()
+    flow._auth_client = lambda: pytest.fail("Voice learning must not start OAuth")
+
+    result = await flow.async_step_voice_learning()
+
+    assert result == {"type": "abort", "reason": "voice_learning_not_available"}
+    assert config_flow_module.fetch_codex_model_ids.await_count == 0
+
+
+@pytest.mark.parametrize("data", [{}, {"module": "codex"}])
+async def test_codex_duplicate_guard_precedes_auth_and_includes_old_entries(
+    config_flow_module, data
+):
+    flow = config_flow_module.CodexAssistConfigFlow()
+    flow.current_entries = [FakeConfigEntry(data=data)]
+    flow._auth_client = lambda: pytest.fail("Duplicate setup must not start OAuth")
+    assert await flow.async_step_codex({}) == {
+        "type": "abort", "reason": "already_configured"
+    }
+
+
+async def test_voice_entry_does_not_block_codex_configuration(config_flow_module):
+    flow = config_flow_module.CodexAssistConfigFlow()
+    flow.current_entries = [FakeConfigEntry(data={"module": "voice_match"})]
+    auth = FakeAuthClient()
+    flow._auth_client = lambda: auth
+    assert (await flow.async_step_codex({}))["step_id"] == "device"
+    assert auth.requested == 1
+
+
+async def test_voice_entry_cannot_enter_codex_options_or_reauth(config_flow_module):
+    entry = FakeConfigEntry(data={"module": "voice_match"}, options={})
+    options = config_flow_module.CodexAssistOptionsFlow()
+    options.config_entry = entry
+    flow = config_flow_module.CodexAssistConfigFlow()
+    flow.reconfigure_entry = entry
+    flow._auth_client = lambda: pytest.fail("Voice entries must not start OAuth")
+
+    for result in (
+        await options.async_step_init(),
+        await flow.async_step_reauth(entry.data),
+        await flow.async_step_reconfigure({}),
+    ):
+        assert result == {"type": "abort", "reason": "voice_learning_not_available"}
 
 
 @pytest.mark.asyncio

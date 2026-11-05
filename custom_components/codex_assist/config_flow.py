@@ -29,6 +29,7 @@ from .codex_image import (
 )
 from .codex_models import ModelCatalog, ModelDiscoveryCache, fetch_codex_model_ids
 from .codex_runtime import runtime_token_coordinator
+from .entry_modules import CONF_MODULE, EntryModule, entry_module
 from .model_discovery import async_entry_model_catalog
 from .speaker_packet import valid_key
 from .voice_match import CONF_VOICE_MATCH_KEY
@@ -71,19 +72,31 @@ class CodexAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._catalog: ModelCatalog | None = None
 
     async def async_step_user(self, user_input=None):
+        return self.async_show_menu(step_id="user", menu_options=["codex", "voice_learning"])
+
+    async def async_step_voice_learning(self, user_input=None):
+        """Do not create inert entries or request cloud credentials for learning."""
+        return self.async_abort(reason="voice_learning_not_available")
+
+    async def async_step_codex(self, user_input=None):
+        if any(
+            entry.data.get(CONF_MODULE, EntryModule.CODEX) == EntryModule.CODEX
+            for entry in self._async_current_entries()
+        ):
+            return self.async_abort(reason="already_configured")
         if user_input is not None:
             self._setup_input = {}
             try:
                 self._device_code = await self._auth_client().request_device_code()
             except RuntimeError:
                 return self.async_show_form(
-                    step_id="user",
+                    step_id="codex",
                     data_schema=_user_schema(),
                     errors={"base": "device_code_request_failed"},
                 )
             return await self.async_step_device()
 
-        return self.async_show_form(step_id="user", data_schema=_user_schema())
+        return self.async_show_form(step_id="codex", data_schema=_user_schema())
 
     async def async_step_device(self, user_input=None):
         if user_input is not None:
@@ -93,7 +106,7 @@ class CodexAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_device_wait(self, user_input=None):
         del user_input
         if self._device_code is None:
-            return await self.async_step_user()
+            return await self.async_step_codex()
 
         auth_client = self._auth_client()
         try:
@@ -127,7 +140,7 @@ class CodexAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
-        self._setup_data = data
+        self._setup_data = {**data, CONF_MODULE: EntryModule.CODEX.value}
         return await self.async_step_model()
 
     async def async_step_model(self, user_input=None):
@@ -157,6 +170,8 @@ class CodexAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_reconfigure(self, user_input=None):
+        if entry_module(self._get_reconfigure_entry()) is not EntryModule.CODEX:
+            return self.async_abort(reason="voice_learning_not_available")
         if user_input is not None:
             self._setup_input = {}
             try:
@@ -175,6 +190,8 @@ class CodexAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]):
+        if entry_data.get(CONF_MODULE, EntryModule.CODEX) != EntryModule.CODEX:
+            return self.async_abort(reason="voice_learning_not_available")
         self._setup_input = {
             key: entry_data[key]
             for key in (
@@ -236,6 +253,8 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
         self._removing_agent_id: str | None = None
 
     async def async_step_init(self, user_input=None):
+        if entry_module(self.config_entry) is not EntryModule.CODEX:
+            return self.async_abort(reason="voice_learning_not_available")
         return self.async_show_menu(
             step_id="init",
             menu_options=["settings", "agents", "voice_match"],

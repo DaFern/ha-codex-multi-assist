@@ -87,6 +87,26 @@ async def test_setup_creates_conversation_and_ai_task_entities(
     assert hass.states.get("ai_task.codex_assist_ai_task") is not None
 
 
+async def test_explicit_codex_module_uses_existing_entity_identifiers(hass):
+    from custom_components.codex_assist.entry_modules import EntryModule
+
+    assert await async_setup_component(hass, "homeassistant", {})
+    entry = MockConfigEntry(
+        domain=DOMAIN, unique_id=DOMAIN, title="Codex Assist",
+        data={**ENTRY_DATA, "module": "codex"},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.runtime_data.module is EntryModule.CODEX
+    assert hass.states.get("conversation.codex_assist") is not None
+    assert hass.states.get("ai_task.codex_assist_ai_task") is not None
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.NOT_LOADED
+
+
 async def test_unload_entry_cleans_up(hass: HomeAssistant) -> None:
     entry = await _setup_entry(hass)
 
@@ -108,6 +128,75 @@ async def test_token_coordinator_survives_reload_but_not_removal(hass: HomeAssis
     await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
     assert runtime_token_coordinator(await _setup_entry(hass)) is not coordinator
+
+
+@pytest.mark.parametrize("module", ["voice_match", "unknown", None, {}])
+async def test_unavailable_module_cannot_start_codex_or_disrupt_existing_entry(
+    hass, monkeypatch, module
+):
+    from unittest.mock import AsyncMock
+
+    from custom_components.codex_assist.entry_modules import EntryModule
+
+    codex = await _setup_entry(hass)
+    coordinator = runtime_token_coordinator(codex)
+    states_before = {state.entity_id for state in hass.states.async_all()}
+    forward = AsyncMock()
+    monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
+    setup_codex = AsyncMock()
+    monkeypatch.setattr("custom_components.codex_assist.codex_entry.async_setup_codex", setup_codex)
+    other = MockConfigEntry(domain=DOMAIN, title="Unavailable module", data={"module": module})
+    other.add_to_hass(hass)
+
+    assert not await hass.config_entries.async_setup(other.entry_id)
+    await hass.async_block_till_done()
+
+    assert other.state is ConfigEntryState.SETUP_ERROR
+    assert codex.state is ConfigEntryState.LOADED
+    assert codex.runtime_data.module is EntryModule.CODEX
+    assert runtime_token_coordinator(codex) is coordinator
+    assert {state.entity_id for state in hass.states.async_all()} == states_before
+    forward.assert_not_awaited()
+    setup_codex.assert_not_awaited()
+
+
+async def test_voice_learning_menu_never_requests_oauth_or_creates_entry(hass, monkeypatch):
+    from unittest.mock import Mock
+
+    auth = Mock(side_effect=AssertionError("Learning must not request Codex credentials"))
+    monkeypatch.setattr(
+        "custom_components.codex_assist.config_flow.CodexAssistConfigFlow._auth_client", auth
+    )
+    before = list(hass.config_entries.async_entries(DOMAIN))
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    assert result["type"] is FlowResultType.MENU
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "voice_learning"}
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "voice_learning_not_available"
+    assert hass.config_entries.async_entries(DOMAIN) == before
+    auth.assert_not_called()
+
+
+async def test_existing_codex_entry_does_not_hide_module_menu(hass):
+    await _setup_entry(hass)
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    assert result["type"] is FlowResultType.MENU
+    assert result["menu_options"] == ["codex", "voice_learning"]
+
+
+async def test_module_options_listener_reloads_only_its_entry(hass, monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from custom_components.codex_assist import async_update_listener
+
+    entry = await _setup_entry(hass)
+    reload_entry = AsyncMock()
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
+    await async_update_listener(hass, entry)
+    reload_entry.assert_awaited_once_with(entry.entry_id)
 
 
 async def test_conversation_turn_streams_codex_reply(
@@ -699,6 +788,14 @@ async def test_new_setup_discovers_models_after_owned_sign_in(hass, monkeypatch)
     )
     result = await hass.config_entries.flow.async_init("codex_assist", context={"source": "user"})
     assert result["step_id"] == "user"
+    assert result["type"] is FlowResultType.MENU
+    assert result["menu_options"] == ["codex", "voice_learning"]
+    auth.request_device_code.assert_not_awaited()
+    discover.assert_not_awaited()
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={"next_step_id": "codex"}
+    )
+    assert result["step_id"] == "codex"
     assert not result["data_schema"].schema
     discover.assert_not_awaited()
     result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input={})
@@ -724,6 +821,7 @@ async def test_new_setup_discovers_models_after_owned_sign_in(hass, monkeypatch)
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"]["model"] == "future-model"
+    assert result["data"]["module"] == "codex"
     await hass.async_block_till_done()
 
 
@@ -775,9 +873,11 @@ async def test_periodic_discovery_is_cancelled_when_entry_unloads(hass, monkeypa
         return cancel
 
     refresh = AsyncMock()
-    monkeypatch.setattr("homeassistant.helpers.event.async_track_time_interval", track)
     monkeypatch.setattr(
-        "custom_components.codex_assist.model_discovery.async_entry_model_catalog", refresh
+        "custom_components.codex_assist.codex_entry.async_track_time_interval", track
+    )
+    monkeypatch.setattr(
+        "custom_components.codex_assist.codex_entry.async_entry_model_catalog", refresh
     )
     entry = await _setup_entry(hass)
     assert len(callbacks) == 1

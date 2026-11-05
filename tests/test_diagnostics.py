@@ -73,3 +73,31 @@ async def test_diagnostics_never_contains_raw_token_values(monkeypatch):
 
     assert "raw-token-value" not in str(diagnostics)
     assert "raw-refresh-value" not in str(diagnostics)
+
+
+async def test_nested_module_secrets_and_agent_prompts_are_redacted_without_mutation(monkeypatch):
+    module = _load_diagnostics(monkeypatch)
+    sensitive = {
+        key: f"synthetic-sensitive-{key}" for key in module.TO_REDACT
+    }
+    entry = types.SimpleNamespace(
+        data={"module": "voice_match", "modules": {"learning": sensitive}},
+        options={
+            "agents": [{"name": "Example", "prompt": "synthetic-personality"}],
+            "nested": ({"bridge": sensitive},),
+            "enabled": False,
+        },
+    )
+    original = deepcopy(vars(entry))
+
+    result = await module.async_get_config_entry_diagnostics(object(), entry)
+
+    assert vars(entry) == original
+    assert result["entry"]["data"]["module"] == "voice_match"
+    assert result["entry"]["options"]["enabled"] is False
+    assert result["entry"]["options"]["agents"][0]["prompt"] == module.REDACTED
+    assert all(value == module.REDACTED for value in
+               result["entry"]["data"]["modules"]["learning"].values())
+    serialized = json.dumps(result)
+    for value in (*sensitive.values(), "synthetic-personality"):
+        assert value not in serialized

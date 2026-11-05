@@ -2,6 +2,14 @@
   "config": {
     "step": {
       "user": {
+        "title": "Choose what to set up",
+        "description": "Codex works without the Voice Match add-on. Voice learning does not require a Codex account, but is not yet available in this development stage.",
+        "menu_options": {
+          "codex": "Codex assistants",
+          "voice_learning": "Voice Match learning (not yet available)"
+        }
+      },
+      "codex": {
         "title": "Codex Assist",
         "description": "Sign in with your ChatGPT/Codex account first. You will choose a chat model from your account’s model list after signing in."
       },
@@ -26,6 +34,7 @@
       }
     },
     "abort": {
+      "voice_learning_not_available": "Voice Match learning has not moved into this integration yet. No entry was created and no recording started. Continue using the separately installed learning companion for now.",
       "reconfigure_successful": "Codex Assist was reconfigured and signed in again.",
       "reauth_successful": "Codex Assist signed in again.",
       "already_configured": "Codex Assist is already configured."

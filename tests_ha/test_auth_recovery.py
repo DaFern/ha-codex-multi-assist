@@ -112,6 +112,12 @@ async def test_flow_manager_auth_failure_can_recover(
     )
     start_step = "reauth_confirm" if source == "reauth" else source
     assert result["step_id"] == start_step
+    if source == "user":
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={"next_step_id": "codex"}
+        )
+        start_step = "codex"
+        assert result["step_id"] == start_step
     failed_response = (
         httpx.ReadTimeout("private-auth-marker")
         if failure == "transport"

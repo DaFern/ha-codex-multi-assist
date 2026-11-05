@@ -45,8 +45,12 @@ def entry(hass):
 
 async def test_duplicate_setup_aborts_before_sign_in(hass, entry, auth):
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    assert result["type"] is FlowResultType.MENU
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input={"next_step_id": "codex"}
+    )
     assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "single_instance_allowed"
+    assert result["reason"] == "already_configured"
     auth.request_device_code.assert_not_awaited()
     auth.poll_device_code.assert_not_awaited()
     auth.exchange_authorization_code.assert_not_awaited()

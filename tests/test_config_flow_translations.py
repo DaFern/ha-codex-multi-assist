@@ -25,6 +25,15 @@ def test_config_flow_errors_are_translated_for_device_polling():
     assert "device_code_request_failed" in errors
 
 
+def test_module_menu_and_unavailable_learning_are_explicit_and_translated():
+    for path in (TRANSLATION, TRANSLATION.parent.parent / "strings.json"):
+        config = json.loads(path.read_text())["config"]
+        assert set(config["step"]["user"]["menu_options"]) == {"codex", "voice_learning"}
+        assert "not yet available" in config["step"]["user"]["menu_options"]["voice_learning"]
+        assert "No entry was created" in config["abort"]["voice_learning_not_available"]
+        assert "Sign in" in config["step"]["codex"]["description"]
+
+
 def test_shared_prompt_translation_identifies_ai_task_scope():
     data = json.loads(TRANSLATION.read_text())
     settings = data["options"]["step"]["settings"]

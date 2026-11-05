@@ -38,7 +38,7 @@ If it does not appear after a new release or a catalog change, try again later.
 Sign-in uses a device code, so you approve it in a browser. The browser can be on any device.
 
 1. Go to **Settings → Devices & services → Add integration**, or use the button above. Search for **Codex Assist** and select it.
-2. Select **Submit**. Home Assistant shows a web address and a short code.
+2. Select **Codex assistants**, then **Submit**. Home Assistant shows a web address and a short code.
 3. Open that address in a browser, sign in to ChatGPT, and enter the code.
 4. Return to Home Assistant and select **Submit**. If it says the code has not been approved yet, wait a few seconds and select **Submit** again.
 5. Choose a chat model from the list, then select **Submit**.
@@ -46,6 +46,13 @@ Sign-in uses a device code, so you approve it in a browser. The browser can be o
 If sign-in does not start or the code page reports an error, device-code login may be turned off for your account. OpenAI's [authentication guide](https://learn.chatgpt.com/docs/auth) says a personal account enables it in ChatGPT security settings, and a workspace admin controls it for a workspace. Home Assistant stores the sign-in itself. Do not paste tokens or copy them from Codex CLI or another tool.
 
 Codex Assist supports one sign-in. To change accounts or sign in again, use **Reconfigure** on the existing entry.
+
+**Development checkout — combined integration foundation:** setup now separates
+Codex from the planned Voice Match learning module. The learning choice is clearly
+marked unavailable and creates no entry; continue using the existing separate
+learning companion until the move is implemented and tested. Codex needs neither
+the add-on nor voice setup. This is not a combined-integration release or a live
+deployment. See [the phased design](docs/COMBINED_INTEGRATION.md).
 
 ### 3. Choose Codex Assist in your pipeline
 

@@ -1,5 +1,9 @@
 # Architecture
 
+The [combined integration foundation](COMBINED_INTEGRATION.md) introduces an
+explicit module choice and entry-scoped lifecycle. Voice learning has not moved
+yet; the existing Codex runtime and token-lock boundaries remain unchanged.
+
 Codex Assist is a Home Assistant custom integration backed by Codex / ChatGPT access. It registers a native Assist conversation agent and a native AI Task provider.
 
 ```mermaid

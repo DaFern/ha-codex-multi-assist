@@ -1,5 +1,24 @@
 # Testing
 
+## Combined integration phase 1 (development only)
+
+The module foundation adds first-run menu selection before OAuth, a Codex-specific
+duplicate-account guard, explicit rejection of unavailable/unknown modules,
+entry-scoped platform setup/unload and recursive diagnostic redaction. Tests cover
+both existing entries without a discriminator and new explicit Codex entries,
+unavailable learning alongside loaded Codex, no learning-triggered OAuth, model
+timer cancellation and options reload targeting. See
+[the design and remaining gates](COMBINED_INTEGRATION.md).
+
+The token-interleaving harness still mirrors the runtime: module dispatch and
+Codex setup do not create or replace the token coordinator. Its weak entry-keyed
+lock survives reload, as verified by the real-HA reload/removal contract. The
+runtime/auth implementation and the model-checker actors were not changed.
+
+This is not a learning-only or combined-install acceptance result. Learning
+remains in the separate companion until phase 2. No live deployment, voice-data
+reset, restart, CI run or beta release is part of this development slice.
+
 ## Minimal Voice Match request diagnostics (development)
 
 The local fast suite passed **701 tests**. Full real-HA contracts passed **244
