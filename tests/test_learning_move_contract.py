@@ -57,14 +57,49 @@ REMINDER_RESPONSES = Counter(
 def test_safety_logic_matches_reviewed_source(name):
     parsed = ast.parse((ROOT / name).read_text())
     if name == "phone_flow.py":
+        # The approved wait delegates read-only polling to a separately tested
+        # helper. Remove only this exact import/call/recheck, not arbitrary code.
+        extension_import = ast.parse("from .finalization import wait_for_final_state").body[0]
+        imports = [node for node in parsed.body if ast.dump(node) == ast.dump(extension_import)]
+        assert len(imports) == 1
+        parsed.body.remove(imports[0])
+        controller = next(
+            node
+            for node in parsed.body
+            if isinstance(node, ast.ClassDef) and node.name == "PhoneController"
+        )
+        next_method = next(
+            node
+            for node in controller.body
+            if isinstance(node, ast.AsyncFunctionDef) and node.name == "_next"
+        )
+        extension = ast.parse(
+            "state = await wait_for_final_state(self, flow, frame, state)\nself.check(frame)"
+        ).body
+        assert [ast.dump(node) for node in next_method.body[2:4]] == [
+            ast.dump(node) for node in extension
+        ]
+        del next_method.body[2:4]
+        new_processing = (
+            "Your voice recording is still processing. This check has ended. "
+            "Check Voice Match management, or ask for status. Do not read another sample yet."
+        )
+        processing_changes = 0
         found = Counter()
         for node in ast.walk(parsed):
             if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if node.value == new_processing:
+                    processing_changes += 1
+                    node.value = (
+                        "Processing your voice recording. Please wait, then ask for status. "
+                        "Do not read another sample yet."
+                    )
                 if node.value.endswith(ASSISTANT_REMINDER):
                     original = node.value.removesuffix(ASSISTANT_REMINDER)
                     found[original] += 1
                     node.value = original
         assert found == REMINDER_RESPONSES
+        assert processing_changes == 1
     tree = ast.dump(parsed, include_attributes=False)
     expected = DIAGNOSTIC_AST if name == "phone_diagnostics.py" else SOURCE_AST[name]
     assert hashlib.sha256(tree.encode()).hexdigest() == expected

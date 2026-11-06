@@ -79,6 +79,21 @@ deletion explanation remain intact. Unverified pause/cancel outcomes keep their
 warnings without claiming success. This is a spoken reminder only: it does not
 switch assistants, change the preferred assistant or start another recording.
 
+The final prompted sample now has a bounded read-only completion wait within the
+same native turn: up to 15 additional seconds, at most 30 status reads, spaced
+0.5 seconds apart. It does not push a new message into an already-finished Assist
+conversation. Success still comes only from the backend's validated-completion
+receipt, followed by the regular-assistant reminder. Intermediate processing does
+not enter this wait. A rejected final sample returns its retry prompt, not success.
+Errors retain the attention response; continued processing explicitly says the
+check has ended and directs the user to management or a fresh status request.
+
+The wait rechecks authenticated turn scope before and after each read, stops on
+disconnect/revocation, expiry, unload or removed flow, and propagates cancellation.
+It neither resubmits PCM nor retries a failed bridge call or any learning mutation.
+Mismatched profile/target and inconsistent completion receipts cannot be announced
+as success by the polling helper. No background polling survives the native turn.
+
 The hidden, non-iframe launcher resolves entities by registry IDs under
 `codex_assist`, not their names. Its read-only command is
 `codex_assist/voice_learning/launch_info`; the JS lives at

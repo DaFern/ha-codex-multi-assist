@@ -66,6 +66,11 @@ Confirmed pauses, cancellation and validated learning completion now end with:
 “If you're finished with voice learning, remember to switch back to your regular
 assistant.” This development reminder does not switch assistants automatically.
 
+After the final phrase, the development agent now waits up to 15 additional
+seconds for confirmed completion and announces success in the same turn. If it
+is still processing, the reply explicitly says the automatic check has ended and
+directs you to Voice Match management or a spoken status request.
+
 For **Codex**, follow these sign-in steps:
 
 Sign-in uses a device code, so you approve it in a browser. The browser can be on any device.

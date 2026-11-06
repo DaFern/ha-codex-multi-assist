@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 import test_phone_learning_pipeline as phone_fixtures
 
+from custom_components.codex_assist.learning import finalization
 from custom_components.codex_assist.learning.learning_bridge_protocol import BridgeError
 
 phone = phone_fixtures.phone
@@ -42,15 +43,26 @@ async def test_cancel_before_consent_keeps_result_and_appends_reminder(phone):
     ]
 
 
-async def test_thirtieth_saved_sample_appends_reminder_only_after_validated_completion(phone):
+async def test_thirtieth_saved_sample_appends_reminder_only_after_validated_completion(
+    phone, monkeypatch
+):
+    monkeypatch.setattr(finalization, "POLL_INTERVAL", 0)
     original = phone["backend"].call
+    final_checks = 0
 
     async def thirty_samples(operation, user_id, data):
+        nonlocal final_checks
         result = await original(operation, user_id, data)
         if operation == "state":
             result.update(
                 target=30, outcome="complete" if phone["backend"].count == 30 else "active"
             )
+            if phone["backend"].count == 30:
+                final_checks += 1
+                result.update(
+                    processing=final_checks < 3,
+                    outcome="active" if final_checks < 3 else "complete",
+                )
         return result
 
     with patch.object(phone["backend"], "call", side_effect=thirty_samples):
@@ -67,6 +79,7 @@ async def test_thirtieth_saved_sample_appends_reminder_only_after_validated_comp
                 assert "saved samples were cleaned up" in reply
                 assert_reminder(reply)
     assert not phone["runtime"].controller.flows
+    assert final_checks == 3, "The final sample waits without another user utterance"
     assert len([call for call in phone["backend"].calls if call[0] == "sample"]) == 30
 
 

@@ -1,5 +1,39 @@
 # Testing
 
+## Final-phrase completion wait (development only)
+
+The final prompted sample can await read-only status for up to 15 additional
+seconds (0.5-second spacing, at most 30 reads) in the same authenticated turn.
+This does not asynchronously replace an already-sent Assist reply. Confirmed
+completion uses the existing validation/cleanup response and assistant reminder;
+continued processing now explicitly states the automatic check has ended.
+
+**32 fast helper cases** cover read-only operations, intermediate/non-processing
+states, rejected samples, errors and ended sessions, mismatched profile/target,
+inconsistent completion, count/time bounds, scope invalidation, bridge failure
+without retry, and cancellation propagation. **Seven native pipeline cases**
+exercise delayed success in the final turn without another utterance, processing
+timeout, rejection/re-prompt, backend error, ended session, bridge error and
+intermediate processing without waiting. These use synthetic backend/audio
+boundaries, not actual voiceprint extraction or Companion acceptance.
+The existing synthetic 30-sample native test now delays the final completion
+receipt across three status reads and verifies success without another utterance.
+
+The source-boundary test removes only the exact new helper import, wait call and
+post-read auth check, restores the changed processing literal, and removes the
+six previously approved reminder suffixes before requiring the original controller
+AST hash. All other consent, permit, sample, pause, discard and completion logic
+remains pinned. The polling helper is separately covered by the cases above.
+
+Local results: **402 current native HA tests passed / 1 skipped** (strict HTTP
+ordering; existing aiohttp rewrite warning), **252 minimum HA tests passed /
+151 newer-only skips**, **804 fast tests plus 32 subtests passed**. All **53**
+paired add-on contracts passed; Ruff, Node launcher and diff checks passed. The
+distribution projection includes **52 runtime files**, not a deployed artifact.
+No deployment, restart, live recording or automatic check of the tester's current
+session was performed. Exact-commit remote CI and real-phone delayed-completion
+acceptance remain pending; commit/push requires separate approval.
+
 ## Regular-assistant spoken reminder (development only)
 
 Six terminal-response literals append the same reminder after confirmed pause,

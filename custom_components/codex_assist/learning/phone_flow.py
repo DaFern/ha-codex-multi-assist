@@ -8,6 +8,7 @@ import time
 import unicodedata
 from dataclasses import dataclass, field
 
+from .finalization import wait_for_final_state
 from .learning_bridge_protocol import BridgeError
 from .phone_diagnostics import record
 
@@ -307,6 +308,8 @@ class PhoneController:
     async def _next(self, flow, frame):
         self.check(frame)
         state = await self.bridge.call("state", flow.user_id, flow.credentials)
+        state = await wait_for_final_state(self, flow, frame, state)
+        self.check(frame)
         if state["error"]:
             flow.phase, flow.permit = "attention", None
             return PhoneReply(
@@ -326,7 +329,8 @@ class PhoneController:
         if state["processing"]:
             flow.phase, flow.permit = "processing", None
             return PhoneReply(
-                "Processing your voice recording. Please wait, then ask for status. Do not read another sample yet."
+                "Your voice recording is still processing. This check has ended. "
+                "Check Voice Match management, or ask for status. Do not read another sample yet."
             )
         self.check(frame)
         permit = await self.bridge.call("permit", flow.user_id, flow.credentials)
