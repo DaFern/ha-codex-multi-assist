@@ -1,5 +1,41 @@
 # Testing
 
+## Recognised-name context and clean-message opt-in (development only)
+
+The sender's optional encrypted display name is validated separately from the
+unchanged 2000-character preference limit. Fast tests cover literal/quoted names,
+Unicode/max-length values, invalid or neutral names, legacy packets, unnamed plain
+requests, scope reset on name changes and no name leakage into diagnostic logs.
+Native conversation contracts check speaker switches and neutral reset; the clean
+STT adapter checks clean events with name context both with and without saved
+preferences. Codex receives name context on both normal and auth-retry composition
+paths; no HA caller, tools, AI Task or learning behavior is changed.
+
+The default-off options now validate pairing and explicitly selected personalised
+Wyoming discovery metadata. Native contracts cover options preservation, invalid
+sources, real entry reload/STT registration, source loss/recovery without taking
+Codex offline, identical concurrent words with different names, cancellation
+during recording/handoff/model processing, mid-record changes, no raw-error
+fallback or retry, and disable/re-enable with stable identity and retained replay
+protection. Engine lookup/discovery metadata and external audio/model results are
+synthetic, not physical-device acceptance.
+
+Local results: **817 fast tests plus 32 subtests passed**. The focused native
+clean-message/setup suite passed **35 tests** on current HA; minimum HA passed
+**21 / 14 managed-feature skips**. The full minimum-version suite passed
+**266 / 165 skipped**. After installing the declared `wyoming==1.10.2` dependency
+in the isolated current-version environment, the full strict-order current suite
+passed **430 / 1 skipped** (existing aiohttp rewrite warning). This resolved the
+four earlier setup errors without changing learning code. The paired add-on's unittest suite
+passed **204 / 4 built-engine skips**, using its pinned cached Wyoming 1.8.0 source.
+
+The adapter now has opt-in registration in development code: the review in
+[CLEAN_SPEAKER_STT_PROTOTYPE.md](CLEAN_SPEAKER_STT_PROTOTYPE.md#activation-review--6-november-2026)
+documents the setup, lifecycle and remaining physical acceptance requirements.
+Ruff and the 52-file distribution projection passed; neither is a deployed artifact.
+There was no live deployment, restart, pipeline change, provider/phone acceptance,
+commit, push or external wiki publication in this preparation step.
+
 ## Final-phrase completion wait (development only)
 
 The final prompted sample can await read-only status for up to 15 additional

@@ -11,6 +11,11 @@ from homeassistant.helpers.event import async_track_time_interval
 from .codex_models import MODEL_CACHE_SECONDS
 from .entry_modules import EntryModule, ModuleRuntime
 from .model_discovery import async_entry_model_catalog
+from .voice_match import (
+    CONF_CLEAN_TRANSCRIPT,
+    CONF_VOICE_MATCH_KEY,
+    runtime_for_entry,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -22,9 +27,19 @@ async def async_setup_codex(hass: HomeAssistant, entry: ModuleConfigEntry) -> bo
     """Start only Codex platforms and model refresh, without touching OAuth locks."""
     from . import async_update_listener
 
-    entry.runtime_data = ModuleRuntime(
-        EntryModule.CODEX, (Platform.CONVERSATION, Platform.AI_TASK)
-    )
+    platforms = (Platform.CONVERSATION, Platform.AI_TASK)
+    if entry.options.get(CONF_CLEAN_TRANSCRIPT):
+        from homeassistant.exceptions import ConfigEntryError
+
+        from .entry_modules import learning_supported
+        from .speaker_packet import valid_key
+
+        if not learning_supported() or not valid_key(entry.options.get(CONF_VOICE_MATCH_KEY, "")):
+            raise ConfigEntryError(
+                "Clean voice messages require HA 2026.10+ and Voice Match pairing"
+            )
+        platforms += (Platform.STT,)
+    entry.runtime_data = ModuleRuntime(EntryModule.CODEX, platforms)
     await hass.config_entries.async_forward_entry_setups(entry, entry.runtime_data.platforms)
     entry.async_on_unload(entry.add_update_listener(async_update_listener))
 
@@ -39,4 +54,5 @@ async def async_setup_codex(hass: HomeAssistant, entry: ModuleConfigEntry) -> bo
 
 async def async_unload_codex(hass: HomeAssistant, entry: ModuleConfigEntry) -> bool:
     """Unload only the platforms recorded for this Codex entry."""
+    await runtime_for_entry(entry).async_stop_clean_requests()
     return await hass.config_entries.async_unload_platforms(entry, entry.runtime_data.platforms)

@@ -1,8 +1,34 @@
-# Clean speaker-aware STT: isolated prototype
+# Clean voice messages: experimental opt-in adapter
 
-**Development only. Not registered, selectable, deployed or a supported HA metadata
-API.** No config-flow, entry-platform setup or live pipeline is changed by this
-prototype. It is a feasibility test, not a finished replacement for port 10352.
+**Development code, not deployed or a supported HA metadata API.** An explicitly
+enabled Codex entry can now register this STT entity on HA 2026.10+. It is off by
+default and never edits or selects a live pipeline. The filename retains the
+original prototype name for existing links.
+
+## Setup after separately approved deployment
+
+1. Keep the ordinary Whisper/original assistant available for rollback. Pair the
+   Codex entry's Voice Match personal preferences with the personalised sender.
+2. On that **Codex entry**, choose **Configure → Clean voice messages**, enable it
+   and explicitly select the personalised Wyoming source (port **10352**). Ordinary
+   Whisper, normal Voice Match, learning STT and wrappers are not eligible sources.
+   The saved discovery metadata must identify `voice-match-personal`; this does
+   not by itself prove pairing. Each incoming packet is still verified.
+3. Saving reloads this entry and stops its active clean-voice requests. It creates
+   **Clean voice messages**, but does not alter your default assistant or any pipeline.
+4. Only after explicit test-pipeline approval, choose that new STT entity with a
+   Codex conversation agent from the **same entry**, and your usual TTS. Disable
+   local-first handling and avoid native sentence-trigger conflicts (see limits).
+5. Verify actual Companion chat bubbles and speech with multiple speakers/devices.
+   Recognition is not authentication. No recording or re-enrolment is started here.
+
+Disable **Clean voice messages** to remove its active STT entity while keeping
+pairing and saved voices. Disabling personal preferences also clears clean setup.
+Before disabling, switch the test pipeline back to its original STT; pipelines
+are never changed automatically, so one still referencing a removed entity fails
+until corrected. No recordings are deleted. Re-enabling uses the stable entity
+unique ID. Publishing code, deployment and a full Core restart require separate
+approval; after installation, changing these options only reloads this entry.
 
 ## Why the current header is visible
 
@@ -15,7 +41,7 @@ field forwarded to the conversation agent. A frontend-only filter would leave
 the underlying transcript/trace unchanged. This prototype does not patch Core,
 edit the frontend, use invisible characters or read a shared last-speaker sensor.
 
-## Candidate design
+## Design and lifecycle
 
 `VoiceMatchSttAdapter` wraps an explicitly supplied personalised Wyoming STT
 entity. It forwards audio and advertises the source entity's languages, audio
@@ -35,11 +61,22 @@ that association once, rechecks the current key/expiry/body binding, then uses t
 existing entry-wide nonce replay protection, preference scoping and speaker-aware
 automation dispatch. The current HA caller is not replaced with the speaker.
 
-At most 256 pending objects are allowed per entry. Key changes fail closed.
+At most 256 pending objects and 256 active clean tasks are allowed per entry.
+Key changes fail closed.
 Weak-reference cleanup, task completion/cancellation callbacks and an expiry timer
 remove abandoned records even if HA retains clean transcript objects in traces.
 A cancelling task cannot consume a packet and begin another model/action turn.
 The clean text can remain in normal HA history; the private association cannot.
+
+Entry unload/options reload invalidates the old adapter generation, destroys
+pending packets/timers/callbacks and cancels entry-owned clean tasks, including
+recording, STT-to-intent handoff and model processing. Plain Codex tasks are not
+selected by this cleanup. Existing nonce replay protection survives reload.
+An old adapter fails closed even if its source later becomes available again.
+Each new recording resolves the source afresh; disappearance, source replacement,
+mid-recording changes or peer failures produce no raw-header fallback or retry.
+Missing sources only mark this STT entity unavailable, and source-state changes
+refresh its availability without taking the other Codex entities offline.
 
 ## Important limits
 
@@ -51,6 +88,10 @@ The clean text can remain in normal HA history; the private association cannot.
   is deliberately no lookup by words, time proximity, device or last speaker to
   recover it. Plain text follows the existing neutral/unverified path; a forged,
   copied, expired, already consumed or wrong-task carrier is rejected.
+- The STT API does not supply the chosen conversation agent to the adapter. Setup
+  therefore cannot enforce a pipeline pairing at the STT stage: use only agents
+  from the same paired Codex entry. Another Codex entry rejects the private carrier;
+  unrelated agents or local handlers can see ordinary words, not verified identity.
 - Native HA sentence triggers can intercept clean text **before Codex**, even with
   local-first intent handling disabled. They do not acquire the private speaker
   condition. Avoid phrase conflicts with the dedicated Voice Match trigger. Tests
@@ -88,8 +129,8 @@ mid-recording changed pairing.
 ## Before any live rollout
 
 1. Review this integration-specific handoff and the supported-version evidence.
-2. Add separately approved opt-in configuration, source-entity validation,
-   setup/unload/reload lifecycle handling and user-facing warnings.
+2. Review the now-implemented default-off configuration, source validation,
+   setup/unload/reload handling and user-facing warnings with their test evidence.
 3. Complete CI, obtain backup/deployment approval and separate Core restart approval.
 4. Select the new adapter in an explicitly approved pipeline and visually verify
    clean transcripts on the Companion app and actual satellite response audio.
@@ -98,3 +139,22 @@ mid-recording changed pairing.
 
 No live settings, source engines, voiceprints, automations, Alexa routines, agent
 personalities, permissions or AI Task defaults were changed for this prototype.
+
+## Activation review — 6 November 2026
+
+The name-context follow-up also exercises this prototype with a recognised name
+and with/without saved preferences. Synthetic native HA pipelines deliver the name
+to the model while `stt-end`, `intent-start` and serialized events contain only the
+spoken text. This does not enable the adapter or prove Companion-app rendering.
+
+The first review retained the prototype as unregistered pending approval for an
+opt-in implementation. That implementation was subsequently approved and prepared
+in this checkout: default-off options/source selection, Codex-only STT lifecycle,
+validation against Wyoming discovery metadata, safe source loss, cleanup and
+cancellation now have native regression tests. Source/engine I/O in those tests is
+synthetic; no real-phone, satellite or provider acceptance is claimed. Remote CI,
+backup/deployment/restart approval and the physical acceptance above remain pending.
+
+The object/task-identity handoff remains version-sensitive and is not a supported
+upstream metadata channel. Installing the name change alone leaves existing
+stock-Wyoming chat bubbles unchanged.

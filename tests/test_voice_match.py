@@ -133,6 +133,75 @@ def test_personal_instructions_are_literal_and_do_not_replace_base():
     assert "not authentication or permission" in result
 
 
+def test_recognised_name_reaches_prompt_without_personal_instructions(caplog):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="custom_components.codex_assist.voice_match")
+    key = Fernet.generate_key().decode()
+    name = 'Alice "Example" {{ 7 * 7 }}'
+    wire = encode(key, "hello", voice="alice", revision="a" * 32,
+                  speaker_name=name, now=1000)
+    assert name not in wire
+    request = SpeakerRuntime().prepare_request(
+        key, wire, [user(wire)], "chat", "agent", now=1000,
+    )
+    assert request.verified and request.speaker_name == name
+    result = personal_instructions("Original personality", request.instructions,
+                                   speaker_name=request.speaker_name,
+                                   request_tag=request.diagnostic_tag)
+    assert result.startswith("Original personality")
+    assert r'Alice \"Example\" {{ 7 * 7 }}' in result
+    assert "say you recognise their voice" in result
+    assert "not authentication" in result
+    assert name not in caplog.text and "Alice" not in caplog.text
+
+
+@pytest.mark.parametrize("name", ["", " ", "x" * 81, "Alice\nAdmin", "A\x00B", 42, []])
+def test_packet_rejects_invalid_speaker_names(name):
+    with pytest.raises(PacketError):
+        encode(Fernet.generate_key().decode(), "hello", voice="alice", revision="a" * 32,
+               speaker_name=name)
+
+
+def test_neutral_packet_cannot_supply_a_name():
+    with pytest.raises(PacketError):
+        encode(Fernet.generate_key().decode(), "hello", speaker_name="Alice")
+
+
+def test_speaker_name_preserves_full_preference_limit_and_literal_unicode():
+    key = Fernet.generate_key().decode()
+    name = "É" * 80
+    preferences = "🙂" * 2000
+    wire = encode(key, "hello", voice="alice", revision="a" * 32,
+                  instructions=preferences, speaker_name=name, now=1000)
+    _, payload, _ = decode(key, wire, now=1000)
+    assert payload["speaker_name"] == name
+    assert payload["instructions"] == preferences
+
+
+def test_name_is_request_local_and_legacy_packets_still_work():
+    key = Fernet.generate_key().decode()
+    runtime = SpeakerRuntime()
+    contents = []
+    scopes = []
+    for voice, name in (("alice", "Alice"), ("alice", "Alicia"), ("bob", "Bob"),
+                        (None, None), ("bob", None)):
+        wire = encode(key, "hello", voice=voice, revision="a" * 32 if voice else None,
+                      speaker_name=name, now=1000)
+        contents.append(user(wire))
+        request = runtime.prepare_request(key, wire, contents, "chat", "agent", now=1000)
+        assert request.speaker_name == name
+        scopes.append(request.scope)
+        result = personal_instructions("Base", "", speaker_name=request.speaker_name)
+        if name is None:
+            assert result == "Base"
+        else:
+            assert name in result
+    assert len(set(scopes)) == len(scopes)
+    plain = runtime.prepare_request(key, "hello", [user("hello")], "chat", "agent", now=1000)
+    assert plain.speaker_name is None and not plain.verified
+
+
 def test_diagnostic_tag_contains_no_text_and_survives_valid_packet_transport():
     from custom_components.codex_assist.speaker_packet import diagnostic_tag
 
@@ -240,3 +309,47 @@ def test_disabling_pairing_cannot_restore_previously_mixed_history():
     assert [item.content for item in scoped_contents(contents, boundary)] == [
         "plain request after disabling"
     ]
+
+
+@pytest.mark.asyncio
+async def test_clean_task_capacity_fails_without_evicting_active_requests():
+    import asyncio
+
+    runtime = SpeakerRuntime()
+    runtime.clean_tasks.update(object() for _ in range(256))
+    with pytest.raises(PacketError):
+        runtime.track_clean_task(asyncio.current_task())
+    assert len(runtime.clean_tasks) == 256
+
+
+@pytest.mark.asyncio
+async def test_clean_shutdown_clears_carriers_timers_and_only_cancels_owned_tasks():
+    import asyncio
+
+    runtime = SpeakerRuntime()
+    ready = asyncio.Event()
+    block = asyncio.Event()
+    key = Fernet.generate_key().decode()
+    runtime.seen["existing-replay-record"] = 2000
+    retained = []
+
+    async def clean_request():
+        runtime.track_clean_task(asyncio.current_task())
+        retained.append(runtime.handoffs.issue(key, packet(key), now=1000))
+        ready.set()
+        await block.wait()
+
+    owned = asyncio.create_task(clean_request())
+    plain = asyncio.create_task(block.wait())
+    await ready.wait()
+    pending = list(runtime.handoffs.pending.values())
+    await runtime.async_stop_clean_requests()
+    assert owned.cancelled() and not plain.cancelled()
+    assert not runtime.handoffs.pending and not runtime.clean_tasks
+    assert all(record.timer.cancelled() for record in pending)
+    assert runtime.seen == {"existing-replay-record": 2000}
+    assert runtime.clean_generation == 1
+    with pytest.raises(PacketError):
+        runtime.handoffs.consume(key, retained[0], now=1000)
+    block.set()
+    await plain

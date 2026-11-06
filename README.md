@@ -136,6 +136,11 @@ permissions. It is off by default and requires paired add-on/integration updates
 See [setup, privacy boundaries and rollback](docs/VOICE_MATCH.md). It does not
 authenticate speakers or retrieve private conversations by recognised identity.
 
+Development code now also supplies the matched voice profile's display name to
+the agent, even without saved personal instructions. This lets it acknowledge a
+recognised speaker naturally, without treating recognition as a login. It needs
+both reviewed updates; it is not deployed by editing this checkout.
+
 The development-only [speaker automation extension](docs/SPEAKER_AUTOMATIONS.md)
 adds a **Voice Match sentence** trigger and **Recognised speaker is** condition.
 Reuse one voice profile across automations, without a shared last-speaker sensor.
@@ -143,8 +148,10 @@ It requires separate reviewed deployment and must not authorise sensitive action
 
 The current personalised Wyoming endpoint embeds an encrypted header in STT text,
 so it can appear in Assist's user-message bubble even though Codex removes it
-before model processing. A [clean-transcript prototype](docs/CLEAN_SPEAKER_STT_PROTOTYPE.md)
-is under isolated development; it is not yet selectable or deployed.
+before model processing. Development code now offers an optional
+[Clean voice messages source](docs/CLEAN_SPEAKER_STT_PROTOTYPE.md), off by default.
+It requires HA 2026.10+, explicit source selection and separate deployment and
+test-pipeline approval; installing code alone does not change an existing assistant.
 
 Development [request diagnostics](docs/VOICE_MATCH.md#minimal-request-diagnostics-development)
 can distinguish neutral matches, missing preferences and local prompt application

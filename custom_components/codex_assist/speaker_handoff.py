@@ -39,6 +39,11 @@ class RequestHandoffs:
     def __init__(self):
         self.pending = {}
 
+    def clear(self):
+        """Remove timers/callbacks as well as packets when an entry stops."""
+        for record in list(self.pending.values()):
+            record.cleanup()
+
     def issue(self, key, wire, *, now=None):
         clean, _packet, issued = decode(key, wire, now=now)
         loop = asyncio.get_running_loop()

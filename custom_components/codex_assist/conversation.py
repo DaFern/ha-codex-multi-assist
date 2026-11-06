@@ -263,7 +263,8 @@ class CodexAssistConversationEntity(
                         model=model,
                         instructions=personal_instructions(_instructions_for_turn(
                             chat_log, prompt, web_search=web_search
-                        ), preferences, request_tag=prepared_request.diagnostic_tag),
+                        ), preferences, request_tag=prepared_request.diagnostic_tag,
+                           speaker_name=prepared_request.speaker_name),
                         input_items=await _codex_input_from_chat_log(
                             self.hass, chat_log, user_input.agent_id, boundary, request_turn
                         ),
@@ -310,7 +311,8 @@ class CodexAssistConversationEntity(
                             model=model,
                             instructions=personal_instructions(_instructions_for_turn(
                                 chat_log, prompt, web_search=web_search
-                            ), preferences, request_tag=prepared_request.diagnostic_tag),
+                            ), preferences, request_tag=prepared_request.diagnostic_tag,
+                               speaker_name=prepared_request.speaker_name),
                             input_items=await _codex_input_from_chat_log(
                                 self.hass, chat_log, user_input.agent_id, boundary, request_turn
                             ),

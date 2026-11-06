@@ -57,6 +57,13 @@ strips the header, and retains the original HA caller/permissions. Preferences
 are appended literally after native base-prompt rendering on every model/tool
 round; they are never executed as Jinja or applied to AI Task.
 
+The development sender's optional encrypted `speaker_name` supplies the matched
+profile label as quoted per-request recognition context, even with empty style
+preferences. It conveys neither an authenticated HA account nor permissions.
+Legacy packets remain unnamed; neutral packets reject a supplied name. Name
+changes also reset scope, and diagnostics still omit names. See the recognised
+names section in the connector guide for deployment and compatibility limits.
+
 The bounded entry-scoped in-memory speaker runtime retains only current-scope
 boundaries, not a private-history database. Model input is filtered by boundary
 and agent, excluding later concurrent user turns; provider session/cache IDs vary
@@ -88,11 +95,18 @@ to use acoustic identity as authorisation.
 
 ### Standard request path
 
-An unregistered development-only [clean STT prototype](CLEAN_SPEAKER_STT_PROTOTYPE.md)
+An opt-in development-only [clean STT adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md)
 wraps personalised Wyoming STT and binds its verified packet to an exact clean
 text object/owning pipeline task. The optional consumer uses the same nonce cache
-and request preparation as encrypted transcripts. It has no setup/configuration
-entry point and is not a live deployment or documented HA metadata API.
+and request preparation as encrypted transcripts. Configure → Clean voice messages
+on a Codex entry enables its STT platform only with explicit opt-in (HA 2026.10+).
+Source selection validates the registered Wyoming provider and advertised
+`voice-match-personal` service, not its editable entity label. Each recording
+resolves the current source again and verifies the result before publishing text.
+Missing sources affect only the clean STT entity, not conversation or AI Task.
+Entry unload/options reload invalidates adapters, clears pending packets/timers
+and cancels tracked clean pipeline tasks through model completion. The nonce cache
+is retained. This source code is not a live deployment or documented HA metadata API.
 
 1. Home Assistant sends a voice or chat request through an Assist pipeline using `conversation.codex_assist`.
 2. Codex Assist refreshes its stored Codex or ChatGPT token if needed.

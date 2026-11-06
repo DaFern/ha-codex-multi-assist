@@ -35,13 +35,44 @@ The add-on's conservative match/gap checks choose a preference profile; accepted
 but uncertain speech uses neutral instructions with fresh context. Existing
 acoustic rejection is unchanged.
 
+## Recognised names (development, not deployed)
+
+The paired sender can now include the matched profile's **display name** in an
+optional encrypted `speaker_name` field. Codex supplies that name separately from
+style preferences on every model/tool round, including the authentication retry
+path. Empty personal instructions no longer prevent name context. The model is
+asked to acknowledge voice recognition naturally, not to claim certain identity
+or ask for a name as though no match were supplied. This remains model guidance,
+not a guarantee of its answer or evidence of a real acoustic match.
+
+This uses the profile label, not an inferred name from presence, a profile ID or
+the current phone login. The label is sent to the selected provider; keep it
+appropriate for that use. It is quoted as literal data, not rendered as Jinja.
+Names are limited to 80 printable characters and never added to these diagnostic
+logs. The existing `instructions_present`/`instructions_applied` flags describe
+saved preferences only; false does not mean no name was supplied.
+
+Neutral/unassigned requests cannot carry a name. Plain text and older packets
+without the optional field remain unnamed; no name is recovered from a previous
+speaker. A name change resets the model's active scope even if the profile revision
+is unchanged. Existing source authentication, utterance binding, expiry/replay
+checks, HA caller permissions and AI Task defaults remain unchanged.
+
+Both packet copies retain version 1: older senders work without names and older
+receivers ignore the optional name. Both updates are needed for the feature; no
+pairing rotation or re-enrolment is required just for this change. The visible
+encrypted-header limitation below is **not** fixed by name context.
+
 ## Conversation history
 
 **Visible transcript limitation:** the current stock Wyoming path displays the
 encrypted header in Assist's user-message bubble. Codex removes it after HA's STT
-event has already been sent to the frontend. See the unregistered, experimental
-[clean STT adapter prototype](CLEAN_SPEAKER_STT_PROTOTYPE.md); it is not a setting
-that can be enabled on the existing endpoint yet.
+event has already been sent to the frontend. The development-only
+[Clean voice messages adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md) now has default-off
+setup under Configure → Clean voice messages on the Codex entry (HA 2026.10+).
+After separately approved deployment, explicitly select the personalised Wyoming
+source, then use the new adapter in a separate test assistant with a Codex agent
+from that entry. It does not clean existing stock-Wyoming pipelines automatically.
 
 When paired, context is bounded to the current speaker/revision and agent within
 the provided HA conversation. Speaker/agent changes, changed preferences/ownership,
@@ -84,8 +115,8 @@ applies; tags are not authentication or a last-speaker API.
 
 `receive` reports recognised/neutral/rejected and `instructions_present`.
 `prompt_prepared` reports `instructions_applied` for each composition attempt;
-it does not prove provider delivery or model compliance. The unregistered clean
-STT prototype uses the same tag as its original encrypted packet. Plain/unpaired
+it does not prove provider delivery or model compliance. The experimental clean
+STT adapter uses the same tag as its original encrypted packet. Plain/unpaired
 requests do not inherit an older tag or produce a recognised-person diagnostic.
 
 Allow INFO only for `custom_components.codex_assist.conversation` and

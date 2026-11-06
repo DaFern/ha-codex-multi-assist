@@ -33,7 +33,7 @@ from .entry_modules import CONF_MODULE, EntryModule, entry_module
 from .learning.config_flow import LearningConfigFlowMixin, LearningOptionsFlow
 from .model_discovery import async_entry_model_catalog
 from .speaker_packet import valid_key
-from .voice_match import CONF_VOICE_MATCH_KEY
+from .voice_match import CONF_CLEAN_TRANSCRIPT, CONF_PERSONAL_STT_SOURCE, CONF_VOICE_MATCH_KEY
 
 CONF_ACCESS_TOKEN = "access_token"
 CONF_PROMPT = "prompt"
@@ -255,7 +255,7 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
             return self.async_abort(reason="learning_reconfigure_required")
         return self.async_show_menu(
             step_id="init",
-            menu_options=["settings", "agents", "voice_match"],
+            menu_options=["settings", "agents", "voice_match", "clean_voice"],
         )
 
     async def async_step_voice_match(self, user_input=None):
@@ -265,6 +265,8 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
             options = dict(self.config_entry.options)
             if not user_input.get("enabled"):
                 options.pop(CONF_VOICE_MATCH_KEY, None)
+                options.pop(CONF_CLEAN_TRANSCRIPT, None)
+                options.pop(CONF_PERSONAL_STT_SOURCE, None)
                 return self.async_create_entry(title="", data=options)
             key = user_input.get(CONF_VOICE_MATCH_KEY, "").strip() or saved
             if valid_key(key):
@@ -278,6 +280,44 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
                 # Deliberately no saved/default key in the form payload.
                 vol.Optional(CONF_VOICE_MATCH_KEY): selector.TextSelector(
                     selector.TextSelectorConfig(type="password")
+                ),
+            }),
+            errors=errors,
+        )
+
+    async def async_step_clean_voice(self, user_input=None):
+        from .entry_modules import learning_supported
+
+        errors = {}
+        options = dict(self.config_entry.options)
+        if user_input is not None:
+            if not user_input.get("enabled"):
+                options.pop(CONF_CLEAN_TRANSCRIPT, None)
+                options.pop(CONF_PERSONAL_STT_SOURCE, None)
+                return self.async_create_entry(title="", data=options)
+            if not learning_supported():
+                errors["base"] = "clean_voice_requires_current_ha"
+            elif not valid_key(options.get(CONF_VOICE_MATCH_KEY, "")):
+                errors["base"] = "clean_voice_needs_pairing"
+            else:
+                from .voice_match_stt import resolve_personal_source
+
+                source_id = user_input.get(CONF_PERSONAL_STT_SOURCE)
+                if resolve_personal_source(self.hass, source_id) is None:
+                    errors[CONF_PERSONAL_STT_SOURCE] = "invalid_personal_stt_source"
+                else:
+                    options[CONF_CLEAN_TRANSCRIPT] = True
+                    options[CONF_PERSONAL_STT_SOURCE] = source_id
+                    return self.async_create_entry(title="", data=options)
+        source_field = vol.Optional(CONF_PERSONAL_STT_SOURCE)
+        if source_id := options.get(CONF_PERSONAL_STT_SOURCE):
+            source_field = vol.Optional(CONF_PERSONAL_STT_SOURCE, default=source_id)
+        return self.async_show_form(
+            step_id="clean_voice",
+            data_schema=vol.Schema({
+                vol.Required("enabled", default=bool(options.get(CONF_CLEAN_TRANSCRIPT))): bool,
+                source_field: selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="stt", integration="wyoming")
                 ),
             }),
             errors=errors,

@@ -51,13 +51,15 @@ def valid_key(key):
         return False
 
 
-def encode(key, text, *, voice=None, revision=None, instructions="", now=None):
+def encode(key, text, *, voice=None, revision=None, instructions="", speaker_name=None, now=None):
     from cryptography.fernet import Fernet
     if not valid_key(key) or not isinstance(text, str) or not 1 <= len(text) <= MAX_TEXT:
         raise PacketError()
     payload = {"v": 1, "nonce": uuid.uuid4().hex, "voice": voice,
                "revision": revision, "instructions": instructions,
                "text_hash": hashlib.sha256(text.encode()).hexdigest()}
+    if speaker_name is not None:
+        payload["speaker_name"] = speaker_name
     validate_payload(payload)
     raw = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
     cipher = Fernet(key.encode())
@@ -78,8 +80,12 @@ def validate_payload(value):
     instructions = value.get("instructions")
     if not isinstance(instructions, str) or len(instructions) > 2000 or "\x00" in instructions:
         raise PacketError()
+    name = value.get("speaker_name")
+    if name is not None and (not isinstance(name, str) or not 1 <= len(name) <= 80
+                             or not name.strip() or not name.isprintable()):
+        raise PacketError()
     if value.get("voice") is None:
-        if value.get("revision") is not None or instructions:
+        if value.get("revision") is not None or instructions or name is not None:
             raise PacketError()
     elif (not isinstance(value["voice"], str)
           or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,39}", value["voice"])
