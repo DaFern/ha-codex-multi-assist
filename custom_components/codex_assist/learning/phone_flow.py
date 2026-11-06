@@ -295,6 +295,7 @@ class PhoneController:
                 record("flow", "cancel_discarded")
                 return PhoneReply(
                     "Voice learning cancelled. This unfinished session's recordings were deleted. Your existing voiceprint is unchanged."
+                    " If you're finished with voice learning, remember to switch back to your regular assistant."
                 )
         except BridgeError:
             pass
@@ -315,6 +316,7 @@ class PhoneController:
             self.flows.pop((flow.login_id, flow.user_id, flow.conversation_id), None)
             return PhoneReply(
                 "Your replacement voiceprint validated and the saved samples were cleaned up. Voice learning is complete."
+                " If you're finished with voice learning, remember to switch back to your regular assistant."
             )
         if state["outcome"] != "active":
             flow.phase, flow.permit = "attention", None
@@ -401,6 +403,7 @@ class PhoneController:
                         self.flows.pop(key, None)
                         return PhoneReply(
                             "Voice learning cancelled. This unfinished session's recordings were deleted. Your existing voiceprint is unchanged."
+                            " If you're finished with voice learning, remember to switch back to your regular assistant."
                         )
                 except BridgeError:
                     pass
@@ -419,6 +422,7 @@ class PhoneController:
                     record("flow", "cancel_before_start")
                     return PhoneReply(
                         "Voice learning cancelled. No learning started in this conversation. Any earlier paused recordings are unchanged."
+                        " If you're finished with voice learning, remember to switch back to your regular assistant."
                     )
                 if control == "cancel":
                     if frame.started_at <= flow.issued:
@@ -430,6 +434,7 @@ class PhoneController:
                     record("flow", "stop_paused")
                     return PhoneReply(
                         "Voice learning is paused. Partial samples are kept for an explicitly consented resume."
+                        " If you're finished with voice learning, remember to switch back to your regular assistant."
                     )
                 record("flow", "stop_unverified")
                 return PhoneReply(
@@ -507,6 +512,7 @@ class PhoneController:
                     record("flow", "control_guard_paused")
                     return PhoneReply(
                         "That sounded like a learning control, so it was not saved. Learning is paused and unfinished recordings are kept. Ask to continue when you're ready."
+                        " If you're finished with voice learning, remember to switch back to your regular assistant."
                     )
                 return PhoneReply(
                     "That recording was not submitted. I could not verify the pause. Close Assist and check Voice Match management."

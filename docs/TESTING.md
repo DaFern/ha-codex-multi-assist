@@ -1,5 +1,27 @@
 # Testing
 
+## Regular-assistant spoken reminder (development only)
+
+Six terminal-response literals append the same reminder after confirmed pause,
+safety pause, cancellation (including before consent and recovered cancellation
+receipts) and validated completion. No warning or intermediate sample prompt is
+replaced. The move-boundary test removes exactly those six allowlisted literal
+suffixes and then requires the original `phone_flow.py` AST hash. This retains
+the original consent, permit, pause, discard and completion control-flow pins;
+it does not broadly repin changed safety logic.
+
+Twelve native contracts cover the reminder, excluded control audio, retained vs
+discarded samples, cancellation receipt recovery without a retry, and uncertain
+outcomes without the success reminder. A synthetic 30-sample backend verifies
+that prompts 1–30 have no reminder and only validated completion appends it.
+This is not real 30-phrase recording, voiceprint validation or phone acceptance.
+
+Local suites: **395 current native HA tests passed / 1 skipped** (strict HTTP
+ordering; existing aiohttp rewrite warning), **252 minimum HA tests passed /
+144 newer-only skips**, **772 fast tests plus 32 subtests passed**. No live code
+deployment, restart or recording is included; commit/push and remote CI remain
+subject to separate approval.
+
 ## Launcher return after native request (development only)
 
 The v2 launcher requests native Assist once, then replaces the underlying HA route

@@ -72,6 +72,13 @@ including mappings inside lists and tuples, without modifying configuration.
    bound unfinished session; the installed voiceprint stays until a validated
    replacement. Recognition is never account authentication.
 
+Confirmed pause (including the safety-control pause), cancellation and validated
+completion responses append: “If you're finished with voice learning, remember
+to switch back to your regular assistant.” The original result and retention/
+deletion explanation remain intact. Unverified pause/cancel outcomes keep their
+warnings without claiming success. This is a spoken reminder only: it does not
+switch assistants, change the preferred assistant or start another recording.
+
 The hidden, non-iframe launcher resolves entities by registry IDs under
 `codex_assist`, not their names. Its read-only command is
 `codex_assist/voice_learning/launch_info`; the JS lives at

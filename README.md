@@ -62,6 +62,10 @@ not confirm Assist opened or grant recording consent. The one-shot launch guard
 stays enabled; a **Back to Voice Match** link remains if dispatch is uncertain.
 See [launcher boundaries](docs/COMBINED_INTEGRATION.md) for fallback limitations.
 
+Confirmed pauses, cancellation and validated learning completion now end with:
+“If you're finished with voice learning, remember to switch back to your regular
+assistant.” This development reminder does not switch assistants automatically.
+
 For **Codex**, follow these sign-in steps:
 
 Sign-in uses a device code, so you approve it in a browser. The browser can be on any device.

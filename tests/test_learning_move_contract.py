@@ -3,6 +3,7 @@
 import ast
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -23,10 +24,48 @@ SOURCE_AST = {
 # consent/transport/handoff source pins remain unchanged.
 DIAGNOSTIC_AST = "60fb6b04e9b8c74896c4f467592d5bf6f3fe1067313cde9f2b4f3e1838c965e8"
 
+# Approved presentation-only extension. Removing precisely these six literal
+# suffixes must restore the original AST, including every consent/control branch.
+ASSISTANT_REMINDER = (
+    " If you're finished with voice learning, remember to switch back to your regular assistant."
+)
+REMINDER_RESPONSES = Counter(
+    {
+        (
+            "Voice learning cancelled. This unfinished session's recordings were deleted. "
+            "Your existing voiceprint is unchanged."
+        ): 2,
+        (
+            "Voice learning cancelled. No learning started in this conversation. "
+            "Any earlier paused recordings are unchanged."
+        ): 1,
+        (
+            "Your replacement voiceprint validated and the saved samples were cleaned up. "
+            "Voice learning is complete."
+        ): 1,
+        "Voice learning is paused. Partial samples are kept for an explicitly consented resume.": 1,
+        (
+            "That sounded like a learning control, so it was not saved. "
+            "Learning is paused and unfinished recordings are kept. "
+            "Ask to continue when you're ready."
+        ): 1,
+    }
+)
+
 
 @pytest.mark.parametrize("name", SOURCE_AST)
 def test_safety_logic_matches_reviewed_source(name):
-    tree = ast.dump(ast.parse((ROOT / name).read_text()), include_attributes=False)
+    parsed = ast.parse((ROOT / name).read_text())
+    if name == "phone_flow.py":
+        found = Counter()
+        for node in ast.walk(parsed):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if node.value.endswith(ASSISTANT_REMINDER):
+                    original = node.value.removesuffix(ASSISTANT_REMINDER)
+                    found[original] += 1
+                    node.value = original
+        assert found == REMINDER_RESPONSES
+    tree = ast.dump(parsed, include_attributes=False)
     expected = DIAGNOSTIC_AST if name == "phone_diagnostics.py" else SOURCE_AST[name]
     assert hashlib.sha256(tree.encode()).hexdigest() == expected
 
@@ -39,8 +78,8 @@ def test_wire_codec_is_identical_to_paired_addon_release():
 
 def test_native_learning_dependencies_remain_optional_and_declared():
     manifest = json.loads((ROOT.parent / "manifest.json").read_text())
-    assert {
-        "assist_pipeline", "http", "frontend", "panel_custom", "stt", "websocket_api"
-    } <= set(manifest["after_dependencies"])
+    assert {"assist_pipeline", "http", "frontend", "panel_custom", "stt", "websocket_api"} <= set(
+        manifest["after_dependencies"]
+    )
     # Fixing import declarations must not require voice/frontend setup for Codex.
     assert not manifest.get("dependencies")
