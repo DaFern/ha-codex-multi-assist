@@ -56,6 +56,12 @@ follow [learning setup](docs/COMBINED_INTEGRATION.md#clean-development-setup-not
 Skip the Codex sign-in and agent-selection steps below. Personalisation is optional
 and uses a separate key only if you later add Codex.
 
+After requesting native Assist, the development launcher returns the underlying
+page to Voice Match management when a safe add-on route is available. This does
+not confirm Assist opened or grant recording consent. The one-shot launch guard
+stays enabled; a **Back to Voice Match** link remains if dispatch is uncertain.
+See [launcher boundaries](docs/COMBINED_INTEGRATION.md) for fallback limitations.
+
 For **Codex**, follow these sign-in steps:
 
 Sign-in uses a device code, so you approve it in a browser. The browser can be on any device.

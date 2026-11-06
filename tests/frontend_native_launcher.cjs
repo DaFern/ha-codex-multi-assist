@@ -11,6 +11,8 @@ const requestHash = "#request=" + "a".repeat(32) + "&user=alice&profile=alice-pr
 function harness(options = {}) {
   const messages = [];
   const calls = [];
+  const navigations = [];
+  const trace = [];
   const listeners = {};
   const timers = new Map();
   let serial = 0;
@@ -24,15 +26,20 @@ function harness(options = {}) {
     set innerHTML(value) { throw new Error("No HTML interpolation"); }
   }
   const location = { pathname: "/voice-match-learning", hash: options.hash ?? requestHash };
-  const history = { state: options.history || null, replaceState(state, ignored, url) { this.state = state; location.hash = ""; location.pathname = url; } };
+  const history = { state: options.history || null, replaceState(state, ignored, url) {
+    if (options.navigationFails && url !== "/voice-match-learning") throw new Error("Synthetic navigation failure");
+    this.state = state; location.hash = ""; location.pathname = url;
+  } };
   const registry = new Map();
   const window = {};
+  window.dispatchEvent = event => { navigations.push(event); trace.push("navigate"); };
   window.top = options.iframe ? {} : window;
   const document = { hidden: false, createElement: () => new Element(),
     addEventListener(name, callback) { listeners[name] = callback; },
     removeEventListener(name) { delete listeners[name]; } };
   const context = vm.createContext({
     HTMLElement: Element, document, window, location, history, URLSearchParams,
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail; } },
     customElements: { get: key => registry.get(key), define: (key, value) => registry.set(key, value) },
     setTimeout: (callback, delay) => { timers.set(++serial, { callback, delay }); return serial; },
     clearTimeout: id => timers.delete(id),
@@ -40,13 +47,15 @@ function harness(options = {}) {
   vm.runInContext(source, context);
   const external = { config: { hasAssist: !options.browser }, fireMessage(message) {
     messages.push(JSON.parse(JSON.stringify(message)));
+    trace.push("native");
+    options.onSend?.(hass, location, document);
     if (options.throwAfterSend) throw new Error("Synthetic uncertain native dispatch");
   } };
   const hass = { connected: true, user: { id: "alice" }, connection: {}, auth: { external },
     callWS: async data => { calls.push(JSON.parse(JSON.stringify(data))); return handler(data); } };
   const Panel = registry.get("voice-match-launch-panel");
   const panel = new Panel();
-  return { panel, hass, history, location, document, external, messages, calls, listeners, timers,
+  return { panel, hass, history, location, document, external, messages, calls, listeners, timers, navigations, trace,
     setHandler(value) { handler = value; },
     mount() { panel.hass = hass; panel.connectedCallback(); },
     reload() { const next = new Panel(); next.hass = hass; next.connectedCallback(); return next; },
@@ -142,6 +151,70 @@ async function checks() {
   await settle();
   assert.equal(peer.messages.length, 0);
   assert(!peer.panel._message.textContent.includes("synthetic-peer-secret"));
+
+  const management = "/repo_voice_match/ingress";
+  const info = { user_id: "alice", profile_id: "alice-profile", pipeline_id: "learning-pipeline", return_path: management };
+  const returned = harness();
+  returned.setHandler(async () => info);
+  returned.mount();
+  await settle();
+  assert.equal(returned.location.pathname, management);
+  assert.deepEqual(returned.trace, ["native", "navigate"], "Request native Assist before changing the underlying route");
+  assert.equal(returned.navigations[0].type, "location-changed");
+  assert.equal(returned.navigations[0].detail.replace, true);
+  assert.equal(returned.panel._back.href, management);
+  assert.equal(returned.panel._back.textContent, "Back to Voice Match");
+  assert.equal(returned.history.state.voiceMatchLaunchConsumed, true);
+  await returned.panel._start();
+  assert.equal(returned.messages.length, 1);
+
+  const nativeForeground = harness({ onSend: (hass, location, document) => { document.hidden = true; } });
+  nativeForeground.setHandler(async () => info);
+  nativeForeground.mount();
+  await settle();
+  assert.deepEqual(nativeForeground.trace, ["native", "navigate"], "Native foregrounding must not prevent repositioning the underlying page");
+  // Simulate a consumed launcher entry reached later by Back/reload.
+  returned.location.pathname = "/voice-match-learning";
+  assert.equal(returned.reload()._open.disabled, true);
+  await settle();
+  assert.equal(returned.messages.length, 1);
+
+  for (const return_path of [null, "", "//evil.example/", "https://evil.example/", "/config", "/voice-match-learning",
+    "/repo_voice_match/ingress?key=private", "/repo_voice_match/ingress#request=a", "/../repo_voice_match/ingress",
+    "/repo_voice_match/ingress/", "/repo_voice_match/ingress\n"]) {
+    const unsafe = harness();
+    unsafe.setHandler(async () => ({ ...info, return_path }));
+    unsafe.mount();
+    await settle();
+    assert.equal(unsafe.messages.length, 1, "Missing/unsafe return data must not prevent an otherwise valid launch");
+    assert.equal(unsafe.navigations.length, 0);
+    assert.equal(unsafe.panel._back.href, "/");
+  }
+
+  for (const options of [{ throwAfterSend: true }, { navigationFails: true }]) {
+    const uncertain = harness(options);
+    uncertain.setHandler(async () => info);
+    uncertain.mount();
+    await settle();
+    assert.equal(uncertain.messages.length, 1);
+    assert.equal(uncertain.navigations.length, 0);
+    assert.equal(uncertain.panel._back.href, management, "Keep the safe manual return available");
+    assert.equal(uncertain.panel._open.disabled, true);
+    await uncertain.panel._start();
+    assert.equal(uncertain.messages.length, 1, "Neither dispatch nor navigation failure may retry the microphone launch");
+  }
+
+  for (const change of [hass => { hass.user = { id: "bob" }; }, hass => { hass.connection = {}; },
+    hass => { hass.auth = {}; }, (hass, location) => { location.pathname = "/elsewhere"; }]) {
+    // Mutating the captured object cannot evade the post-dispatch identity check
+    // for user; normal HA setter transitions are separately covered above.
+    const changedAfterDispatch = harness({ onSend: change });
+    changedAfterDispatch.setHandler(async () => info);
+    changedAfterDispatch.mount();
+    await settle();
+    assert.equal(changedAfterDispatch.messages.length, 1);
+    assert.equal(changedAfterDispatch.navigations.length, 0);
+  }
   console.log("Native learning launcher boundary checks passed");
 }
 

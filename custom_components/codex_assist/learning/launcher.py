@@ -13,6 +13,7 @@ from homeassistant.helpers import entity_registry as er
 
 from . import DOMAIN
 from .const import MODULE_URL, PANEL_PATH
+from .discovery import cached_addons, origins_from_metadata
 from .learning_bridge_protocol import BridgeError
 from .lifecycle import loaded_runtime
 
@@ -93,6 +94,35 @@ def learning_pipeline(hass, phone):
     return matches[0].id
 
 
+def management_path(hass, origin):
+    """One matched internal add-on and its real public panel, never a return URL."""
+    addons = cached_addons(hass)
+    if not isinstance(addons, dict) or not isinstance(origin, str):
+        return None
+    matches = []
+    for slug, info in list(addons.items())[:128]:
+        if (
+            not isinstance(slug, str)
+            or len(slug) > 128
+            or re.fullmatch(r"[a-z0-9][a-z0-9_]*_voice_match", slug) is None
+            or origin.rstrip("/") not in origins_from_metadata({slug: info})
+        ):
+            continue
+        matches.append(slug)
+    if len(matches) != 1:
+        return None
+    slug = matches[0]
+    panel = hass.data.get(frontend.DATA_PANELS, {}).get(slug)
+    if (
+        panel is None
+        or panel.component_name != "app"
+        or panel.require_admin
+        or (panel.config or {}).get("addon") != slug
+    ):
+        return None
+    return f"/{slug}/ingress"
+
+
 @websocket_api.websocket_command({schema.Required("type"): DOMAIN + "/voice_learning/launch_info"})
 @websocket_api.async_response
 async def launch_info(hass, connection, msg):
@@ -134,5 +164,6 @@ async def launch_info(hass, connection, msg):
             "user_id": connection.user.id,
             "profile_id": own["id"],
             "pipeline_id": pipeline_id,
+            "return_path": management_path(hass, phone.entry.data.get("url")),
         },
     )

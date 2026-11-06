@@ -1,5 +1,30 @@
 # Testing
 
+## Launcher return after native request (development only)
+
+The v2 launcher requests native Assist once, then replaces the underlying HA route
+with a validated Voice Match management path. Node boundary contracts cover
+request-before-navigation order, native foregrounding, consumed-launch retention,
+unsafe/missing paths, changed context, uncertain dispatch and navigation failure.
+Native HA contracts cover exact cached-origin/public-panel matching, ambiguity,
+unsafe slugs, wrong panel bindings and read-only discovery. Consent, recording
+and the preferred assistant remain unchanged.
+
+Local results: **383 native HA current tests passed / 1 skipped** with strict
+HTTP plugin ordering (existing aiohttp rewrite warning); HA minimum **252 passed /
+132 newer-only skips**; **772 fast tests plus 32 subtests passed**. All **53**
+cross-repository bridge/controller contracts passed and all **10** fast mutations
+were caught. Ruff and Node launcher checks passed. The distribution projection
+contains **51 runtime files**, not a deployed or published artifact.
+
+Synthetic Chromium checks passed normal return and uncertain-dispatch fallback
+using production JS with a simulated native boundary. The fallback screenshot
+showed the disabled one-shot button and **Back to Voice Match**. This harness had
+no HA connection or microphone and is not a committed browser runner. It proves
+neither native acknowledgement nor real Companion overlay behaviour. No live
+deployment, restart or additional recording is included; remote exact-commit CI
+and real-phone navigation acceptance remain pending.
+
 ## Stage 5 cancellation investigation (development-only follow-up)
 
 Real-phone acceptance remains blocked by intermittent STT failures and a reported

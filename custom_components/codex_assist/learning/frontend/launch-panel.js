@@ -2,6 +2,8 @@
 const LAUNCH_PATH = "/voice-match-learning";
 const idText = (value) => typeof value === "string" && /^[a-zA-Z0-9_-]{1,128}$/.test(value);
 const profileId = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9_-]{0,39}$/.test(value);
+const managementPath = (value) => typeof value === "string" && value === value.trim() && value.length <= 138
+  && /^\/[a-z0-9][a-z0-9_]*_voice_match\/ingress$/.test(value);
 
 class VoiceMatchLaunchPanel extends HTMLElement {
   constructor() {
@@ -46,9 +48,9 @@ class VoiceMatchLaunchPanel extends HTMLElement {
     fallback.append(make("p", 'In the Android Companion app, open Assist and choose Voice Learning. Say “Learn my voice” and follow the spoken notice. In a retained paused conversation, follow its separate “Continue learning” confirmation. A new conversation needs fresh consent.'));
     fallback.append(make("p", "If the learning assistant is missing, ask an administrator to check the setup. Don't change the default assistant or use an ordinary assistant to record samples."));
     main.append(fallback);
-    const home = make("a", "Back to Home Assistant");
-    home.href = "/";
-    main.append(home);
+    this._back = make("a", "Back to Home Assistant");
+    this._back.href = "/";
+    main.append(this._back);
     this.shadowRoot.append(style, main);
     this._onVisibility = () => {
       if (document.hidden) {
@@ -133,6 +135,21 @@ class VoiceMatchLaunchPanel extends HTMLElement {
     }
   }
 
+  _returnToManagement(path, context, external) {
+    // Native Assist has no acknowledgement. This only repositions the underlying
+    // HA page after dispatch, without reloading its WebView or dismissing Assist.
+    if (!managementPath(path) || !this._connected || location.pathname !== LAUNCH_PATH
+        || !this._hass.connected || this._hass.user?.id !== context.user
+        || this._hass.connection !== context.connection || this._hass.auth !== context.auth
+        || this._native() !== external) return;
+    try {
+      history.replaceState({ ...(history.state || {}), voiceMatchLaunchConsumed: true }, "", path);
+      window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: true } }));
+    } catch {
+      this._status("Opening Voice Learning requested. Automatic return was unavailable; use Back to Voice Match below. Nothing has been retried.");
+    }
+  }
+
   async _start() {
     if (this._busy || this._sent || this._locked || !this._connected) return;
     const hass = this._hass;
@@ -149,6 +166,7 @@ class VoiceMatchLaunchPanel extends HTMLElement {
       return;
     }
     const generation = ++this._generation;
+    const context = { user, connection: hass.connection, auth: hass.auth };
     this._busy = true;
     this._status("Checking your profile and learning assistant…");
     let timer;
@@ -171,8 +189,13 @@ class VoiceMatchLaunchPanel extends HTMLElement {
       // assist/show has no acknowledgement. Mark sent BEFORE calling: a thrown
       // or lost response must never cause an automatic second native launch.
       this._sent = true;
+      if (managementPath(info.return_path)) {
+        this._back.href = info.return_path;
+        this._back.textContent = "Back to Voice Match";
+      }
       external.fireMessage({ type: "assist/show", payload: { pipeline_id: info.pipeline_id, start_listening: true } });
       this._status('Opening Voice Learning requested. If it appears, say “Learn my voice” to hear the notice. This page has not granted recording consent.');
+      this._returnToManagement(info.return_path, context, external);
     } catch {
       this._status(this._sent ? "The Assist opening request could not be verified. Check your phone; it has not been retried."
         : "Your learning setup could not be verified. Check your own profile, the enabled companion and the learning assistant. Nothing has been launched by this request.");

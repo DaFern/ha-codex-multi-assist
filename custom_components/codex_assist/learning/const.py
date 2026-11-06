@@ -3,4 +3,4 @@
 CONF_PHONE_ENABLED = "phone_enabled"
 CONF_CONTROL_STT = "control_stt_engine"
 PANEL_PATH = "voice-match-learning"
-MODULE_URL = "/codex_assist/voice-learning-launch-v1.js"
+MODULE_URL = "/codex_assist/voice-learning-launch-v2.js"

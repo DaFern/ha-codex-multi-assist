@@ -29,13 +29,18 @@ def origins_from_metadata(addons):
     return sorted(origins)[:8]
 
 
-def suggested_origins(hass):
-    """No Supervisor on Core-only installs: retain the manual pairing route."""
+def cached_addons(hass):
+    """Read cached metadata only, without fetching options or making requests."""
     if "hassio" not in hass.config.components:
-        return []
+        return {}
     from homeassistant.components.hassio import HassioNotReadyError, get_addons_info
 
     try:
-        return origins_from_metadata(get_addons_info(hass))
+        return get_addons_info(hass)
     except HassioNotReadyError:
-        return []
+        return {}
+
+
+def suggested_origins(hass):
+    """No Supervisor on Core-only installs: retain the manual pairing route."""
+    return origins_from_metadata(cached_addons(hass))

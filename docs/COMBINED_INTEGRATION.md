@@ -75,11 +75,29 @@ including mappings inside lists and tuples, without modifying configuration.
 The hidden, non-iframe launcher resolves entities by registry IDs under
 `codex_assist`, not their names. Its read-only command is
 `codex_assist/voice_learning/launch_info`; the JS lives at
-`/codex_assist/voice-learning-launch-v1.js`. It rechecks the signed-in login and
+`/codex_assist/voice-learning-launch-v2.js`. It rechecks the signed-in login and
 own profile, requires exactly one enabled matching learning assistant, and keeps
 the previous duplicate/stale-launch guards. It never overwrites another panel.
 If the old companion still owns the shared URL, use manual selection until the
 separately approved cutover; loading both is not a supported final installation.
+
+After a non-throwing native `assist/show` request, the launcher replaces the
+underlying HA route with Voice Match management using in-page navigation, not a
+WebView reload. Native Assist has no acknowledgement: this is a request followed
+by navigation, not proof that Assist opened. It does not react to spoken pause or
+cancel, dismiss Assist, change the preferred assistant or grant recording consent.
+
+The optional `return_path` comes only from one cached Voice Match add-on whose
+internal origin matches the configured bridge and whose public HA `app` panel
+binds to the same safe slug. The browser validates the internal ingress path
+again and rechecks the captured account, connection, auth and native bridge.
+No browser-supplied return URL is accepted. Missing/ambiguous metadata, aliases,
+HTTPS/custom origins or a missing public panel can prevent automatic return;
+launch discovery still works without a return path. With a validated path,
+**Back to Voice Match** remains available if dispatch throws or navigation fails;
+otherwise the fallback is **Back to Home Assistant**. No failure retries the
+native launch or re-enables the consumed launch button. Actual Companion overlay
+behaviour remains a separate acceptance check.
 
 Internal `voice_learning/manage` coordinator controls remain scoped to an entry
 and the authenticated caller. No satellite adapter ships, and browser-supplied

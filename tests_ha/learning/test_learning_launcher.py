@@ -45,6 +45,7 @@ async def test_launcher_is_non_iframe_panel_and_discovery_is_read_only(hass, pho
             for p in assist_pipeline.async_get_pipelines(hass)
             if p.stt_engine == phone["engine"].entity_id
         ),
+        "return_path": None,
     }
     assert [call[0] for call in phone["backend"].calls[len(before) :]] == ["own_profile"]
     assert not phone["backend"].active
@@ -53,12 +54,98 @@ async def test_launcher_is_non_iframe_panel_and_discovery_is_read_only(hass, pho
 
 async def test_launcher_asset_is_served_without_pairing_or_recording_secrets(hass_client, phone):
     client = await hass_client()
-    response = await client.get("/codex_assist/voice-learning-launch-v1.js")
+    response = await client.get("/codex_assist/voice-learning-launch-v2.js")
     assert response.status == 200
     source = await response.text()
     assert 'type: "assist/show"' in source
     assert "session_token" not in source
     assert "learning_bridge_key" not in source
+
+
+async def test_launch_returns_matched_public_management_panel_without_mutating_state(hass, phone):
+    from custom_components.codex_assist.learning import launcher
+
+    frontend.async_register_built_in_panel(
+        hass,
+        "app",
+        frontend_url_path="repo_voice_match",
+        config={"addon": "repo_voice_match"},
+        require_admin=False,
+    )
+    metadata = {
+        "repo_voice_match": {
+            "name": "Wyoming Voice Match",
+            "hostname": "addon",
+            "ingress_port": 8099,
+            "options": {"key": "PRIVATE-not-exported"},
+        }
+    }
+    before = list(phone["backend"].calls)
+    options = dict(phone["entry"].options)
+    with patch.object(launcher, "cached_addons", return_value=metadata):
+        result = await discover(phone)
+    assert result["success"]
+    assert result["result"]["return_path"] == "/repo_voice_match/ingress"
+    assert "PRIVATE" not in str(result)
+    assert phone["entry"].data["key"] not in str(result)
+    assert phone["entry"].options == options
+    assert [call[0] for call in phone["backend"].calls[len(before) :]] == ["own_profile"]
+    assert not phone["backend"].active
+
+
+@pytest.mark.parametrize(
+    "problem",
+    [
+        "no_metadata",
+        "bad_slug",
+        "wrong_origin",
+        "wrong_name",
+        "ambiguous",
+        "missing_panel",
+        "wrong_component",
+        "wrong_panel_binding",
+        "admin_panel",
+        "long_slug",
+    ],
+)
+async def test_management_return_refuses_unmatched_or_unsafe_destinations(hass, phone, problem):
+    from custom_components.codex_assist.learning import launcher
+
+    slug = "repo_voice_match"
+    info = {"name": "Wyoming Voice Match", "hostname": "addon", "ingress_port": 8099}
+    metadata = {slug: info}
+    panel = {
+        "component_name": "app",
+        "frontend_url_path": slug,
+        "config": {"addon": slug},
+        "require_admin": False,
+    }
+    if problem == "no_metadata":
+        metadata = None
+    elif problem == "bad_slug":
+        metadata = {"../repo_voice_match": info}
+    elif problem == "long_slug":
+        metadata = {"a" * 129 + "_voice_match": info}
+    elif problem == "wrong_origin":
+        info["hostname"] = "different-server"
+    elif problem == "wrong_name":
+        info["name"] = "Other app"
+    elif problem == "ambiguous":
+        metadata["other_voice_match"] = dict(info)
+    elif problem == "wrong_component":
+        panel["component_name"] = "map"
+    elif problem == "wrong_panel_binding":
+        panel["config"] = {"addon": "unrelated"}
+    elif problem == "admin_panel":
+        panel["require_admin"] = True
+    if problem != "missing_panel":
+        frontend.async_register_built_in_panel(hass, **panel)
+    with patch.object(launcher, "cached_addons", return_value=metadata):
+        result = await discover(phone)
+    assert result["success"], (
+        "Missing return metadata must not disable safe native launch discovery"
+    )
+    assert result["result"]["return_path"] is None
 
 
 async def test_launcher_registration_never_overwrites_an_existing_panel(hass, phone):
@@ -77,6 +164,7 @@ async def test_launcher_registration_never_overwrites_an_existing_panel(hass, ph
         {"pipeline_id": "other"},
         {"consent": True},
         {"session_token": "synthetic"},
+        {"return_path": "https://example.com"},
     ],
 )
 async def test_launch_discovery_never_accepts_client_scope_or_consent(phone, extra):
