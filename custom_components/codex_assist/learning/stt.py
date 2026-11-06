@@ -168,7 +168,7 @@ class PhoneLearningStt(stt.SpeechToTextEntity):
             record("stt", "ready", control=control_category(result.text), audio_bytes=len(audio))
             return stt.SpeechResult(MARKER, stt.SpeechResultState.SUCCESS)
         except asyncio.CancelledError:
-            record("stt", "cancelled", audio_bytes=len(audio))
+            record("stt", "cancelled", audio_bytes=len(audio), cancel_stage=stage)
             if owner is not None:
                 self.runtime.frames.discard(owner)
             raise

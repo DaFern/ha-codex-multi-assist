@@ -3,7 +3,7 @@
 import time
 import unittest
 
-from custom_components.codex_assist.learning.phone_diagnostics import LOGGER, record
+from custom_components.codex_assist.learning.phone_diagnostics import LOGGER, STT_STEPS, record
 from custom_components.codex_assist.learning.phone_flow import (
     NOTICE,
     PhoneController,
@@ -51,6 +51,7 @@ class DiagnosticsTests(unittest.TestCase):
                 phase=private,
                 continuity=private,
                 audio_bytes=10**100,
+                cancel_stage=private,
             )
             record(
                 Sensitive(),
@@ -59,16 +60,25 @@ class DiagnosticsTests(unittest.TestCase):
                 phase=Sensitive(),
                 continuity=Sensitive(),
                 audio_bytes=Sensitive(),
+                cancel_stage=Sensitive(),
             )
             record("stt", "ready", control="stop", audio_bytes=-99)
         self.assertNotIn(private, repr([entry.__dict__ for entry in logs.records]))
         self.assertIn("audio_ms=10000", logs.output[0])
         self.assertIn("stage=unknown result=unknown", logs.output[1])
         self.assertIn("audio_ms=0", logs.output[1])
+        self.assertIn("cancel_stage=unknown", logs.output[0])
+        self.assertIn("cancel_stage=unknown", logs.output[1])
         self.assertIn("audio_ms=0", logs.output[2])
         for entry in logs.records:
             self.assertIsNone(entry.exc_info)
             self.assertIsNone(entry.stack_info)
+
+    def test_cancellation_stage_only_records_fixed_vocabulary(self):
+        for stage in sorted(STT_STEPS):
+            with self.subTest(stage=stage), self.assertLogs(LOGGER, level="INFO") as logs:
+                record("stt", "cancelled", cancel_stage=stage)
+            self.assertIn(f"cancel_stage={stage}", logs.output[0])
 
 
 class LookupOnlyBridge:

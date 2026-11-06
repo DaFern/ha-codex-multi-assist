@@ -1,5 +1,44 @@
 # Testing
 
+## Stage 5 cancellation investigation (development-only follow-up)
+
+Real-phone acceptance remains blocked by intermittent STT failures and a reported
+consent loop. The observed zero-buffer cancellation does **not** establish which
+STT operation was interrupted or explain the original cause. Do not infer that
+the user spoke the wrong consent phrase from an STT cancellation. The displayed
+"Voice learning input" is the intentional privacy marker, not the original STT text.
+
+The diagnostic follow-up appends `cancel_stage` using a fixed vocabulary only.
+Cancellation still drops the frame and re-raises; no retry, consent inheritance,
+recording permit or recovery behaviour changes. Unknown strings/objects cannot
+enter the new field. This is not Whisper debug logging and logs no raw speech,
+audio, peer exception, profile identity, credentials or conversation identifiers.
+INFO logging remains off unless separately enabled for a bounded live test.
+
+Six native contracts in `tests_ha/learning/test_learning_cancellation.py` cover:
+cancellation during prepare; zero-consumption source cancellation followed by
+"no active session" and a fresh notice without implicit consent; the actual HA
+Wyoming provider's consent/sample/pause path; early transcription without client
+EOF; peer disconnect without partial sample submission; and a native client
+disconnect before PCM upload through the real Wyoming provider. The latter
+awaits actual provider cancellation after its upload/receive child tasks unwind.
+Saved samples remain retained. The fixture uses a synthetic loopback server and
+synthetic PCM, not real Whisper, a phone, DSP or biometric fixtures. The current
+native environment now pins `wyoming==1.10.2`, matching Core 2026.10's manifest;
+older Codex environments skip the newer-only tests before those fixture imports.
+
+The original source AST pins remain for consent, handoff, transport and coordinator
+logic. The diagnostic file has an explicitly reviewed post-move hash for the new
+allowlisted field, with its original source hash retained as provenance.
+
+Local results: **772 fast tests plus 32 subtests passed**; native HA 2026.10
+**371 passed / 1 skipped** in default and strict HTTP plugin orders (the latter
+retains the existing aiohttp rewrite warning); HA 2026.6 **252 passed / 120 skips**.
+All **53** cross-repository bridge/controller contracts passed and all **10** fast
+token/tool mutations were caught. Ruff passed. These are local development
+results, not remote CI or proof that the original phone failure is fixed.
+No new live code deployment, restart, recording or data reset is included.
+
 ## Combined integration phase 4 (development distribution preparation)
 
 `python scripts/check_distribution.py` performs read-only checks of the single

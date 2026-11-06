@@ -12,3 +12,6 @@ PyTurboJPEG==1.8.3
 # Pure-Python TTS imports used by native STT-to-intent pipeline contracts.
 mutagen==1.48.1
 ha-ffmpeg==3.2.2
+
+# Match the pinned Core Wyoming provider for loopback-only transport contracts.
+wyoming==1.10.2

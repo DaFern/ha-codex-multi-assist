@@ -64,6 +64,20 @@ CONTINUITY = {
     "account_changed",
 }
 PHASES = {"none", "consent", "resume_consent", "paused", "sample", "processing", "attention"}
+STT_STEPS = {
+    "none",
+    "binding",
+    "account_or_metadata",
+    "reserve",
+    "prepare",
+    "source",
+    "source_metadata",
+    "transcription",
+    "capture",
+    "audio_limit",
+    "audio_format",
+    "handoff",
+}
 
 
 def _allowed(value, choices):
@@ -71,16 +85,26 @@ def _allowed(value, choices):
     return value if type(value) is str and value in choices else "unknown"
 
 
-def record(stage, result, *, control="none", continuity="none", phase="none", audio_bytes=0):
+def record(
+    stage,
+    result,
+    *,
+    control="none",
+    continuity="none",
+    phase="none",
+    audio_bytes=0,
+    cancel_stage="none",
+):
     """Only fixed enums and bounded PCM duration may enter the log record."""
     audio_ms = min(max(audio_bytes, 0), 320000) // 32 if type(audio_bytes) is int else 0
     LOGGER.info(
         "Phone learning diagnostic: stage=%s result=%s control=%s "
-        "continuity=%s phase=%s audio_ms=%d",
+        "continuity=%s phase=%s audio_ms=%d cancel_stage=%s",
         _allowed(stage, STAGES),
         _allowed(result, RESULTS),
         _allowed(control, CONTROLS),
         _allowed(continuity, CONTINUITY),
         _allowed(phase, PHASES),
         audio_ms,
+        _allowed(cancel_stage, STT_STEPS),
     )
