@@ -2,6 +2,12 @@
 
 ## Recognised-name context and clean-message opt-in (development only)
 
+Default-enabled setup follow-up: regression tests cover the initial enabled toggle,
+saved enabled/disabled choices, no mutation merely by opening setup, and persistent
+opt-out after disabling. Full local suites passed **817 fast tests / 32 subtests**,
+**433 current native HA tests / 1 skipped**, and **269 minimum HA tests / 165 skipped**.
+No live deployment, pipeline change or restart was performed for this follow-up.
+
 The sender's optional encrypted display name is validated separately from the
 unchanged 2000-character preference limit. Fast tests cover literal/quoted names,
 Unicode/max-length values, invalid or neutral names, legacy packets, unnamed plain
@@ -11,8 +17,9 @@ STT adapter checks clean events with name context both with and without saved
 preferences. Codex receives name context on both normal and auth-retry composition
 paths; no HA caller, tools, AI Task or learning behavior is changed.
 
-The default-off options now validate pairing and explicitly selected personalised
-Wyoming discovery metadata. Native contracts cover options preservation, invalid
+The default-enabled setup toggle preserves saved opt-outs and does not activate
+the adapter until valid setup is saved. Options validate pairing and explicitly
+selected personalised Wyoming discovery metadata. Native contracts cover options preservation, invalid
 sources, real entry reload/STT registration, source loss/recovery without taking
 Codex offline, identical concurrent words with different names, cancellation
 during recording/handoff/model processing, mid-record changes, no raw-error

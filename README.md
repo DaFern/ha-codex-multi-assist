@@ -149,7 +149,8 @@ It requires separate reviewed deployment and must not authorise sensitive action
 The current personalised Wyoming endpoint embeds an encrypted header in STT text,
 so it can appear in Assist's user-message bubble even though Codex removes it
 before model processing. Development code now offers an optional
-[Clean voice messages source](docs/CLEAN_SPEAKER_STT_PROTOTYPE.md), off by default.
+[Clean voice messages source](docs/CLEAN_SPEAKER_STT_PROTOTYPE.md), enabled by default
+in its setup form, with saved opt-outs retained. Activation still requires saving setup.
 It requires HA 2026.10+, explicit source selection and separate deployment and
 test-pipeline approval; installing code alone does not change an existing assistant.
 

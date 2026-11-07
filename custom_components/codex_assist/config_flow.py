@@ -292,7 +292,7 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
         options = dict(self.config_entry.options)
         if user_input is not None:
             if not user_input.get("enabled"):
-                options.pop(CONF_CLEAN_TRANSCRIPT, None)
+                options[CONF_CLEAN_TRANSCRIPT] = False
                 options.pop(CONF_PERSONAL_STT_SOURCE, None)
                 return self.async_create_entry(title="", data=options)
             if not learning_supported():
@@ -315,7 +315,9 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="clean_voice",
             data_schema=vol.Schema({
-                vol.Required("enabled", default=bool(options.get(CONF_CLEAN_TRANSCRIPT))): bool,
+                vol.Required(
+                    "enabled", default=bool(options.get(CONF_CLEAN_TRANSCRIPT, True))
+                ): bool,
                 source_field: selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="stt", integration="wyoming")
                 ),
