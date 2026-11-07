@@ -1,5 +1,17 @@
 # Testing
 
+## Remove the old-source review option (development follow-up)
+
+The old-source review menu, form, helper and report-only tests were removed.
+Native options and translation tests pin the menu to Shared AI Task defaults,
+Manage conversation assistants and Voice Match. Direct-backend handling, existing
+connection compatibility, learning and saved settings remain unchanged.
+
+Local verification passed **819 fast tests plus 32 subtests**, **460 current native
+HA tests / 1 skipped**, and **269 minimum HA tests / 192 skipped**. Ruff, the
+53-file distribution projection and diff checks passed. This removal is not yet
+committed, pushed or deployed; no live entity or connection was changed.
+
 ## Consolidated Voice Match setup (development follow-up)
 
 The everyday Voice Match entity now supports a private direct Wyoming connection,
@@ -11,19 +23,19 @@ endpointing without client EOF, cancellation and entry unload, backend loss and
 recovery, malformed saved options, rejected/unverified packets, clean events,
 empty instructions, recognised names and concurrent identical utterances.
 
-Options tests cover the single visible setup route, legacy address suggestions,
-no migration merely by opening a form, explicit save and stable opt-outs. Cleanup
-tests cover assistant, legacy wrapper and learning dependencies, host scoping and
-unavailable dependency checks; the report never disables entities. Diagnostics
-redact the new backend hostname. The distribution inventory includes both new
-runtime modules. Core supplies its own version-specific Wyoming dependency only
+Options tests cover the three-item menu, single visible Voice Match setup route,
+legacy address suggestions, no migration merely by opening a form, explicit save
+and stable opt-outs. Translation parity tests reject a leftover old-source review
+step. Diagnostics redact the new backend hostname. The distribution inventory
+includes the direct backend module. Core supplies its own version-specific Wyoming
+dependency only
 when the direct feature is configured; Codex-only dependency floors stay unchanged.
 
 These are development-only changes on `main`. No deployed source, live options,
 pipelines, voiceprints or registry settings were changed. Physical Companion /
 satellite acceptance and external wiki publication remain pending.
 
-Local verification passed **820 fast tests plus 32 subtests**, **466 current native
+Initial consolidation verification passed **820 fast tests plus 32 subtests**, **466 current native
 HA tests / 1 skipped** with strict HTTP fixture ordering, and **275 minimum HA
 tests / 192 skipped**. The strict run retained the existing aiohttp assertion-
 rewrite warning. All ten fast token/tool mutations were caught; Ruff, the

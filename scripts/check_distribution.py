@@ -32,7 +32,6 @@ REQUIRED = {
     "trigger.py",
     "voice_match.py",
     "voice_match_backend.py",
-    "voice_match_cleanup.py",
     "voice_match_stt.py",
     "entry_modules.py",
     "conversation.py",

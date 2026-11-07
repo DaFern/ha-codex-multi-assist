@@ -155,10 +155,9 @@ instructions are optional. New setups need no separate `voice-match` or
 `voice-match-personal` Wyoming STT entities. **Voice Learning** remains separate.
 
 Existing Clean voice messages entity IDs and pipeline bindings are preserved;
-legacy source connections continue until explicitly reconfigured. The read-only
-**Review old Voice Match sources** screen reports known dependencies before you
-consider manually disabling unused engines. It does not remove anything or hide
-unrelated STT providers. This development follow-up needs separate deployment and
+legacy source connections continue until explicitly reconfigured. Setup does not
+remove existing engines or hide unrelated STT providers. This development follow-up
+needs separate deployment and
 real-device acceptance; installing code does not change existing pipelines.
 See [setup, migration and limitations](docs/CLEAN_SPEAKER_STT_PROTOTYPE.md).
 

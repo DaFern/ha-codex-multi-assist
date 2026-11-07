@@ -47,13 +47,13 @@ suggest the existing personal source's hostname and port from HA's public config
 entry/registry APIs. Only saving a successful direct-backend setup replaces the
 saved source-entity dependency; the source entity itself is not changed.
 
-Once the direct connection has been tested, **Configure → Review old Voice Match
-sources** reports known assistant, legacy wrapper and learning-source references
-for loaded legacy engines on this host. It is advisory, not a complete audit of
-external clients or arbitrary custom integrations. It neither disables nor deletes
-anything. Review remaining uses before manually disabling an unused STT entity
-through HA's entity settings. Keep a fallback and the ordinary Whisper source
-needed by enrolment. No add-on rebuild or endpoint removal is required.
+Once the direct connection has been tested, review any remaining assistants,
+source dependencies and external clients before disabling an unused STT entity
+through HA's entity settings. If no longer needed, remove only its corresponding
+Wyoming Protocol connection through the Integrations page, not the Voice Match
+add-on. Keep a fallback and the ordinary Whisper source needed by enrolment.
+There is no separate old-source review option or automatic removal. No add-on
+rebuild or endpoint removal is required.
 
 New setups register neither `voice-match` nor `voice-match-personal` as extra
 Wyoming STT entities. Those backend ports remain available for compatibility.

@@ -199,8 +199,7 @@
         "menu_options": {
           "settings": "Shared AI Task defaults",
           "agents": "Manage conversation assistants",
-          "voice_match": "Voice Match",
-          "voice_match_cleanup": "Review old Voice Match sources"
+          "voice_match": "Voice Match"
         }
       },
       "voice_match": {
@@ -212,10 +211,6 @@
           "voice_match_port": "Personalised backend port",
           "voice_match_pairing_key": "Pairing key"
         }
-      },
-      "voice_match_cleanup": {
-        "title": "Review old Voice Match sources",
-        "description": "{report}\n\nThis review changes nothing. Test the direct Voice Match connection first. Only after reviewing other uses, open an unused legacy STT entity in Settings → Devices & services → Entities and disable it. Do not disable Whisper used for enrolment. Existing sources stay enabled until you choose otherwise."
       },
       "clean_voice": {
         "title": "Clean voice messages",

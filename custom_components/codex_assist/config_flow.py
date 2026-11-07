@@ -261,7 +261,7 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
             return self.async_abort(reason="learning_reconfigure_required")
         return self.async_show_menu(
             step_id="init",
-            menu_options=["settings", "agents", "voice_match", "voice_match_cleanup"],
+            menu_options=["settings", "agents", "voice_match"],
         )
 
     async def async_step_voice_match(self, user_input=None):
@@ -330,16 +330,6 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
                 ),
             }),
             errors=errors,
-        )
-
-    async def async_step_voice_match_cleanup(self, user_input=None):
-        if user_input is not None:
-            return await self.async_step_init()
-        from .voice_match_cleanup import cleanup_report
-
-        return self.async_show_form(
-            step_id="voice_match_cleanup", data_schema=vol.Schema({}),
-            description_placeholders={"report": cleanup_report(self.hass, self.config_entry)},
         )
 
     async def async_step_clean_voice(self, user_input=None):
