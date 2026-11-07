@@ -68,8 +68,9 @@ encrypted-header limitation below is **not** fixed by name context.
 **Visible transcript limitation:** the current stock Wyoming path displays the
 encrypted header in Assist's user-message bubble. Codex removes it after HA's STT
 event has already been sent to the frontend. The development-only
-[Clean voice messages adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md) now has default-off
-setup under Configure → Clean voice messages on the Codex entry (HA 2026.10+).
+[Clean voice messages adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md) defaults to enabled
+in setup under Configure → Clean voice messages on the Codex entry (HA 2026.10+).
+Saved opt-outs remain off; saving valid setup is still required for activation.
 After separately approved deployment, explicitly select the personalised Wyoming
 source, then use the new adapter in a separate test assistant with a Codex agent
 from that entry. It does not clean existing stock-Wyoming pipelines automatically.

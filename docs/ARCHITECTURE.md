@@ -99,7 +99,8 @@ An opt-in development-only [clean STT adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md)
 wraps personalised Wyoming STT and binds its verified packet to an exact clean
 text object/owning pipeline task. The optional consumer uses the same nonce cache
 and request preparation as encrypted transcripts. Configure → Clean voice messages
-on a Codex entry enables its STT platform only with explicit opt-in (HA 2026.10+).
+on a Codex entry defaults its setup toggle to enabled and preserves saved opt-outs.
+Its STT platform starts only after valid setup is saved (HA 2026.10+).
 Source selection validates the registered Wyoming provider and advertised
 `voice-match-personal` service, not its editable entity label. Each recording
 resolves the current source again and verifies the result before publishing text.

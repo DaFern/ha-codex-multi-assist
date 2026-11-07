@@ -1,17 +1,19 @@
-# Clean voice messages: experimental opt-in adapter
+# Clean voice messages: experimental adapter
 
 **Development code, not deployed or a supported HA metadata API.** An explicitly
-enabled Codex entry can now register this STT entity on HA 2026.10+. It is off by
-default and never edits or selects a live pipeline. The filename retains the
-original prototype name for existing links.
+enabled Codex entry can now register this STT entity on HA 2026.10+. Its setup
+toggle defaults to enabled, while saved opt-outs remain off. Activation still
+requires saving valid pairing/source setup; it never edits or selects a live
+pipeline. The filename retains the original prototype name for existing links.
 
 ## Setup after separately approved deployment
 
 1. Keep the ordinary Whisper/original assistant available for rollback. Pair the
    Codex entry's Voice Match personal preferences with the personalised sender.
-2. On that **Codex entry**, choose **Configure → Clean voice messages**, enable it
-   and explicitly select the personalised Wyoming source (port **10352**). Ordinary
-   Whisper, normal Voice Match, learning STT and wrappers are not eligible sources.
+2. On that **Codex entry**, choose **Configure → Clean voice messages**, leave it
+   enabled (the default for an unsaved choice) and explicitly select the personalised
+   Wyoming source (port **10352**). Ordinary Whisper, normal Voice Match, learning
+   STT and wrappers are not eligible sources.
    The saved discovery metadata must identify `voice-match-personal`; this does
    not by itself prove pairing. Each incoming packet is still verified.
 3. Saving reloads this entry and stops its active clean-voice requests. It creates
@@ -23,7 +25,11 @@ original prototype name for existing links.
    Recognition is not authentication. No recording or re-enrolment is started here.
 
 Disable **Clean voice messages** to remove its active STT entity while keeping
-pairing and saved voices. Disabling personal preferences also clears clean setup.
+pairing and saved voices. Saving this choice records an explicit opt-out, so the
+toggle stays off when reopened. Older versions removed the setting on disable;
+an absent setting now shows the enabled default in setup, but does not activate
+the adapter until valid setup is saved. Existing options are not migrated.
+Disabling personal preferences also clears clean setup.
 Before disabling, switch the test pipeline back to its original STT; pipelines
 are never changed automatically, so one still referencing a removed entity fails
 until corrected. No recordings are deleted. Re-enabling uses the stable entity
@@ -129,7 +135,7 @@ mid-recording changed pairing.
 ## Before any live rollout
 
 1. Review this integration-specific handoff and the supported-version evidence.
-2. Review the now-implemented default-off configuration, source validation,
+2. Review the default-enabled setup toggle, retained opt-outs, source validation,
    setup/unload/reload handling and user-facing warnings with their test evidence.
 3. Complete CI, obtain backup/deployment approval and separate Core restart approval.
 4. Select the new adapter in an explicitly approved pipeline and visually verify

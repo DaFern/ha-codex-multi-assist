@@ -86,7 +86,19 @@ async def clean_options(hass, entry):
     )
 
 
-async def test_clean_options_default_off_and_pairing_required(hass):
+@pytest.mark.parametrize("saved, expected", [(None, True), (True, True), (False, False)])
+async def test_clean_options_default_on_preserves_saved_choice(hass, saved, expected):
+    options = {} if saved is None else {CONF_CLEAN_TRANSCRIPT: saved}
+    entry = MockConfigEntry(domain=DOMAIN, data={}, options=options)
+    entry.add_to_hass(hass)
+    result = await clean_options(hass, entry)
+    enabled = next(field for field in result["data_schema"].schema if field == "enabled")
+    assert enabled.default() is expected
+    # Opening setup alone must not enable a platform or change existing options.
+    assert dict(entry.options) == options
+
+
+async def test_clean_options_pairing_required(hass):
     entry = MockConfigEntry(domain=DOMAIN, data={})
     entry.add_to_hass(hass)
     result = await clean_options(hass, entry)
@@ -130,7 +142,10 @@ async def test_clean_options_save_source_preserve_defaults_and_disable(hass, mon
         result["flow_id"], user_input={"enabled": False},
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert dict(entry.options) == options
+    assert dict(entry.options) == {**options, CONF_CLEAN_TRANSCRIPT: False}
+    result = await clean_options(hass, entry)
+    enabled = next(field for field in result["data_schema"].schema if field == "enabled")
+    assert enabled.default() is False
 
 
 async def test_disabling_pairing_also_disables_clean_source(hass):
