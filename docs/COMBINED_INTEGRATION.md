@@ -1,220 +1,117 @@
-# Combined integration — development phases 1 to 4
+# Combined integration
 
-Umbrella: [Voice Match issue #5](https://github.com/DaFern/wyoming-voice-match-ha/issues/5).
-This document describes development work, not a released combined integration.
-The running add-on and separate learning companion are not changed by this work.
+One custom HACS integration, `codex_assist`, provides independent **Codex assistants**
+and **Voice Match learning** entries. The Voice Match app is installed separately.
+Source version is **0.7.0**, app **0.4.7**; identify exact revisions as well.
+**No combined public beta is published.** [Installation](INSTALLATION.md).
 
-## One install, separate lifecycles
+## Independent modules
 
-Keep one HACS integration repository and the `codex_assist` domain. Each config
-entry has an explicit `module`: `codex` or `voice_match`.
-Existing entries without that discriminator are Codex entries; their stored data,
-unique IDs, agents and options are not rewritten. There is still only one Codex
-sign-in, protected by its existing unique ID. Removing the manifest's global
-single-entry restriction does not enable additional Codex accounts.
+The module menu is shown before network requests. Codex alone requests OAuth,
+discovers models and provides conversation agents plus one shared AI Task entity.
+It supports HA **2026.6+** and needs no Voice Match app or Whisper.
 
-The user menu selects a module before any network requests. Only the Codex route
-requests OAuth credentials or discovers models. The learning route verifies an
-encrypted `hello` with the add-on, then offers phone learning, off by default.
-Pairing and enabling entities are not recording consent. It does not select or
-create a pipeline, request Codex credentials or change a default assistant.
+Learning requires **HA 2026.10+**, the app, ordinary Wyoming Whisper, TTS and a normal
+Companion login, but no Codex account. It verifies an encrypted bridge handshake
+and offers phone learning off by default. Only an enabled learning entry forwards
+its STT and non-LLM conversation entities. It never forwards AI Task or schedules
+Codex model refresh. Entry unload/reconfigure/reauth stays module-scoped.
 
-Entry setup dispatches before provider-specific lifecycle imports. Codex alone
-forwards Conversation and AI Task, schedules model refresh and registers its
-entry-specific options listener. `ModuleRuntime` records that entry's platforms;
-unload uses those platforms only. Learning has its own `LearningRuntime`, bridge,
-coordinator and optional phone runtime. Only an enabled learning entry forwards
-STT and its non-LLM Conversation agent; it never forwards AI Task or schedules
-Codex model refresh. Bridge or source unavailability retries only learning setup.
-Unknown modules fail explicitly without starting cloud platforms.
-
-The learning entry owns its options/reconfiguration and can be repaired without
-Codex sign-in. Shutdown pauses bound unfinished work; it does not discard stored
-samples or replace voiceprints. Unverified shutdown/restoration refuses unload
-rather than forgetting the state. That refusal does not unload Codex. Conversely,
-Codex unload, options reload or reauthentication do not replace the phone runtime.
-
-Learning retains the standalone companion's **HA 2026.10+** requirement. Earlier
-HA versions reject learning setup before using its phone APIs; Codex retains its
-existing **2026.6+** floor. This is not a promise that learning works on older HA.
-
-The OAuth refresh coordinator remains keyed by the config-entry object and
-survives reload; it is **not** moved into unload-cleared `runtime_data`.
-Diagnostics recursively redact credentials, prompts and personal bridge fields,
-including mappings inside lists and tuples, without modifying configuration.
+Shutdown pauses unfinished learning, not sample deletion or replacement. Unverified
+shutdown/restoration refuses unload rather than forgetting state; it does not unload
+Codex. Codex options/reauth do not replace the learning runtime. Diagnostics redact
+credentials, prompts and private bridge fields. One Codex sign-in is supported.
 
 ## Clean development setup (not a live cutover instruction)
 
-1. Use HA 2026.10+ with the separate Voice Match add-on and an ordinary Wyoming
-   Whisper source. This checkout contains one integration domain. Do not install
-   both learning implementations against the same launcher/pipeline.
-2. Add **Codex Assist → Voice Match learning**. Where supported, choose an address
-   suggested from cached Supervisor metadata, or enter it manually. A suggestion
-   grants no trust and causes no connection until you submit the separate key.
-   Enter the internal add-on origin
-   and its **learning** bridge key from its administrator page. This manually
-   verifies encrypted pairing; it is not zero-touch adoption or key transfer.
-3. Leave phone learning off, or explicitly enable it and select ordinary Whisper.
-   Do not select the add-on's filtering/personalisation endpoints as the control
-   transcription source. The selector checks the Wyoming provider and language;
-   administrators must still choose the correct ordinary Whisper connection.
-   Review the final setup guidance and explicitly submit to save. No entry is
-   created merely by selecting an endpoint or viewing the final review.
-4. In Voice assistants, create a dedicated **Voice Learning** assistant with both
-   new Voice Learning entities from this entry and your usual TTS. Do not change
-   the default assistant. The integration does not silently create a pipeline.
-5. Use your own normal Companion login and an account-assigned voice profile.
-   The add-on's existing Learn/Resume links still target `/voice-match-learning`.
-   Opening Assist can start its initial microphone request, but only a separate
-   post-notice **Start learning** permits sample submission. A retained paused
-   scope needs preview and separate **Continue learning** confirmation.
-6. Pause retains unfinished samples. **Cancel voice learning** discards only the
-   bound unfinished session; the installed voiceprint stays until a validated
-   replacement. Recognition is never account authentication.
+1. Install the integration and separate app using the [installation guide](INSTALLATION.md).
+   Do not run standalone `voice_match_enrollment` and combined learning together.
+2. Add **Codex Assist → Voice Match learning**. Select a metadata-suggested address
+   or enter the app's internal HTTP origin on **8099** manually. Enter the separate
+   **learning key** from **Administrator settings → Voice Learning connection**.
+   Suggestions confer no trust; an encrypted handshake verifies pairing.
+3. Explicitly enable phone learning with ordinary Wyoming Whisper, not a filtering,
+   personalised or recursive learning endpoint. Provider/language checks cannot
+   prove which backend a Wyoming source uses. Review and submit to save.
+4. Manually create **Voice Learning** with both learning entities and usual TTS.
+   No pipeline, global default or ordinary assistant is changed automatically.
+5. Use an own-account uniquely assigned profile and normal Companion login. The
+   management Learn/Resume button requests the dedicated native assistant; manual
+   selection is the fallback. Hear the notice and separately say **Start learning**.
+6. Only saved samples advance the guided phrase. **Pause learning** retains samples;
+   a verified paused scope previews the count and needs separate **Continue learning**.
+   New/expired/interrupted scopes require fresh notice and **Start learning**.
+   **Cancel voice learning** discards only the bound unfinished session, not the
+   installed voiceprint. Never blindly retry uncertain mutations.
 
-Confirmed pause (including the safety-control pause), cancellation and validated
-completion responses append: “If you're finished with voice learning, remember
-to switch back to your regular assistant.” The original result and retention/
-deletion explanation remain intact. Unverified pause/cancel outcomes keep their
-warnings without claiming success. This is a spoken reminder only: it does not
-switch assistants, change the preferred assistant or start another recording.
+Pairing, entity enablement and launch are not recording consent. Initial, consent
+and control turns are never samples. Ordinary Assist traffic never trains.
 
-The final prompted sample now has a bounded read-only completion wait within the
-same native turn: up to 15 additional seconds, at most 30 status reads, spaced
-0.5 seconds apart. It does not push a new message into an already-finished Assist
-conversation. Success still comes only from the backend's validated-completion
-receipt, followed by the regular-assistant reminder. Intermediate processing does
-not enter this wait. A rejected final sample returns its retry prompt, not success.
-Errors retain the attention response; continued processing explicitly says the
-check has ended and directs the user to management or a fresh status request.
+## Completion and return to normal use
 
-The wait rechecks authenticated turn scope before and after each read, stops on
-disconnect/revocation, expiry, unload or removed flow, and propagates cancellation.
-It neither resubmits PCM nor retries a failed bridge call or any learning mutation.
-Mismatched profile/target and inconsistent completion receipts cannot be announced
-as success by the polling helper. No background polling survives the native turn.
+The final prompted sample has a bounded read-only completion wait: up to 15 extra
+seconds, at most 30 status reads at 0.5-second spacing, within the same native turn.
+Only a validated installation/cleanup receipt is success. Rejected samples repeat;
+errors retain attention warnings. Continued processing explicitly ends the automatic
+check and directs the user to management or a status request. No background polling
+or unsolicited replacement of an already-sent reply occurs.
 
-The hidden, non-iframe launcher resolves entities by registry IDs under
-`codex_assist`, not their names. Its read-only command is
-`codex_assist/voice_learning/launch_info`; the JS lives at
-`/codex_assist/voice-learning-launch-v2.js`. It rechecks the signed-in login and
-own profile, requires exactly one enabled matching learning assistant, and keeps
-the previous duplicate/stale-launch guards. It never overwrites another panel.
-If the old companion still owns the shared URL, use manual selection until the
-separately approved cutover; loading both is not a supported final installation.
+The wait rechecks authenticated scope before/after reads and stops on revocation,
+disconnect, expiry, unload or removed flow. It never resubmits audio or retries a
+failed mutation. Confirmed pause/cancellation/completion appends a spoken reminder
+to select the regular assistant manually. Unverified outcomes do not claim success.
 
-After a non-throwing native `assist/show` request, the launcher replaces the
-underlying HA route with Voice Match management using in-page navigation, not a
-WebView reload. Native Assist has no acknowledgement: this is a request followed
-by navigation, not proof that Assist opened. It does not react to spoken pause or
-cancel, dismiss Assist, change the preferred assistant or grant recording consent.
+## Native launcher
 
-The optional `return_path` comes only from one cached Voice Match add-on whose
-internal origin matches the configured bridge and whose public HA `app` panel
-binds to the same safe slug. The browser validates the internal ingress path
-again and rechecks the captured account, connection, auth and native bridge.
-No browser-supplied return URL is accepted. Missing/ambiguous metadata, aliases,
-HTTPS/custom origins or a missing public panel can prevent automatic return;
-launch discovery still works without a return path. With a validated path,
-**Back to Voice Match** remains available if dispatch throws or navigation fails;
-otherwise the fallback is **Back to Home Assistant**. No failure retries the
-native launch or re-enables the consumed launch button. Actual Companion overlay
-behaviour remains a separate acceptance check.
+The authenticated `/voice-match-learning` panel resolves registry IDs, current
+login and own profile, and requires exactly one enabled matching learning assistant.
+Read-only discovery uses `codex_assist/voice_learning/launch_info`; frontend code
+is served at `/codex_assist/voice-learning-launch-v2.js`.
 
-Internal `voice_learning/manage` coordinator controls remain scoped to an entry
-and the authenticated caller. No satellite adapter ships, and browser-supplied
-device/account IDs cannot grant recording authority. They are not a general phone
-recording API. Global WS/panel registrations retain no entry credentials; handlers
-accept only loaded learning runtimes, not a Codex entry or a failed/removed entry.
+It requests native `assist/show` once, then navigates the underlying HA page to
+Voice Match management when one safe metadata-verified app route matches the
+configured origin. This is not native acknowledgement, Assist dismissal, consent
+or restoration of the previous assistant. Missing/ambiguous/unsafe metadata uses
+the manual fallback. **Back to Voice Match** or **Back to Home Assistant** remains
+available after uncertain dispatch; failure does not retry the consumed launch.
+The panel never overwrites a conflicting standalone launcher.
 
-## Guided checks and repairs (phase 3 development)
+## Check setup and Repairs
 
-The learning options menu separates **Check setup**, phone settings, pairing
-repair instructions and optional personalisation guidance. Checks report the
-bridge, source, learning entities, dedicated assistant and launcher separately.
-They do not verify account ownership, a voiceprint, recording consent or an actual
-phone handoff. A provider/language check cannot prove that a Wyoming connection
-is ordinary Whisper rather than a filtered endpoint; the UI says so.
+Learning options separate **Check setup**, phone settings, pairing repair and optional
+personalisation guidance. Checks report bridge, source, learning entities, dedicated
+assistant and launcher independently. They do not verify own-profile readiness,
+consent, actual microphone handoff or acoustic quality.
 
-Checks occur during observed setup transitions and on explicit request, not by
-continuous network polling. A manual check makes a fresh bounded encrypted
-`hello` only. It does not use `begin`, `permit`, `sample`, `resume`, `cancel` or
-`discard`. A configuration change during that await returns **not checked** and
-cannot clear issues for the newer configuration.
+An explicit check makes a bounded encrypted `hello`, not a learning mutation.
+Checks run on observed transitions/request, not continuous network polling. Stale
+configuration results remain **not checked**. Entry-scoped Repairs offer confirmed
+Reconfigure, source settings or instructions/recheck. Unknown results cannot count
+as fixed; unresolved issues/dismissal state survive reload. Removal cleans only that
+entry's issue IDs. Failed unload is not successful disablement.
 
-Repairs use stable IDs per learning entry. Bridge failure offers that entry's
-Reconfigure flow after confirmation; source failure opens its own learning
-options. Missing/unavailable entities, missing/duplicated/mixed assistants and
-launcher conflicts offer instructions and a read-only recheck. An unresolved or
-unknown result does not count as fixed. Reload retains unresolved issues and
-their dismissal state; entry removal cleans only its own known issue IDs. The
-implementation uses the pinned HA 2026.10 issue API rather than assuming newer
-entry-ownership arguments are available. Disabled, missing, Codex or mismatched
-entry/issue targets are not accepted by the repair flow.
+Checks/repairs do not install apps, adopt/rotate keys, create assistants, record,
+delete, reassign profiles or change defaults. A complete end-to-end administrator
+onboarding wizard is still [app issue #4](https://github.com/DaFern/wyoming-voice-match-ha/issues/4).
 
-The launcher recognises its own existing panel on reload, but never overwrites
-another panel at the shared URL. No repair installs an add-on, starts a server,
-rotates a key, submits a clip, deletes recordings, reassigns a profile, switches
-assistants or creates/changes a pipeline. Failed unload is not displayed as
-successful disablement. Correcting pairing or settings still uses its existing
-explicit confirmation and reload path, including refusal of unverified cleanup.
+## Everyday Voice Match
 
-Optional personalisation is a **guide**, not automatic pairing: explicitly choose
-an enabled Codex entry, then use its existing personal-preferences options and a
-separate personalisation key. The guide reads only whether a key is configured,
-does not show/copy it and does not claim it is verified. No Codex entry means
-learning can continue without one; the guide does not start OAuth. Actual packet
-verification and prompt composition remain per turn in the existing Codex path.
+On the Codex entry choose **Configure → Voice Match** and enter the app hostname,
+**10352** and its distinct personalisation key. Use **Voice Match** STT with a Codex
+agent from that entry. No second Wyoming STT integration is required. Recognised
+names work without personal instructions. Learning remains separate and works
+without Codex. [Privacy and scoping](VOICE_MATCH.md).
 
-## Distribution preparation (phase 4 development)
+## Limits and acceptance
 
-The [installation guide](INSTALLATION.md) now identifies this fork's custom HACS
-repository, the independent add-on and per-module support requirements. The
-[beta acceptance and rollback checklist](BETA_ACCEPTANCE.md) is deliberately
-uncompleted: package preparation is not HACS transport, clean-install or phone
-acceptance. A read-only distribution check verifies the runtime source projection,
-assets, one-domain layout and manifest/project/lockfile parity. Source `0.7.0` is
-unchanged; identify development builds by SHA until a distinct candidate is approved.
-The add-on baseline is `0.4.5`; it is versioned separately. Retain standalone
-companion instructions while combined replacement acceptance is pending.
+No secure automatic key adoption, automatic assistant creation, production satellite
+learning adapter, accountless Echo admission or exact previous-assistant restoration
+is supplied. Recognition is not authentication or authority for sensitive actions.
 
-## Remaining phase (not implemented here)
-
-Secure automatic adoption/key exchange is still not implemented. Metadata
-suggestions and manual cryptographically verified learning pairing must not be
-described as zero-touch pairing. The learning wizard gives pipeline guidance,
-not automatic pipeline creation. Speaker-aware automation configuration remains
-a separate explicit opt-in, with no general recording/service-call API.
-
-5. Separately approve backups, live cutover, restart and real-phone acceptance.
-   Do not delete voices, voiceprints or samples just because a clean reset is
-   permitted. Identify every proposed deletion before approval. Remove obsolete
-   companion installation instructions only when its replacement works.
-
-No phase may change ordinary Assist traffic, Piper, agent personalities, AI Task
-defaults or recognition thresholds as an incidental effect. Recognition remains
-personalisation, not authentication. Preserve separate endpoints 10350, 10352
-and 8099. Do not silently change the default assistant or promise unsupported
-automatic restoration of the previously selected Companion assistant.
-
-## Verification gates
-
-Fast tests/lint and token-interleaving checks cover the unchanged Codex boundary.
-Native HA 2026.10 tests load the moved entities and exercise real authenticated
-WebSocket pipelines with synthetic Whisper, DSP and server responses, including
-ownership/login rejection, exact-turn permits, progression, pause/resume, cancel,
-disconnect and launcher discovery. Paired source logic is pinned to reviewed
-release `7ce8f71`: the codec is byte-identical and core safety logic has matching
-AST hashes. The test-only cross-repository runner also exercises the new client
-against the add-on's encrypted HTTP bridge and voice-store fixtures.
-
-Older HA matrix entries run Codex and explicit learning-rejection contracts; the
-newer-only learning pipeline tests skip there. A skip is not learning acceptance.
-Android native launch/actual audio, 30-sample real training, clean HAOS installs
-and live recovery remain separate acceptance work. No beta publication before
-those checks and the packaging/documentation reconciliation.
-
-Later: Codex-only and learning-only clean installs, combined operation, bridge
-outages, Codex reauth during learning, key changes, unload/reload isolation,
-protocol parity across repositories, real-phone consent/progression/resume/cancel,
-ownership rejection and rollback. No beta publication before clean-install checks.
+Tests cover native HA lifecycle/authentication/pipelines, exact-turn handoff,
+loopback encrypted bridge and Wyoming protocol with synthetic audio/inference.
+Ordinary direct-connected assistant use and the app's admin layout are confirmed
+on the test installation. Short notice/timely pause-resume have narrow phone
+acceptance. The current combined full 30-sample replacement/cleanup, privacy details,
+resume-prompt cancellation, fresh installs, wider device/recognition tests and
+rollback remain open. [Testing](TESTING.md) and [candidate beta gates](BETA_ACCEPTANCE.md).

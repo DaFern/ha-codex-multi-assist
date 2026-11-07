@@ -1,4 +1,4 @@
-# Speaker-aware automations (development, not deployed)
+# Speaker-aware automations — experimental
 
 Use **Codex Assist: Voice Match sentence** as the trigger, then
 **Codex Assist: Recognised speaker is** as a condition or in a `choose` branch.
@@ -9,9 +9,10 @@ This checks a recognised acoustic profile, not a logged-in Home Assistant user.
 ## Requirements
 
 - Both reviewed components installed, with the existing pairing enabled.
-- The personalised Wyoming STT endpoint on 10352 and a paired Codex agent.
+- Voice Match STT connected directly to the app on 10352 and a Codex agent from
+  the paired entry. No separate Wyoming STT integration is required.
 - Local-first intent handling disabled so the request reaches that agent.
-- This development change installed after review and an approved Core restart.
+- Explicitly configured automations and separately verified real-device behaviour.
 
 The condition is reusable, but not a global sensor. A native time, motion, event,
 manual run or ordinary sentence trigger has no matching speaker and returns false.
@@ -104,4 +105,5 @@ capacity, unsubscribe, exceptions and cancellation. Real HA tests load the nativ
 trigger/condition descriptions, run an automation with `choose` and conversation
 responses, preserve caller context, reject packet replay, and check concurrent
 conversation requests. Real voice accuracy, editor rendering, and physical-device
-speech still need separate live acceptance after approved deployment.
+speech still need separate live acceptance. Ordinary assistant operation does not
+establish automation editor or physical-device acceptance.

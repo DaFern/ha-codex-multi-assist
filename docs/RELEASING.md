@@ -8,7 +8,7 @@ yet. This checklist does not authorise creating those branches or publishing a r
 
 ## Combined integration gate (development fork)
 
-**No combined beta is published by phases 1–4.** Follow
+**No combined public beta is published.** Follow
 [INSTALLATION.md](INSTALLATION.md) for the fork/custom-repository identity and
 per-feature support floors. Source `0.7.0` remains aligned across manifest,
 project and lockfile; it is not a unique development-build identifier. Record

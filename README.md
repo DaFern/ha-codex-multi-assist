@@ -56,7 +56,7 @@ follow [learning setup](docs/COMBINED_INTEGRATION.md#clean-development-setup-not
 Skip the Codex sign-in and agent-selection steps below. Personalisation is optional
 and uses a separate key only if you later add Codex.
 
-After requesting native Assist, the development launcher returns the underlying
+After requesting native Assist, the launcher returns the underlying
 page to Voice Match management when a safe add-on route is available. This does
 not confirm Assist opened or grant recording consent. The one-shot launch guard
 stays enabled; a **Back to Voice Match** link remains if dispatch is uncertain.
@@ -64,9 +64,9 @@ See [launcher boundaries](docs/COMBINED_INTEGRATION.md) for fallback limitations
 
 Confirmed pauses, cancellation and validated learning completion now end with:
 “If you're finished with voice learning, remember to switch back to your regular
-assistant.” This development reminder does not switch assistants automatically.
+assistant.” This reminder does not switch assistants automatically.
 
-After the final phrase, the development agent now waits up to 15 additional
+After the final phrase, the learning agent waits up to 15 additional
 seconds for confirmed completion and announces success in the same turn. If it
 is still processing, the reply explicitly says the automatic check has ended and
 directs you to Voice Match management or a spoken status request.
@@ -85,22 +85,21 @@ If sign-in does not start or the code page reports an error, device-code login m
 
 Codex Assist supports one sign-in. To change accounts or sign in again, use **Reconfigure** on the existing entry.
 
-**Development checkout — optional Voice Match learning:** setup now offers a
+**Optional Voice Match learning:** setup offers a
 separate learning entry with verified bridge pairing and an explicit phone opt-in.
 Learning requires HA **2026.10+**, the add-on and ordinary Wyoming Whisper—not a
 Codex account. Codex still needs neither the add-on nor voice setup. The learning
-entities and native launcher now live inside this integration; no second custom
-integration is needed for a clean development install. This is **not** a released
-combined beta or approval to replace an existing live companion. See
+entities and native launcher live inside this integration; no second custom
+integration is needed. This is **not** a released combined beta. See
 [setup, boundaries and the separate cutover gate](docs/COMBINED_INTEGRATION.md).
 
-The development learning wizard can suggest an internal add-on address from
+The learning setup flow can suggest an internal add-on address from
 Home Assistant's cached Supervisor metadata, but still requires your learning key
 and verified pairing. It ends with a separate review before saving. **Configure →
 Check setup** reports technical readiness; **Repairs** explains observed problems
 without resetting data or changing pipelines. Optional personalisation guidance
 explicitly selects an existing Codex entry and never copies the learning key.
-These are development features, not an announcement of a combined beta release.
+These checks do not replace clean-install or real-phone acceptance.
 
 ### 3. Choose Codex Assist in your pipeline
 
@@ -137,17 +136,16 @@ personal instructions are optional, not a separate STT mode.
 See [setup, privacy boundaries and rollback](docs/VOICE_MATCH.md). It does not
 authenticate speakers or retrieve private conversations by recognised identity.
 
-Development code now also supplies the matched voice profile's display name to
+Voice Match supplies the matched voice profile's display name to
 the agent, even without saved personal instructions. This lets it acknowledge a
-recognised speaker naturally, without treating recognition as a login. It needs
-both reviewed updates; it is not deployed by editing this checkout.
+recognised speaker naturally, without treating recognition as a login.
 
-The development-only [speaker automation extension](docs/SPEAKER_AUTOMATIONS.md)
+The experimental [speaker automation extension](docs/SPEAKER_AUTOMATIONS.md)
 adds a **Voice Match sentence** trigger and **Recognised speaker is** condition.
 Reuse one voice profile across automations, without a shared last-speaker sensor.
 It requires separate reviewed deployment and must not authorise sensitive actions.
 
-The consolidated development setup offers one everyday **Voice Match** STT choice
+The setup offers one everyday **Voice Match** STT choice
 on HA 2026.10+: configure its internal backend address and personalisation key
 under **Configure → Voice Match**, then select it with a Codex agent from that
 entry. Chat transcripts stay clean, recognised names are retained, and personal
@@ -156,15 +154,15 @@ instructions are optional. New setups need no separate `voice-match` or
 
 Existing Clean voice messages entity IDs and pipeline bindings are preserved;
 legacy source connections continue until explicitly reconfigured. Setup does not
-remove existing engines or hide unrelated STT providers. This development follow-up
-needs separate deployment and
-real-device acceptance; installing code does not change existing pipelines.
+remove existing engines or hide unrelated STT providers. Installing code does not
+change existing pipelines. Ordinary direct-connected assistant use is confirmed on
+the test installation; multi-speaker/device accuracy remains unverified.
 See [setup, migration and limitations](docs/CLEAN_SPEAKER_STT_PROTOTYPE.md).
 
-Development [request diagnostics](docs/VOICE_MATCH.md#minimal-request-diagnostics-development)
+[Request diagnostics](docs/VOICE_MATCH.md#minimal-request-diagnostics)
 can distinguish neutral matches, missing preferences and local prompt application
-without logging names, keys, transcripts or instruction text. Deployment and any
-targeted logging-level changes require separate approval.
+without logging names, keys, transcripts or instruction text. Targeted runtime
+logging-level changes require separate approval.
 
 ### Multiple conversation assistants
 

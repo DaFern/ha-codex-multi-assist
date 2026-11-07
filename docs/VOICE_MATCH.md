@@ -1,146 +1,108 @@
 # Voice Match and optional per-person response preferences
 
-Experimental connector for **Wyoming Voice Match 0.3.0** and **Codex Multi-Assist
-0.7.0**. It is off by default, with no changes to saved agent personalities or
-AI Task settings. Full setup/transport/rollback documentation is maintained in
-[the add-on repository](https://github.com/DaFern/wyoming-voice-match-ha/blob/main/docs/PERSONALIZATION.md).
-That link becomes available once the paired repository changes are pushed.
+The experimental connector pairs **Codex Multi Assist 0.7.0** with the **Voice Match
+0.4.7** app. Record exact source revisions too. It offers one everyday **Voice Match**
+STT choice on **HA 2026.10+**, clean chat text, recognised names and optional personal
+instructions. **Voice Learning** is a separate entry/assistant and uses a separate key.
 
-After both reviewed updates pass CI and are deployed:
+## Setup
 
-1. In Voice Match, enrol and assign voice ownership. **Personal instructions** are
-   optional: an empty value still permits recognised-name context.
-2. An administrator creates a pairing key in that add-on. Copy it directly into
-   **Configure → Voice Match** here. Never paste it in chat,
-   screenshots, logs or issues. The password field is not prefilled; blank keeps
-   an existing key. Disable the option to remove it. Diagnostics redact the key.
-3. Enable the add-on's personalised endpoint and enter its internal hostname and
-   port **10352** in the same setup form. No separate Wyoming STT connection is
-   needed. Select **Voice Match** in a test pipeline with a Codex agent from this
-   entry; disable local-first intent handling if offered.
-4. Test with multiple enrolled people and simultaneous devices. Until then, keep
-   ordinary STT/Whisper available as a fallback. Do not enable the endpoint with
-   unrelated conversation agents or an intent-only pipeline.
+1. Install compatible reviewed components; back up before replacement. Integration
+   Python updates require an approved Core restart; app builds/updates are separate.
+2. Enrol voices and assign each to its actual HA account. Personal instructions in
+   Manage voices are optional; an empty value still permits recognised-name context.
+3. In the app's **Administrator settings → Voice Match connection**, create a
+   personalisation key only if needed and enable the endpoint. Never put keys in
+   chat, logs, URLs, screenshots or issues; retain an existing working key.
+4. On the Codex entry choose **Configure → Voice Match**. Enable it and enter the
+   internal hostname, **10352** and the same personalisation key. Blank preserves
+   a saved key; disabling removes it. The initial enabled toggle does not activate
+   anything until valid setup is saved; saved opt-outs remain off.
+5. Select **Voice Match** STT, a Codex agent from that same entry and usual TTS in
+   an approved test assistant. No separate Wyoming STT connection is needed. Disable
+   local-first handling if offered and avoid native sentence-trigger conflicts.
+6. Test multiple people/devices, uncertainty and rollback. Keep ordinary Whisper
+   available. Do not pair this STT with an unrelated or intent-only agent.
 
-Personal instructions are added **after** HA renders the agent's base prompt.
-They are literal text, not HA/Jinja templates. They are shared with the selected
-provider for a matched request. Prefer short style/default instructions; never
-store secrets or sensitive facts. The current agent/model/reasoning/tools remain
-unchanged, and the original HA caller context is retained—not replaced by the
-account linked to the recognised voice.
+Setup probes service metadata, not audio or key validity; every transcription packet
+is verified separately. The stable existing entity ID/pipeline binding is retained
+(`stt.clean_voice_messages` on the test installation), displayed as **Voice Match**.
+Saving options reloads the entry, not pipelines. No old-source review/removal menu
+exists and no redundant connections are automatically deleted.
 
-The add-on uses an encrypted, authenticated, utterance-bound request header because
-standard Wyoming STT discards extra speaker fields. The connector verifies it,
-checks expiry/replay and strips it before preparing model input. Invalid, expired,
-replayed or unpaired headers fail closed, not as a raw prompt or a trusted name.
-The add-on's conservative match/gap checks choose a preference profile; accepted
-but uncertain speech uses neutral instructions with fresh context. Existing
-acoustic rejection is unchanged.
+## Names, preferences and permissions
 
-## Recognised names (development, not deployed)
+A confidently matched assigned profile supplies its display name, including when
+instructions are empty. Names are literal data, limited to 80 printable characters;
+they are not inferred from presence or phone login. The model receives the name on
+normal/tool/auth-retry composition and is guided to acknowledge recognition naturally.
+Its wording and real acoustic accuracy are not guaranteed.
 
-The paired sender can now include the matched profile's **display name** in an
-optional encrypted `speaker_name` field. Codex supplies that name separately from
-style preferences on every model/tool round, including the authentication retry
-path. Empty personal instructions no longer prevent name context. The model is
-asked to acknowledge voice recognition naturally, not to claim certain identity
-or ask for a name as though no match were supplied. This remains model guidance,
-not a guarantee of its answer or evidence of a real acoustic match.
+Personal instructions are literal text up to 2000 characters, added after rendering
+the agent's base prompt—not executed as Jinja. Name and preferences go to the selected
+provider. Never store secrets or sensitive facts. They do not replace the personality,
+model, tools, original HA caller, permissions, Piper voice or shared AI Task defaults.
+Neutral/unassigned requests carry no recognised name or inherited speaker context.
 
-This uses the profile label, not an inferred name from presence, a profile ID or
-the current phone login. The label is sent to the selected provider; keep it
-appropriate for that use. It is quoted as literal data, not rendered as Jinja.
-Names are limited to 80 printable characters and never added to these diagnostic
-logs. The existing `instructions_present`/`instructions_applied` flags describe
-saved preferences only; false does not mean no name was supplied.
+## Transport and conversation scope
 
-Neutral/unassigned requests cannot carry a name. Plain text and older packets
-without the optional field remain unnamed; no name is recovered from a previous
-speaker. A name change resets the model's active scope even if the profile revision
-is unchanged. Existing source authentication, utterance binding, expiry/replay
-checks, HA caller permissions and AI Task defaults remain unchanged.
+The app's stricter similarity/gap checks use an independent assessment of the PCM
+sent to Whisper. Incomplete/conflicting assessments stay neutral; acoustic rejection
+still returns no transcript. The paired endpoint uses Fernet authenticated encrypted,
+utterance-bound context. Wrong key, expiry, altered text and replay fail closed.
+The direct STT adapter returns clean words and holds the packet privately for the
+exact pipeline task; [handoff design and limitations](CLEAN_SPEAKER_STT_PROTOTYPE.md).
+A stock personalised-Wyoming path still displays the encrypted header in chat.
 
-Both packet copies retain version 1: older senders work without names and older
-receivers ignore the optional name. Both updates are needed for the feature; no
-pairing rotation or re-enrolment is required just for this change. The visible
-encrypted-header limitation below is **not** fixed by name context.
+Active model scope is bounded by speaker/revision/name and agent within the supplied
+HA conversation. Speaker/agent changes, preferences/ownership changes, uncertainty,
+idle expiry or restart reset it. Returning speakers do not recover an old branch;
+no history is fetched by recognised identity. Later concurrent turns are excluded.
+HA's normal log retention is not erased or converted into authenticated private logs.
 
-## Conversation history
+Unpaired ordinary requests retain the ordinary path. Enabling pairing starts a new
+scope, including plain requests; disabling retains isolation for that running entry's
+lifetime. Core restart clears volatile scopes and in-memory conversation logs.
+Scope-specific provider cache/session IDs may increase token cost/latency; live
+costs are unmeasured.
 
-**Visible transcript limitation:** the current stock Wyoming path displays the
-encrypted header in Assist's user-message bubble. Codex removes it after HA's STT
-event has already been sent to the frontend. The development-only
-[Voice Match adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md) defaults to enabled
-in setup under Configure → Voice Match on the Codex entry (HA 2026.10+).
-Saved opt-outs remain off; saving valid setup is still required for activation.
-After separately approved deployment, connect directly to the personalised backend
-and use the adapter in a test assistant with a Codex agent from that entry. Older
-source-based configurations still work until reconfigured; the existing entity ID
-and pipeline bindings remain stable. It does not clean existing stock-Wyoming
-pipelines or disable their engines automatically.
+The bounded entry-scoped replay cache survives ordinary entry reload but not Core
+restart. Payloads expire after 120 seconds with Fernet clock-skew allowance. A still
+valid captured packet may be accepted after restart with fresh history. Possession
+of a pairing key permits metadata creation/decryption; protect Core/app backups.
+Already issued snapshots remain valid until expiry; immediate receiver revocation
+requires disabling/removing pairing in Codex too. Accepted actions cannot be retracted.
 
-When paired, context is bounded to the current speaker/revision and agent within
-the provided HA conversation. Speaker/agent changes, changed preferences/ownership,
-uncertainty, idle expiry or restart reset the scope. An earlier speaker returning
-does not recover their old branch. No history is fetched by recognised identity.
-Unpaired ordinary requests retain the previous conversation path; enabling pairing
-starts a new scope, including for plain requests under that entry.
-After pairing has been enabled, disabling it keeps scope isolation for that
-entry's running lifetime so old mixed HA log history cannot reappear. A Core
-restart clears both volatile speaker scopes and HA's in-memory conversation logs.
+**Recognition is not authentication or confidentiality.** False matches and replayed
+speech remain possible. Do not authorise locks, alarms, purchases or confidential
+data access from a match. HA's exposed-entity/Assist API boundary remains decisive.
+The [speaker automation extension](SPEAKER_AUTOMATIONS.md) requires explicit automation
+configuration; saved preferences alone cannot create a trusted speaker condition.
 
-Only scoped turns and their tool/native output are replayed. A request cannot
-rewrite a different current turn or include a later concurrent user's turn.
-Provider session/cache IDs are salted per active scope. Normal HA conversation
-logs/retention are not erased or converted into separate authenticated user logs.
-This may reduce prompt-cache hits and increase token usage/latency compared with
-the ordinary entry/agent cache; live costs have not been measured.
+## Minimal request diagnostics
 
-**Recognition is not authentication or a privacy guarantee.** False accepts/replay
-of actual voices remain possible. The pairing authenticates the source of metadata,
-not the human. Do not retrieve confidential data or authorise sensitive actions
-solely from voice identity. The model's preference instructions are guidance, not
-a security policy. HA's existing Assist API/exposed-entity checks remain decisive.
+INFO sender/receiver/prompt records share a short hash of the encrypted header.
+It correlates one request without logging its key, token, transcript, name/profile
+ID, instructions or base prompt. Timing/outcomes still require protected retention.
+Tags are not identity, authentication or a shared last-speaker API.
 
-The replay cache is volatile, bounded and entry-scoped. It survives ordinary entry
-reloads but not a Core restart; a captured still-valid header could be accepted
-after restart with fresh history. Payloads expire after 120 seconds (with Fernet
-clock-skew allowance). No guarantee of redaction across all HA/debug/provider logs
-is made, and possession of a pairing key permits metadata creation/decryption.
+`receive` reports recognised/neutral/rejected and `instructions_present`;
+`prompt_prepared` reports `instructions_applied`. These flags describe preferences,
+not whether a name was supplied. Composition does not prove provider delivery or
+model compliance. Plain requests inherit no previous diagnostic tag.
 
-## Minimal request diagnostics (development)
+For separately approved diagnostics, allow targeted INFO for
+`custom_components.codex_assist.conversation` and
+`custom_components.codex_assist.voice_match`, then use a fresh utterance. See the
+[app diagnostic guide](https://github.com/DaFern/wyoming-voice-match-ha/blob/main/docs/PERSONALIZATION.md#request-diagnostics).
+No universal HA/debug/provider log redaction is promised.
 
-The add-on's sender decision, this receiver and prompt composition now have
-correlatable INFO diagnostics in the development code. See
-[the sender's diagnostic guide](https://github.com/DaFern/wyoming-voice-match-ha/blob/main/docs/PERSONALIZATION.md#request-diagnostics-development-not-deployed)
-after both reviewed changes are pushed. A short hash of ciphertext correlates a
-single request without logging its key, token, transcript, name/profile ID,
-personal instructions or base prompt. Normal log timing/outcome privacy still
-applies; tags are not authentication or a last-speaker API.
+## Current acceptance and rollback
 
-`receive` reports recognised/neutral/rejected and `instructions_present`.
-`prompt_prepared` reports `instructions_applied` for each composition attempt;
-it does not prove provider delivery or model compliance. The experimental clean
-STT adapter uses the same tag as its original encrypted packet. Plain/unpaired
-requests do not inherit an older tag or produce a recognised-person diagnostic.
+Ordinary direct-connected assistant operation is confirmed on the test installation.
+That is not multi-person discrimination, simultaneous-device, accuracy or all-client
+acceptance. See [testing](TESTING.md) and [beta gates](BETA_ACCEPTANCE.md).
 
-Allow INFO only for `custom_components.codex_assist.conversation` and
-`custom_components.codex_assist.voice_match` when diagnosing, with separate
-approval for runtime logging changes. The implementation changes no live logging
-levels. New deployment and a fresh utterance are required; prior requests have no
-retained diagnostic snapshots. No pairing rotation or protocol change is needed.
-
-## Deployment and rollback
-
-The development-only [speaker automation extension](SPEAKER_AUTOMATIONS.md) adds
-a Voice Match sentence trigger and a reusable Recognised speaker is condition.
-It needs separate review/deployment; personal instructions alone cannot supply
-an automation's speaker identity.
-
-This source change is not a live deployment. Updating integration Python requires
-an explicitly approved full Core restart; update/back up the add-on separately.
-Keep current personalities and AI Task defaults. Disable this connector and switch
-back to ordinary STT to roll back the feature without removing voiceprints.
-
-The corresponding user-guide/wiki section should be published only after the
-reviewed changes are committed/pushed; that external wiki publication is pending.
+To roll back, first select ordinary Whisper/original STT in affected assistants,
+then disable Voice Match in Codex and the app endpoint. No voiceprint deletion or
+re-enrolment is required. Code rollback needs its own reviewed backup/restart plan.

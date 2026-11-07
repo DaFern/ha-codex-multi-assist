@@ -1,11 +1,11 @@
 # Architecture
 
-The [combined integration development work](COMBINED_INTEGRATION.md) introduces
-an explicit module choice and entry-scoped lifecycle. Optional learning now lives
+The [combined integration](COMBINED_INTEGRATION.md) uses
+an explicit module choice and entry-scoped lifecycle. Optional learning lives
 under `learning/`, with its own paired entry, STT/agent dispatch and native launcher.
 Codex runtime, token locks, request personalisation and AI Task remain separate.
 
-Phase 3 adds metadata-only endpoint suggestions, a final setup review, technical
+Learning setup provides metadata-only endpoint suggestions, a final review, technical
 readiness checks and entry-specific native Repairs flows. These administrative
 surfaces do not enter the phone recording controller or transfer learning
 authority to Codex. See the combined design for the pinned repair-API ownership
@@ -38,7 +38,9 @@ flowchart LR
 
 - **Config flow** handles Codex-style device-code sign-in. It stores OAuth tokens in the Home Assistant config entry and exposes integration options.
 - **Model discovery** uses only visible model IDs returned for the signed-in account. An entry-scoped, in-memory cache survives temporary failures; a small, explicitly unverified fallback list is used only before a successful result.
-- **Conversation agent** registers `conversation.codex_assist` for Home Assistant Assist pipelines.
+- **Conversation agents** register the retained primary entity and independent
+  managed personalities for Assist pipelines; each has its own settings/history
+  while sharing the entry's sign-in. AI Task uses separate shared defaults.
 - **AI Task entity** registers a native provider for text, structured data, supported image attachments, and image generation.
 - **Runtime token coordinator** serializes refresh-token rotation per config entry. Concurrent Conversation and AI Task requests reuse the winning refresh instead of invalidating one another. The coordinator outlives entry reloads, so a request that is still refreshing keeps the lock that later requests wait on. Its in-memory model list and retry backoff also survive a reload. Reauthentication and reconfiguration still clear them.
 - **Codex client** sends requests to the Codex-compatible service interface and normalizes its response stream. Text/tool and image streams share a completion reader. Success requires `response.completed`; EOF or `[DONE]` alone is not success. The reader stops at completion without waiting for the connection to close and preserves explicit backend error classifications. Text can stream before completion, but tool calls are held until completion so a truncated response cannot dispatch native actions. Each tool call comes from its completed `function_call` item in `response.output_item.done`, as in Codex CLI. Argument deltas and `response.function_call_arguments.done` are ignored. A completed call without a call ID, a name, or arguments that parse to a JSON object, or one that repeats an earlier call ID, fails the turn instead of running. An interrupted image stream fails even if it supplied a preview. Existing preview-image acceptance after completion is unchanged.
@@ -57,12 +59,12 @@ strips the header, and retains the original HA caller/permissions. Preferences
 are appended literally after native base-prompt rendering on every model/tool
 round; they are never executed as Jinja or applied to AI Task.
 
-The development sender's optional encrypted `speaker_name` supplies the matched
+The sender's optional encrypted `speaker_name` supplies the matched
 profile label as quoted per-request recognition context, even with empty style
 preferences. It conveys neither an authenticated HA account nor permissions.
 Legacy packets remain unnamed; neutral packets reject a supplied name. Name
 changes also reset scope, and diagnostics still omit names. See the recognised
-names section in the connector guide for deployment and compatibility limits.
+names section in the connector guide for privacy and compatibility limits.
 
 The bounded entry-scoped in-memory speaker runtime retains only current-scope
 boundaries, not a private-history database. Model input is filtered by boundary
@@ -72,14 +74,14 @@ starts fresh. Missing or forged metadata never selects another person's prompt.
 Pairing keys are redacted from integration diagnostics. This is response
 personalisation, not authentication, confidentiality or authorisation by voice.
 
-Development diagnostics correlate the sender, receiver and prompt composition by
+Request diagnostics correlate the sender, receiver and prompt composition by
 a short hash of the random encrypted header. They report fixed outcomes/reasons,
 numeric match metrics and instruction presence/application flags, never names,
 profile IDs, keys, tokens, transcript or prompt text. A `prompt_prepared` record
 does not establish provider receipt or model compliance. No runtime logging level
-is changed; see [VOICE_MATCH.md](VOICE_MATCH.md#minimal-request-diagnostics-development).
+is changed; see [VOICE_MATCH.md](VOICE_MATCH.md#minimal-request-diagnostics).
 
-### Optional speaker-aware automation dispatch (development)
+### Optional speaker-aware automation dispatch
 
 See [SPEAKER_AUTOMATIONS.md](SPEAKER_AUTOMATIONS.md). Verified request preparation
 also returns an immutable per-turn profile snapshot. Explicitly configured native
@@ -90,12 +92,11 @@ backs `codex_assist.speaker_is`; no global speaker sensor, public event, model
 argument, user impersonation or direct service bridge is involved. Invalid packets
 never dispatch; neutral packets cannot match a person. Matching action failure
 does not fall through to the model or replay actions. Unmatched requests and AI
-Task retain their prior paths. This code is not a live deployment or permission
-to use acoustic identity as authorisation.
+Task retain their separate paths. Acoustic identity is never authorisation.
 
 ### Standard request path
 
-The development [Voice Match STT adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md) connects
+The [Voice Match STT adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md) connects
 directly to the personalised Wyoming backend without registering a source entity.
 Legacy configurations still wrap their explicitly selected Wyoming STT source.
 Both paths bind the verified packet to an exact clean text object/owning pipeline
@@ -109,7 +110,7 @@ fallback are added. Metadata-only probes refresh availability every thirty secon
 Missing sources affect only the clean STT entity, not conversation or AI Task.
 Entry unload/options reload invalidates adapters, clears pending packets/timers
 and cancels tracked clean pipeline tasks through model completion. The nonce cache
-is retained. This source code is not a live deployment or documented HA metadata API.
+is retained. The object/task handoff is not a documented upstream HA metadata API.
 
 1. Home Assistant sends a voice or chat request through an Assist pipeline using `conversation.codex_assist`.
 2. Codex Assist refreshes its stored Codex or ChatGPT token if needed.

@@ -5,14 +5,14 @@
 This is **DaFern/ha-codex-multi-assist**, a development fork of
 [itsreverence/ha-codex-assist](https://github.com/itsreverence/ha-codex-assist).
 It is not the upstream default-catalog HACS entry. No combined beta is published
-by this preparation work. A green build is not real-phone or clean-install acceptance.
+yet. A green build is not real-phone or clean-install acceptance.
 
 | Component | Source metadata | Install channel / requirement |
 | --- | --- | --- |
 | Combined custom integration | `0.7.0` in manifest, project and lockfile; record commit SHA too | This fork as a HACS **custom Integration** repository; one `codex_assist` domain |
 | Codex module | HA 2026.6+; Python 3.14 supplied by HA | Codex-enabled ChatGPT account; no Voice Match dependency |
 | Learning module | HA 2026.10+ | Separate add-on, ordinary Wyoming Whisper, TTS and normal Companion login; no Codex account |
-| Wyoming Voice Match add-on | `0.4.5` baseline | Separate HAOS app repository; amd64 CPU only; locally built image |
+| Wyoming Voice Match add-on | `0.4.7` plus exact source/build revision | Separate HAOS app repository; amd64 CPU only; locally built image |
 | Standalone Voice Match Enrolment | Existing experimental companion | Retained for current installations/rollback; never run alongside combined learning |
 
 Source metadata is not deployed state or a release announcement. `0.7.0` spans
@@ -20,7 +20,9 @@ development revisions, so record the tested SHA. Do not manufacture a release/ta
 to make version strings appear newer. A future candidate must choose a distinct
 version, align `manifest.json`, `pyproject.toml` and `uv.lock`, and mark its GitHub
 release as a prerelease. Review tag syntax against HA/HACS before publication.
-The add-on versions independently; this work does not bump or deploy its manifest.
+The add-on versions independently. Ordinary direct-connected assistant operation
+and the rebuilt app's admin layout are confirmed on the test installation; these
+do not establish full combined learning, clean-install or public-beta acceptance.
 
 ## Fresh test installation
 
@@ -57,10 +59,12 @@ OAuth/bridge keys, biometric recordings and voiceprints.
    one dedicated assistant with both learning entities and your usual TTS. Do not
    change the global default or ordinary assistants. Opening the launcher and
    enabling entities are not recording consent.
-7. Optional Codex personalisation is independent: explicitly select the Codex
-   entry and configure its **personalisation** key. Keep **10350** ordinary
-   filtering, **10352** opt-in personalised STT and **8099** learning bridge separate.
-   A configured key is not evidence that voice packets were verified.
+7. Everyday Voice Match is independent: on the Codex entry open **Configure →
+   Voice Match**, enable it and enter the internal app hostname, **10352** and its
+   separate personalisation key. Use **Voice Match** STT with a Codex agent from
+   that entry and usual TTS. No extra Wyoming STT connection is needed. Personal
+   instructions are optional. Keep **10350** ordinary filtering, **10352** paired
+   STT and **8099** learning separate. A configured key is not verified voice evidence.
 8. Complete the [acceptance checklist](BETA_ACCEPTANCE.md). Revert to ordinary
    Whisper/manual assistant selection if uncertain. Do not improvise retries of
    uncertain sample submissions, cancellation, deletion or key rotation.

@@ -1,14 +1,15 @@
-# Combined beta acceptance and rollback — not yet executed
+# Combined beta acceptance and rollback
 
 This is a **checklist, not a result or permission to deploy**. All boxes below
-remain open until evidence is recorded. Work in disposable amd64 HAOS first.
+remain open for the selected candidate until matching evidence is recorded.
+Work in disposable amd64 HAOS first.
 Backups, live cutover, restarts, key changes, profile assignments and recording
 each need their own explicit approval. No data reset is necessary for packaging.
 
 ## Candidate record (complete before tests)
 
 - Integration version + exact commit SHA: **pending candidate selection**.
-- Add-on version + exact commit/build: **pending candidate selection** (`0.4.5` baseline).
+- Add-on version + exact commit/build: **pending candidate selection** (`0.4.7` source baseline).
 - HAOS/Core, amd64 hardware, Android/Companion, Whisper and TTS versions: **pending**.
 - HACS/Marketplace version, selected repository/ref and download/restart evidence: **pending**.
 - Private backup identifiers and tested recovery method: **pending**. Do not upload
@@ -98,6 +99,6 @@ each need their own explicit approval. No data reset is necessary for packaging.
 
 - [ ] Record clean-install and real-phone evidence for the selected candidate in
   issue #5; unresolved privacy/consent/cleanup failures block publication.
-- [ ] Reconcile remaining standalone instructions only **after** replacement acceptance.
+- [ ] Verify current setup docs, compatibility notes and limitations match the candidate.
 - [ ] Obtain separate version/tag/prerelease/publication approval. Follow
-  [RELEASING.md](RELEASING.md); don't treat phase 4 preparation as approval.
+  [RELEASING.md](RELEASING.md); documentation updates are not publication approval.
