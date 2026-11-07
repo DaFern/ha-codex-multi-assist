@@ -1,5 +1,35 @@
 # Testing
 
+## Consolidated Voice Match setup (development follow-up)
+
+The everyday Voice Match entity now supports a private direct Wyoming connection,
+with the former Clean voice messages unique ID retained. Native tests use a real
+loopback Wyoming peer and native HA STT-to-agent pipelines, not a physical voice
+engine. They cover metadata-only setup, actual-service validation before audio,
+bounded requests/audio, single submission, interrupted/oversized audio, early
+endpointing without client EOF, cancellation and entry unload, backend loss and
+recovery, malformed saved options, rejected/unverified packets, clean events,
+empty instructions, recognised names and concurrent identical utterances.
+
+Options tests cover the single visible setup route, legacy address suggestions,
+no migration merely by opening a form, explicit save and stable opt-outs. Cleanup
+tests cover assistant, legacy wrapper and learning dependencies, host scoping and
+unavailable dependency checks; the report never disables entities. Diagnostics
+redact the new backend hostname. The distribution inventory includes both new
+runtime modules. Core supplies its own version-specific Wyoming dependency only
+when the direct feature is configured; Codex-only dependency floors stay unchanged.
+
+These are development-only changes on `main`. No deployed source, live options,
+pipelines, voiceprints or registry settings were changed. Physical Companion /
+satellite acceptance and external wiki publication remain pending.
+
+Local verification passed **820 fast tests plus 32 subtests**, **466 current native
+HA tests / 1 skipped** with strict HTTP fixture ordering, and **275 minimum HA
+tests / 192 skipped**. The strict run retained the existing aiohttp assertion-
+rewrite warning. All ten fast token/tool mutations were caught; Ruff, the
+54-file distribution projection and diff checks passed. No remote exact-commit
+CI, commit/push, deployment or restart was performed for this follow-up.
+
 ## Recognised-name context and clean-message opt-in (development only)
 
 Default-enabled setup follow-up: regression tests cover the initial enabled toggle,

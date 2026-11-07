@@ -1,7 +1,9 @@
-# Clean voice messages: experimental adapter
+# Voice Match: one everyday STT choice
 
-**Development code, not deployed or a supported HA metadata API.** An explicitly
-enabled Codex entry can now register this STT entity on HA 2026.10+. Its setup
+**Direct-backend consolidation is a development follow-up, not yet deployed.**
+An explicitly enabled Codex entry registers one **Voice Match** STT entity on
+HA 2026.10+. This is the former **Clean voice messages** entity with the same
+unique ID and existing entity ID/pipeline bindings. Its setup
 toggle defaults to enabled, while saved opt-outs remain off. Activation still
 requires saving valid pairing/source setup; it never edits or selects a live
 pipeline. The filename retains the original prototype name for existing links.
@@ -10,31 +12,53 @@ pipeline. The filename retains the original prototype name for existing links.
 
 1. Keep the ordinary Whisper/original assistant available for rollback. Pair the
    Codex entry's Voice Match personal preferences with the personalised sender.
-2. On that **Codex entry**, choose **Configure → Clean voice messages**, leave it
-   enabled (the default for an unsaved choice) and explicitly select the personalised
-   Wyoming source (port **10352**). Ordinary Whisper, normal Voice Match, learning
-   STT and wrappers are not eligible sources.
-   The saved discovery metadata must identify `voice-match-personal`; this does
-   not by itself prove pairing. Each incoming packet is still verified.
+2. On that **Codex entry**, choose **Configure → Voice Match**, leave it enabled
+   (the default for an unsaved choice), and enter the add-on's internal hostname,
+   personalised port (normally **10352**) and personalisation key. The learning
+   key is separate and cannot substitute for this pairing. Personal instructions
+   are optional; recognised names work with an empty instruction.
+   Setup sends only a Wyoming Describe probe, never audio. The response must
+   advertise `voice-match-personal`; this does not itself prove key pairing.
+   Every incoming transcription packet is still verified with the pairing key.
 3. Saving reloads this entry and stops its active clean-voice requests. It creates
-   **Clean voice messages**, but does not alter your default assistant or any pipeline.
+   **Voice Match**, but does not alter your default assistant or any pipeline.
 4. Only after explicit test-pipeline approval, choose that new STT entity with a
    Codex conversation agent from the **same entry**, and your usual TTS. Disable
    local-first handling and avoid native sentence-trigger conflicts (see limits).
 5. Verify actual Companion chat bubbles and speech with multiple speakers/devices.
    Recognition is not authentication. No recording or re-enrolment is started here.
 
-Disable **Clean voice messages** to remove its active STT entity while keeping
-pairing and saved voices. Saving this choice records an explicit opt-out, so the
+Disable **Voice Match** to remove its active STT entity and pairing while keeping
+saved voices and the backend address. Saving this choice records an explicit opt-out, so the
 toggle stays off when reopened. Older versions removed the setting on disable;
 an absent setting now shows the enabled default in setup, but does not activate
 the adapter until valid setup is saved. Existing options are not migrated.
-Disabling personal preferences also clears clean setup.
 Before disabling, switch the test pipeline back to its original STT; pipelines
 are never changed automatically, so one still referencing a removed entity fails
 until corrected. No recordings are deleted. Re-enabling uses the stable entity
 unique ID. Publishing code, deployment and a full Core restart require separate
 approval; after installation, changing these options only reloads this entry.
+
+## Existing setups and redundant sources
+
+No options or pipelines are migrated automatically. Existing source-based setups
+keep working, including the older encrypted-transcript path. Opening setup can
+suggest the existing personal source's hostname and port from HA's public config
+entry/registry APIs. Only saving a successful direct-backend setup replaces the
+saved source-entity dependency; the source entity itself is not changed.
+
+Once the direct connection has been tested, **Configure → Review old Voice Match
+sources** reports known assistant, legacy wrapper and learning-source references
+for loaded legacy engines on this host. It is advisory, not a complete audit of
+external clients or arbitrary custom integrations. It neither disables nor deletes
+anything. Review remaining uses before manually disabling an unused STT entity
+through HA's entity settings. Keep a fallback and the ordinary Whisper source
+needed by enrolment. No add-on rebuild or endpoint removal is required.
+
+New setups register neither `voice-match` nor `voice-match-personal` as extra
+Wyoming STT entities. Those backend ports remain available for compatibility.
+Voice Learning is deliberately separate; this change does not hide unrelated
+Google/Whisper engines or filter HA's native picker.
 
 ## Why the current header is visible
 
@@ -49,10 +73,18 @@ edit the frontend, use invisible characters or read a shared last-speaker sensor
 
 ## Design and lifecycle
 
-`VoiceMatchSttAdapter` wraps an explicitly supplied personalised Wyoming STT
-entity. It forwards audio and advertises the source entity's languages, audio
-formats and processing requirements unchanged. The add-on's encrypted wire format
-and ordinary STT endpoint remain unchanged.
+`VoiceMatchSttAdapter` owns a private `PersonalBackend` connection for new setups;
+legacy configurations still wrap an explicitly supplied personalised Wyoming STT
+entity. The direct backend loads Core's Wyoming protocol component/dependency
+without registering a Wyoming config entry or STT entity, rather than imposing
+a global protocol-version pin on older Codex-only installations. It checks service metadata on
+the same TCP connection before sending audio, propagates the advertised languages
+and processing requirements, and accepts mono 16 kHz/16-bit PCM only. Upload and
+receive run concurrently to retain early endpointing. Request completion or
+cancellation closes the upload iterator and both child tasks. Audio is limited
+to sixty seconds and requests to 105 seconds, including a five-second metadata
+deadline. There is no retry. The wire protocol, filtering thresholds, optional
+instructions and separate enrolment-consent boundary remain unchanged.
 
 On a successful non-empty transcript, the adapter verifies the encrypted packet
 with the paired entry's key and returns a `str` subclass containing **only the
@@ -79,10 +111,11 @@ pending packets/timers/callbacks and cancels entry-owned clean tasks, including
 recording, STT-to-intent handoff and model processing. Plain Codex tasks are not
 selected by this cleanup. Existing nonce replay protection survives reload.
 An old adapter fails closed even if its source later becomes available again.
-Each new recording resolves the source afresh; disappearance, source replacement,
+Each new recording revalidates its backend/source; disappearance, source replacement,
 mid-recording changes or peer failures produce no raw-header fallback or retry.
-Missing sources only mark this STT entity unavailable, and source-state changes
-refresh its availability without taking the other Codex entities offline.
+Missing backends only mark this STT entity unavailable, without taking the other
+Codex entities offline. Direct backends receive metadata-only availability probes
+every thirty seconds; legacy sources retain source-state change monitoring.
 
 ## Important limits
 

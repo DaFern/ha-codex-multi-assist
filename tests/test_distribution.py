@@ -41,6 +41,8 @@ def test_distribution_has_one_complete_runtime_and_no_generated_data():
         "translations/en.json",
         "brand/icon.png",
         "triggers.yaml",
+        "voice_match_backend.py",
+        "voice_match_cleanup.py",
     ],
 )
 def test_distribution_refuses_missing_required_runtime_asset(candidate, missing):

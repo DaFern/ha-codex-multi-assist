@@ -95,15 +95,17 @@ to use acoustic identity as authorisation.
 
 ### Standard request path
 
-An opt-in development-only [clean STT adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md)
-wraps personalised Wyoming STT and binds its verified packet to an exact clean
-text object/owning pipeline task. The optional consumer uses the same nonce cache
-and request preparation as encrypted transcripts. Configure → Clean voice messages
-on a Codex entry defaults its setup toggle to enabled and preserves saved opt-outs.
-Its STT platform starts only after valid setup is saved (HA 2026.10+).
-Source selection validates the registered Wyoming provider and advertised
-`voice-match-personal` service, not its editable entity label. Each recording
-resolves the current source again and verifies the result before publishing text.
+The development [Voice Match STT adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md) connects
+directly to the personalised Wyoming backend without registering a source entity.
+Legacy configurations still wrap their explicitly selected Wyoming STT source.
+Both paths bind the verified packet to an exact clean text object/owning pipeline
+task and share the existing nonce cache and request preparation. Configure → Voice
+Match defaults its setup toggle to enabled and preserves saved opt-outs; the STT
+platform starts only after valid setup is saved (HA 2026.10+).
+The direct transport verifies the advertised `voice-match-personal` service on
+the actual request connection before sending audio. Discovery never proves key
+pairing; every returned packet is verified separately. No retries or raw-header
+fallback are added. Metadata-only probes refresh availability every thirty seconds.
 Missing sources affect only the clean STT entity, not conversation or AI Task.
 Entry unload/options reload invalidates adapters, clears pending packets/timers
 and cancels tracked clean pipeline tasks through model completion. The nonce cache

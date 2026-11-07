@@ -14,7 +14,7 @@ TO_REDACT = {
     "access_token", "refresh_token", "prompt", "voice_match_pairing_key",
     "key", "pairing_key", "learning_bridge_key", "personalisation_key",
     "personal_instructions", "instructions", "session_token", "capability",
-    "user_id", "voice_id", "profile_id", "url", "host",
+    "user_id", "voice_id", "profile_id", "url", "host", "voice_match_host",
 }
 
 

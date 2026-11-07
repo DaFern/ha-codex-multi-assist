@@ -12,8 +12,10 @@ def test_manifest_is_hacs_loadable_custom_integration():
     assert manifest["config_flow"] is True
     assert "conversation" in manifest["after_dependencies"]
     assert "ai_task" in manifest["after_dependencies"]
-    # httpx is provided by Home Assistant core and should not be reinstalled by HACS.
+    # Core manages both httpx and its version-specific optional Wyoming client.
     assert "requirements" not in manifest
+    assert "wyoming" in manifest["after_dependencies"]
+    assert "wyoming" not in manifest.get("dependencies", [])
 
 
 def test_release_and_minimum_runtime_metadata_stay_aligned():

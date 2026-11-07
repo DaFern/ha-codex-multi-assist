@@ -33,7 +33,13 @@ from .entry_modules import CONF_MODULE, EntryModule, entry_module
 from .learning.config_flow import LearningConfigFlowMixin, LearningOptionsFlow
 from .model_discovery import async_entry_model_catalog
 from .speaker_packet import valid_key
-from .voice_match import CONF_CLEAN_TRANSCRIPT, CONF_PERSONAL_STT_SOURCE, CONF_VOICE_MATCH_KEY
+from .voice_match import (
+    CONF_CLEAN_TRANSCRIPT,
+    CONF_PERSONAL_STT_SOURCE,
+    CONF_VOICE_MATCH_HOST,
+    CONF_VOICE_MATCH_KEY,
+    CONF_VOICE_MATCH_PORT,
+)
 
 CONF_ACCESS_TOKEN = "access_token"
 CONF_PROMPT = "prompt"
@@ -255,28 +261,69 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
             return self.async_abort(reason="learning_reconfigure_required")
         return self.async_show_menu(
             step_id="init",
-            menu_options=["settings", "agents", "voice_match", "clean_voice"],
+            menu_options=["settings", "agents", "voice_match", "voice_match_cleanup"],
         )
 
     async def async_step_voice_match(self, user_input=None):
+        from .entry_modules import learning_supported
+
         saved = self.config_entry.options.get(CONF_VOICE_MATCH_KEY, "")
+        defaults = dict(self.config_entry.options)
+        # Suggest the old source's endpoint without changing or disabling it.
+        if CONF_VOICE_MATCH_HOST not in defaults and getattr(self, "hass", None) is not None:
+            from homeassistant.helpers import entity_registry as er
+
+            source = er.async_get(self.hass).async_get(defaults.get(CONF_PERSONAL_STT_SOURCE, ""))
+            old_entry = (self.hass.config_entries.async_get_entry(source.config_entry_id)
+                         if source and source.platform == "wyoming" else None)
+            if old_entry is not None and old_entry.domain == "wyoming":
+                defaults[CONF_VOICE_MATCH_HOST] = old_entry.data.get("host", "")
+                defaults[CONF_VOICE_MATCH_PORT] = old_entry.data.get("port", 10352)
         errors = {}
         if user_input is not None:
             options = dict(self.config_entry.options)
             if not user_input.get("enabled"):
                 options.pop(CONF_VOICE_MATCH_KEY, None)
-                options.pop(CONF_CLEAN_TRANSCRIPT, None)
+                options[CONF_CLEAN_TRANSCRIPT] = False
                 options.pop(CONF_PERSONAL_STT_SOURCE, None)
                 return self.async_create_entry(title="", data=options)
             key = user_input.get(CONF_VOICE_MATCH_KEY, "").strip() or saved
-            if valid_key(key):
-                options[CONF_VOICE_MATCH_KEY] = key
-                return self.async_create_entry(title="", data=options)
-            errors["base"] = "invalid_voice_match_pairing_key"
+            if not valid_key(key):
+                errors["base"] = "invalid_voice_match_pairing_key"
+            elif not learning_supported():
+                errors["base"] = "clean_voice_requires_current_ha"
+            else:
+                from .voice_match_backend import async_backend
+
+                connection = {name: user_input.get(name, defaults.get(name, fallback))
+                              for name, fallback in ((CONF_VOICE_MATCH_HOST, ""),
+                                                     (CONF_VOICE_MATCH_PORT, 10352))}
+                defaults.update(connection)
+                try:
+                    backend = await async_backend(self.hass, connection)
+                    ready = backend.available
+                except ValueError:
+                    ready = False
+                if not ready:
+                    errors["base"] = "voice_match_backend_unavailable"
+                else:
+                    options.update(connection)
+                    options[CONF_VOICE_MATCH_KEY] = key
+                    options[CONF_CLEAN_TRANSCRIPT] = True
+                    options.pop(CONF_PERSONAL_STT_SOURCE, None)
+                    return self.async_create_entry(title="", data=options)
         return self.async_show_form(
             step_id="voice_match",
             data_schema=vol.Schema({
-                vol.Required("enabled", default=bool(saved)): bool,
+                vol.Required(
+                    "enabled", default=bool(defaults.get(CONF_CLEAN_TRANSCRIPT, True))
+                ): bool,
+                vol.Optional(
+                    CONF_VOICE_MATCH_HOST, default=defaults.get(CONF_VOICE_MATCH_HOST, "")
+                ): str,
+                vol.Optional(
+                    CONF_VOICE_MATCH_PORT, default=defaults.get(CONF_VOICE_MATCH_PORT, 10352)
+                ): int,
                 # Deliberately no saved/default key in the form payload.
                 vol.Optional(CONF_VOICE_MATCH_KEY): selector.TextSelector(
                     selector.TextSelectorConfig(type="password")
@@ -285,7 +332,18 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
             errors=errors,
         )
 
+    async def async_step_voice_match_cleanup(self, user_input=None):
+        if user_input is not None:
+            return await self.async_step_init()
+        from .voice_match_cleanup import cleanup_report
+
+        return self.async_show_form(
+            step_id="voice_match_cleanup", data_schema=vol.Schema({}),
+            description_placeholders={"report": cleanup_report(self.hass, self.config_entry)},
+        )
+
     async def async_step_clean_voice(self, user_input=None):
+        """Backward-compatible source-based step, no longer shown in the menu."""
         from .entry_modules import learning_supported
 
         errors = {}

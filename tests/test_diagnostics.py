@@ -75,6 +75,16 @@ async def test_diagnostics_never_contains_raw_token_values(monkeypatch):
     assert "raw-refresh-value" not in str(diagnostics)
 
 
+async def test_direct_backend_address_is_redacted(monkeypatch):
+    module = _load_diagnostics(monkeypatch)
+    entry = types.SimpleNamespace(data={}, options={
+        "voice_match_host": "synthetic-private.invalid", "voice_match_port": 10352,
+    })
+    result = await module.async_get_config_entry_diagnostics(object(), entry)
+    assert result["entry"]["options"]["voice_match_host"] == module.REDACTED
+    assert "synthetic-private.invalid" not in str(result)
+
+
 async def test_nested_module_secrets_and_agent_prompts_are_redacted_without_mutation(monkeypatch):
     module = _load_diagnostics(monkeypatch)
     sensitive = {

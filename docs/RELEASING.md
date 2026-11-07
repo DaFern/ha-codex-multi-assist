@@ -2,6 +2,10 @@
 
 This checklist is for maintainers.
 
+Development uses `main` directly, without per-change feature branches. `beta` and
+`release` are reserved stages; their promotion workflow is not defined or enabled
+yet. This checklist does not authorise creating those branches or publishing a release.
+
 ## Combined integration gate (development fork)
 
 **No combined beta is published by phases 1–4.** Follow
@@ -57,8 +61,10 @@ data files. Exact-commit HACS/Hassfest CI remains required in addition to this c
    checks in [TESTING.md](TESTING.md). Document changes to exported response fields
    in the release notes, including their effect on API consumers.
 6. Run all checks in [TESTING.md](TESTING.md).
-7. Commit the scoped release change, open a pull request, and wait for every required check to pass.
-8. Merge through the protected `main` branch and verify the post-merge `main` checks before tagging.
+7. With approval, commit/push the scoped development change directly to `main` and
+   wait for every required check on the exact commit to pass.
+8. Before tagging, obtain separate release approval and agree the promotion through
+   the reserved beta/release stages. Do not assume development `main` is a release.
 9. If the release changes user-facing behavior, publish matching fork documentation after review. Upstream wiki pages are background, not this fork's install/release channel; do not edit the upstream wiki for fork features. Open every changed public guide/link once to confirm it resolves.
 10. When the wiki carries an upcoming-release notice, remove it as part of this release and rewrite any wording that depends on it. Search the wiki for "Next release" and for the behavior the notice describes, such as `response.card`. Do not leave a notice for a change that has shipped.
 

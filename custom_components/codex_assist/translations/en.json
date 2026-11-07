@@ -187,7 +187,7 @@
       },
       "learning_personalisation_guide": {
         "title": "Set up preferences on the selected Codex entry",
-        "description": "Pairing status: **{pairing_status}**.\n\nOn the [integration page](/config/integrations/integration/codex_assist), open Configure on the Codex entry you selected → Voice Match personal preferences. Use the add-on's separate **personalisation** key, never the learning key. Keep it off unless you explicitly want it. Use a separate personalised STT connection on port 10352 only with that Codex entry; the ordinary 10350 endpoint stays separate.\n\nThis guide cannot verify a key by its shape or prove a received voice packet. Recognition changes response preferences, not HA permissions. Existing personalities, tools and AI Task settings stay unchanged. Submit returns without changing either entry."
+        "description": "Pairing status: **{pairing_status}**.\n\nOn the [integration page](/config/integrations/integration/codex_assist), open Configure on the Codex entry you selected → Voice Match. Enter the add-on's internal hostname, personalised port (normally 10352) and **personalisation** key, never the learning key. Then select Voice Match with a Codex agent from that entry. Personal instructions are optional; no separate Wyoming Voice Match sources are needed.\n\nThis guide cannot verify a key by its shape or prove a received voice packet. Recognition changes response preferences, not HA permissions. Existing personalities, tools and AI Task settings stay unchanged. Submit returns without changing either entry."
       },
       "learning_phone": {
         "title": "Phone voice learning",
@@ -199,17 +199,23 @@
         "menu_options": {
           "settings": "Shared AI Task defaults",
           "agents": "Manage conversation assistants",
-          "voice_match": "Voice Match personal preferences",
-          "clean_voice": "Clean voice messages"
+          "voice_match": "Voice Match",
+          "voice_match_cleanup": "Review old Voice Match sources"
         }
       },
       "voice_match": {
-        "title": "Voice Match personal preferences",
-        "description": "Optional pairing with Wyoming Voice Match. Create a key in its administrator page, paste it here, then use its personalised STT endpoint only with this integration. Leave the key blank to keep an existing pairing. Disabling removes this pairing. A matched voice changes response preferences, never Home Assistant permissions. Do not use shared speakers for confidential conversations.",
+        "title": "Voice Match",
+        "description": "Connect to the add-on's internal personalised backend (normally port 10352) using its personalisation key, not its learning key. Leave the key blank to keep an existing pairing. Then choose Voice Match in your Codex assistant. No separate Wyoming Voice Match sources are needed. Chat messages stay clean; personal instructions are optional. Saving stops active Voice Match requests. Disabling removes this pairing, not your voices. Recognition is not a login or permission to access private information.",
         "data": {
-          "enabled": "Enable personal preferences",
+          "enabled": "Enable Voice Match",
+          "voice_match_host": "Add-on hostname or IP address",
+          "voice_match_port": "Personalised backend port",
           "voice_match_pairing_key": "Pairing key"
         }
+      },
+      "voice_match_cleanup": {
+        "title": "Review old Voice Match sources",
+        "description": "{report}\n\nThis review changes nothing. Test the direct Voice Match connection first. Only after reviewing other uses, open an unused legacy STT entity in Settings → Devices & services → Entities and disable it. Do not disable Whisper used for enrolment. Existing sources stay enabled until you choose otherwise."
       },
       "clean_voice": {
         "title": "Clean voice messages",
@@ -320,7 +326,8 @@
       "last_agent": "Keep at least one conversation assistant.",
       "invalid_voice_match_pairing_key": "Paste a valid pairing key from the Voice Match administrator page.",
       "clean_voice_requires_current_ha": "Clean voice messages require Home Assistant 2026.10 or later.",
-      "clean_voice_needs_pairing": "Set up Voice Match personal preferences first.",
+      "clean_voice_needs_pairing": "Set up Voice Match pairing first.",
+      "voice_match_backend_unavailable": "Cannot connect to the personalised Voice Match backend. Check its hostname and port; ordinary Whisper and the plain Voice Match endpoint cannot be used here.",
       "invalid_personal_stt_source": "Choose an available personalised Voice Match source, not ordinary Whisper or Voice Learning."
     }
   }

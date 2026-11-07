@@ -1,16 +1,18 @@
-"""Opt-in clean-message STT; the object-bound handoff remains experimental."""
+"""One Voice Match STT engine; the object-bound handoff remains experimental."""
 
 import asyncio
+from datetime import timedelta
 
 from homeassistant.components import stt
 from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 
 from .speaker_packet import PacketError, valid_key
 from .voice_match import (
     CONF_CLEAN_TRANSCRIPT,
     CONF_PERSONAL_STT_SOURCE,
+    CONF_VOICE_MATCH_HOST,
     CONF_VOICE_MATCH_KEY,
     runtime_for_entry,
 )
@@ -45,15 +47,16 @@ def resolve_personal_source(hass, entity_id):
 
 
 class VoiceMatchSttAdapter(stt.SpeechToTextEntity):
-    """Wrap a personalised Wyoming STT entity without publishing its wire header."""
+    """Read personalised Wyoming STT without publishing its wire header."""
 
     _attr_has_entity_name = True
-    _attr_name = "Clean voice messages"
+    _attr_name = "Voice Match"
 
-    def __init__(self, entry, source, *, managed=False):
+    def __init__(self, entry, source, *, managed=False, backend=None):
         self._entry = entry
         self._prototype_source = source
         self._managed = managed
+        self._backend = backend
         self._runtime = runtime_for_entry(entry)
         self._generation = self._runtime.clean_generation
         suffix = "voice_match_clean_stt" if managed else "voice_match_stt_prototype"
@@ -63,6 +66,16 @@ class VoiceMatchSttAdapter(stt.SpeechToTextEntity):
     def _source(self):
         if not self._managed:
             return self._prototype_source
+        if CONF_VOICE_MATCH_HOST in self._entry.options:
+            from .voice_match_backend import endpoint
+
+            try:
+                if (self._backend is not None and self._backend.available
+                        and self._backend.endpoint == endpoint(self._entry.options)):
+                    return self._backend
+            except ValueError:
+                pass
+            return None
         return resolve_personal_source(self.hass, self._entry.options.get(CONF_PERSONAL_STT_SOURCE))
 
     def _enabled(self):
@@ -102,10 +115,14 @@ class VoiceMatchSttAdapter(stt.SpeechToTextEntity):
     def audio_processing(self):
         if (source := self._source) is not None:
             return source.audio_processing
-        return stt.SpeechAudioProcessing()
+        return stt.SpeechAudioProcessing(True, False, False)
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
+        if self._backend is not None:
+            self.async_on_remove(async_track_time_interval(
+                self.hass, self._refresh_backend, timedelta(seconds=30),
+            ))
         source_id = self._entry.options.get(CONF_PERSONAL_STT_SOURCE)
         if self._managed and isinstance(source_id, str):
             self.async_on_remove(async_track_state_change_event(
@@ -116,6 +133,11 @@ class VoiceMatchSttAdapter(stt.SpeechToTextEntity):
     @callback
     def _source_state_changed(self, _event):
         self.async_write_ha_state()
+
+    async def _refresh_backend(self, _now):
+        await self._backend.async_refresh()
+        if self._enabled():
+            self.async_write_ha_state()
 
     async def async_will_remove_from_hass(self):
         if self._managed:
@@ -141,6 +163,9 @@ class VoiceMatchSttAdapter(stt.SpeechToTextEntity):
         except Exception:
             # No raw transcript/exception fallback and no second audio submission.
             return stt.SpeechResult(None, stt.SpeechResultState.ERROR)
+        finally:
+            if self._backend is not None and self._enabled():
+                self.async_write_ha_state()
         if self._managed and (not self._enabled() or self._source is not source
                               or self._entry.options.get(CONF_PERSONAL_STT_SOURCE) != source_id):
             return stt.SpeechResult(None, stt.SpeechResultState.ERROR)

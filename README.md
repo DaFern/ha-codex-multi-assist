@@ -128,11 +128,12 @@ If something fails, start with [Troubleshooting](https://github.com/itsreverence
 
 **Assist conversations.** Codex Assist registers as a normal Assist conversation agent and streams replies. It reads and controls only the entities you expose to Assist, through Home Assistant's own Assist LLM API.
 
-### Optional personal response preferences
+### Voice Match and optional response preferences
 
 The experimental Voice Match connector can add a recognised person's response
 preferences to the selected agent without changing its personality or HA
-permissions. It is off by default and requires paired add-on/integration updates.
+permissions. It requires explicit pairing and reviewed add-on/integration updates;
+personal instructions are optional, not a separate STT mode.
 See [setup, privacy boundaries and rollback](docs/VOICE_MATCH.md). It does not
 authenticate speakers or retrieve private conversations by recognised identity.
 
@@ -146,13 +147,20 @@ adds a **Voice Match sentence** trigger and **Recognised speaker is** condition.
 Reuse one voice profile across automations, without a shared last-speaker sensor.
 It requires separate reviewed deployment and must not authorise sensitive actions.
 
-The current personalised Wyoming endpoint embeds an encrypted header in STT text,
-so it can appear in Assist's user-message bubble even though Codex removes it
-before model processing. Development code now offers an optional
-[Clean voice messages source](docs/CLEAN_SPEAKER_STT_PROTOTYPE.md), enabled by default
-in its setup form, with saved opt-outs retained. Activation still requires saving setup.
-It requires HA 2026.10+, explicit source selection and separate deployment and
-test-pipeline approval; installing code alone does not change an existing assistant.
+The consolidated development setup offers one everyday **Voice Match** STT choice
+on HA 2026.10+: configure its internal backend address and personalisation key
+under **Configure → Voice Match**, then select it with a Codex agent from that
+entry. Chat transcripts stay clean, recognised names are retained, and personal
+instructions are optional. New setups need no separate `voice-match` or
+`voice-match-personal` Wyoming STT entities. **Voice Learning** remains separate.
+
+Existing Clean voice messages entity IDs and pipeline bindings are preserved;
+legacy source connections continue until explicitly reconfigured. The read-only
+**Review old Voice Match sources** screen reports known dependencies before you
+consider manually disabling unused engines. It does not remove anything or hide
+unrelated STT providers. This development follow-up needs separate deployment and
+real-device acceptance; installing code does not change existing pipelines.
+See [setup, migration and limitations](docs/CLEAN_SPEAKER_STT_PROTOTYPE.md).
 
 Development [request diagnostics](docs/VOICE_MATCH.md#minimal-request-diagnostics-development)
 can distinguish neutral matches, missing preferences and local prompt application

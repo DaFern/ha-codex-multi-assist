@@ -21,6 +21,8 @@ from .speaker_packet import TTL, WIRE_PREFIX, PacketError, decode, diagnostic_ta
 CONF_VOICE_MATCH_KEY = "voice_match_pairing_key"
 CONF_CLEAN_TRANSCRIPT = "voice_match_clean_transcript"
 CONF_PERSONAL_STT_SOURCE = "voice_match_stt_source"
+CONF_VOICE_MATCH_HOST = "voice_match_host"
+CONF_VOICE_MATCH_PORT = "voice_match_port"
 _RUNTIMES = weakref.WeakKeyDictionary()
 LOGGER = logging.getLogger(__name__)
 

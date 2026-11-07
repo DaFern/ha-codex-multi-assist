@@ -1,4 +1,4 @@
-# Optional per-person response preferences
+# Voice Match and optional per-person response preferences
 
 Experimental connector for **Wyoming Voice Match 0.3.0** and **Codex Multi-Assist
 0.7.0**. It is off by default, with no changes to saved agent personalities or
@@ -8,14 +8,16 @@ That link becomes available once the paired repository changes are pushed.
 
 After both reviewed updates pass CI and are deployed:
 
-1. In Voice Match, assign voice ownership and set **Personal instructions**.
+1. In Voice Match, enrol and assign voice ownership. **Personal instructions** are
+   optional: an empty value still permits recognised-name context.
 2. An administrator creates a pairing key in that add-on. Copy it directly into
-   **Configure → Voice Match personal preferences** here. Never paste it in chat,
+   **Configure → Voice Match** here. Never paste it in chat,
    screenshots, logs or issues. The password field is not prefilled; blank keeps
    an existing key. Disable the option to remove it. Diagnostics redact the key.
-3. Enable the add-on's personalised endpoint and add its separate Wyoming STT
-   connection on **10352**, not the normal **10350**. Use a separate test pipeline
-   with a paired Codex agent; disable local-first intent handling if offered.
+3. Enable the add-on's personalised endpoint and enter its internal hostname and
+   port **10352** in the same setup form. No separate Wyoming STT connection is
+   needed. Select **Voice Match** in a test pipeline with a Codex agent from this
+   entry; disable local-first intent handling if offered.
 4. Test with multiple enrolled people and simultaneous devices. Until then, keep
    ordinary STT/Whisper available as a fallback. Do not enable the endpoint with
    unrelated conversation agents or an intent-only pipeline.
@@ -68,12 +70,14 @@ encrypted-header limitation below is **not** fixed by name context.
 **Visible transcript limitation:** the current stock Wyoming path displays the
 encrypted header in Assist's user-message bubble. Codex removes it after HA's STT
 event has already been sent to the frontend. The development-only
-[Clean voice messages adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md) defaults to enabled
-in setup under Configure → Clean voice messages on the Codex entry (HA 2026.10+).
+[Voice Match adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md) defaults to enabled
+in setup under Configure → Voice Match on the Codex entry (HA 2026.10+).
 Saved opt-outs remain off; saving valid setup is still required for activation.
-After separately approved deployment, explicitly select the personalised Wyoming
-source, then use the new adapter in a separate test assistant with a Codex agent
-from that entry. It does not clean existing stock-Wyoming pipelines automatically.
+After separately approved deployment, connect directly to the personalised backend
+and use the adapter in a test assistant with a Codex agent from that entry. Older
+source-based configurations still work until reconfigured; the existing entity ID
+and pipeline bindings remain stable. It does not clean existing stock-Wyoming
+pipelines or disable their engines automatically.
 
 When paired, context is bounded to the current speaker/revision and agent within
 the provided HA conversation. Speaker/agent changes, changed preferences/ownership,

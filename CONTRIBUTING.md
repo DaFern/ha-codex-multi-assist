@@ -33,7 +33,17 @@ uv pip install --python .venv-ha/bin/python -r requirements_test_ha.txt \
 Also run the previous-version and mixed-library checks in [docs/TESTING.md](docs/TESTING.md)
 when changing schema conversion or dependency support.
 
-## Pull requests
+## Branch workflow
+
+Development goes directly into `main`; do not create a branch for each change.
+The reserved stages are `main`, `beta` and `release`. Promotion to beta or release
+will be defined when those stages are ready; do not create or publish them yet.
+Existing historical branches are not deleted by this policy.
+
+Run the checks below before a development handoff. Committing/pushing, deployment
+and a Home Assistant restart still require their respective owner approvals.
+
+## Change review
 
 Keep changes narrowly scoped and explain:
 
