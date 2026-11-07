@@ -20,9 +20,11 @@ development revisions, so record the tested SHA. Do not manufacture a release/ta
 to make version strings appear newer. A future candidate must choose a distinct
 version, align `manifest.json`, `pyproject.toml` and `uv.lock`, and mark its GitHub
 release as a prerelease. Review tag syntax against HA/HACS before publication.
-The add-on versions independently. Ordinary direct-connected assistant operation
-and the rebuilt app's admin layout are confirmed on the test installation; these
-do not establish full combined learning, clean-install or public-beta acceptance.
+The add-on versions independently. The owner confirms the rebuilt admin layout and
+current combined phone flow: privacy details, pause/resume, resume-prompt cancellation,
+30-sample replacement/cleanup and everyday Voice Match afterwards. Fresh-account,
+multi-speaker, fault-recovery, clean-install and rollback acceptance remain open;
+this is not public-beta qualification.
 
 ## Fresh test installation
 

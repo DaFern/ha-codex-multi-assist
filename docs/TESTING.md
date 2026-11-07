@@ -59,12 +59,14 @@ skipped**. Runtime commit `013d69f` passed all seven remote CI jobs:
 These counts describe the current implementation baseline, not tests rerun by
 reading this guide or a qualified release candidate.
 
-Ordinary direct-connected assistant operation and the app's rebuilt admin layout
-are confirmed on the test installation. Existing-profile Android launch and short
-notice/timely pause-resume have narrow phone acceptance. Full current combined
-30-sample replacement/cleanup, fresh-account setup, privacy details, resume-prompt
-cancellation, clean HAOS installation and rollback remain open. Candidate release
-acceptance must be recorded separately in [BETA_ACCEPTANCE.md](BETA_ACCEPTANCE.md).
+The app's rebuilt admin layout and existing-profile Android launch are confirmed.
+The owner reports the current combined phone journey passed **Privacy details**,
+pause/resume, cancellation at the resume prompt, **30-sample replacement/cleanup**
+and everyday Voice Match afterwards. This is owner-reported acceptance, not a new
+instrumented run or proof of every failure/security path. Fresh-account setup,
+multi-speaker/device tests, fault recovery, clean HAOS installation and rollback
+remain open. [BETA_ACCEPTANCE.md](BETA_ACCEPTANCE.md) separates this current-installation
+evidence from future candidate-specific qualification.
 
 ## Test ownership and covered contracts
 

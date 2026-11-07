@@ -1,10 +1,28 @@
 # Combined beta acceptance and rollback
 
-This is a **checklist, not a result or permission to deploy**. All boxes below
-remain open for the selected candidate until matching evidence is recorded.
-Work in disposable amd64 HAOS first.
+The candidate checklist is **not permission to deploy**. Current-installation
+owner acceptance is recorded separately below; candidate gates remain open until
+matching evidence is recorded for the selected build. Work in disposable amd64 HAOS
+for fresh-install and rollback testing.
 Backups, live cutover, restarts, key changes, profile assignments and recording
 each need their own explicit approval. No data reset is necessary for packaging.
+
+## Owner-reported acceptance on the current installation
+
+The owner confirms these current combined phone-flow tests passed:
+
+- [x] Privacy details.
+- [x] Pause/resume.
+- [x] Cancel voice learning at the resume prompt.
+- [x] Complete 30 samples through successful replacement and recording cleanup.
+- [x] Everyday Voice Match works afterwards.
+
+This is the owner's report, not a newly captured instrumented run. It does not
+prove every internal safeguard, hands-free/echo metric, failure case or account
+boundary. It is not clean-install evidence or qualification of an as-yet unselected
+release candidate. Fresh accounts, multiple speakers/devices, changed/expired/revoked
+scope, outages, backup/restore and rollback remain open. Do not repeat the accepted
+phone journey as unfinished work unless a new candidate or regression warrants it.
 
 ## Candidate record (complete before tests)
 

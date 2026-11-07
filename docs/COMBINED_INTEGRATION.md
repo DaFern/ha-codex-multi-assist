@@ -110,8 +110,10 @@ is supplied. Recognition is not authentication or authority for sensitive action
 
 Tests cover native HA lifecycle/authentication/pipelines, exact-turn handoff,
 loopback encrypted bridge and Wyoming protocol with synthetic audio/inference.
-Ordinary direct-connected assistant use and the app's admin layout are confirmed
-on the test installation. Short notice/timely pause-resume have narrow phone
-acceptance. The current combined full 30-sample replacement/cleanup, privacy details,
-resume-prompt cancellation, fresh installs, wider device/recognition tests and
-rollback remain open. [Testing](TESTING.md) and [candidate beta gates](BETA_ACCEPTANCE.md).
+The owner confirms the app's admin layout and current combined phone flow:
+privacy details, pause/resume, cancellation at the resume prompt, all 30 samples
+through replacement/cleanup and everyday Voice Match afterwards. This is reported
+acceptance on the current installation, not independent measurement of internal
+safeguards or release-candidate qualification. Fresh accounts, clean installs,
+multi-speaker/device recognition, fault recovery and rollback remain open.
+[Testing](TESTING.md) and [candidate beta gates](BETA_ACCEPTANCE.md).
