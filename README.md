@@ -127,6 +127,24 @@ If something fails, start with [Troubleshooting](https://github.com/itsreverence
 
 **Assist conversations.** Codex Assist registers as a normal Assist conversation agent and streams replies. It reads and controls only the entities you expose to Assist, through Home Assistant's own Assist LLM API.
 
+Device commands recognised by native Assist are routed through existing authorised
+intent tools before asking the model. Shared result handling covers all tool/device
+types: replies acknowledge accepted, failed or partial requests without inventing
+physical completion. A tools-disabled reply step uses the selected agent's saved
+instructions to write the entire acknowledgement in its personality, without a
+mandatory stock sentence or fixed prefix/suffix.
+This supports user-created agents as well as starter personalities. If generation
+fails or its result is invalid, the factual acknowledgement remains the fallback;
+actions are never repeated just to improve wording. This adds a model call/latency.
+Unrecognised wording still uses the model path, so this is not a
+universal language or truth verifier. See [scope and limitations](docs/ACTION_CONTROL.md).
+
+On HA 2026.8+, every Codex conversation profile can also use a read-only attribute
+tool for approved details omitted by HA's live context, such as weather wind speed,
+pressure and thermostat settings. It checks exposure and caller read permissions,
+returns units/missing values honestly, and has no four-agent limit. It is not an
+unrestricted attribute dump. See [supported attributes and safeguards](docs/ENTITY_ATTRIBUTES.md).
+
 ### Voice Match and optional response preferences
 
 The experimental Voice Match connector can add a recognised person's response

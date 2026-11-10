@@ -96,6 +96,15 @@ Task retain their separate paths. Acoustic identity is never authorisation.
 
 ### Standard request path
 
+The native provider in `llm.py` supplements the Assist API with a generic read-only
+attribute tool on HA 2026.8+. It is gated by API/request platform, not personality
+IDs or profile counts. HA retains tool dispatch and caller context. Candidate
+entities are filtered by current exposure and caller read permissions before native
+name/alias matching; `entity_attributes.py` projects only bounded, explicitly
+approved fields. It neither patches Core nor introduces a service bridge. See
+[ENTITY_ATTRIBUTES.md](ENTITY_ATTRIBUTES.md) for units, privacy, version limits and
+the distinction between scripted delivery and live model compliance.
+
 The [Voice Match STT adapter](CLEAN_SPEAKER_STT_PROTOTYPE.md) connects
 directly to the personalised Wyoming backend without registering a source entity.
 Legacy configurations still wrap their explicitly selected Wyoming STT source.
@@ -132,6 +141,26 @@ This composition leaves config-entry prompts and chat-log system content unchang
 Each request, including auth retries and native tool handoffs, appends the internal
 guidance once. AI Task continues to use its existing instruction path. The guidance
 is a model instruction, not an execution guard.
+
+The domain-independent routing/result layer in [ACTION_CONTROL.md](ACTION_CONTROL.md)
+first recognises supported commands with HA's native recogniser, then dispatches
+only an existing authorised intent tool via ChatLog. Caller/exposure controls are
+unchanged. Recognised device commands do not need model-generated success text.
+Both native and model-requested tools use paired current-round result checks;
+accepted/failed/partial/unconfirmed replies are integration-owned, neutral and do
+not claim physical completion. Native query results can feed an otherwise normal
+model answer, with tools disabled to avoid executing the recognised request twice.
+Unknown sentences and unavailable intent tools retain the model path; this is not
+a universal intent or semantic truth classifier. No arbitrary service bridge or
+corrective action retry is added.
+
+Model rounds are buffered until completion before handoff, dropping text that
+precedes tools rather than speaking an unverified action confirmation. Ordinary
+no-tool text and clarification survive but can start later. A late auth failure
+after received text/calls remains non-retryable. Successful actions and failures
+stop processing before a model final-speech round, so speech errors cannot replay
+them. Typed native acknowledgement is distinguished from real hardware completion,
+especially for covers, climate, scenes and scripts.
 
 `conversation.async_get_result_from_chat_log` still supplies the result and
 continuation flag. In the tested HA versions, the final assistant message triggers
@@ -181,6 +210,15 @@ than dropping evidence, splitting tool pairs, or stripping reasoning. Search
 retention does not implement the CLI's encrypted search-output or ref-ID protocol.
 
 ### Conversation error boundary
+
+Known action results use the shared tools-disabled personality reply described in
+[ACTION_CONTROL.md](ACTION_CONTROL.md#personality-aware-acknowledgements). Outcome
+classification remains deterministic; the selected profile writes the entire reply
+without a required stock sentence. Structural validation cannot prove the prose's
+meaning; instructions constrain it to the recorded outcome. No raw tool/exception payload is sent into this
+isolated request and no additional actions or search tools are available. Generation
+failure keeps the original factual outcome; it does not retry an action or pretend
+that an accepted operation failed because its acknowledgement could not be styled.
 
 The conversation owner maps caught exceptions to fixed speech locally. Only
 `_start_reauth_result`, which starts reauthentication, selects "Codex Assist needs

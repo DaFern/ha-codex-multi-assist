@@ -6,6 +6,7 @@ import json
 import logging
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -229,6 +230,7 @@ def native_tool(monkeypatch):
 
     class Reading(llm.Tool):
         name = "HassTestReading"
+        annotations = SimpleNamespace(read_only=True)
         description = "Return a synthetic reading."
         parameters = vol.Schema({})
 

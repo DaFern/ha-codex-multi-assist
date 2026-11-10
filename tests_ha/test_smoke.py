@@ -265,7 +265,8 @@ async def test_conversation_serializes_ha_tool_result(
         api_prompt = "A read-only test tool is available."
         tools = [
             SimpleNamespace(
-                name="HassTestState", description="Read a test state", parameters=vol.Schema({})
+                name="HassTestState", description="Read a test state", parameters=vol.Schema({}),
+                annotations=SimpleNamespace(read_only=True),
             )
         ]
         custom_serializer = None
@@ -287,7 +288,8 @@ async def test_conversation_serializes_ha_tool_result(
                 CodexToolCall(id="state-query-1", name="HassTestState", arguments={})
             )
             return
-        yield CodexTextDelta("The test door is locked.")
+        yield CodexTextDelta("A follow-up answer." if result_kind == "error"
+                             else "The test door is locked.")
 
     monkeypatch.setattr(CodexClient, "stream_turn", fake_stream_turn)
 
@@ -299,11 +301,22 @@ async def test_conversation_serializes_ha_tool_result(
         agent_id="conversation.codex_assist",
     )
 
-    assert result.response.speech["plain"]["speech"] == "The test door is locked."
+    if result_kind == "error":
+        assert len(calls) == 2
+        assert result.response.speech["plain"]["speech"] == (
+            "Sorry, Home Assistant couldn't complete that request."
+        )
+        result = await conversation.async_converse(
+            hass, "Give a test answer.", result.conversation_id, Context(),
+            agent_id="conversation.codex_assist",
+        )
+        assert result.response.speech["plain"]["speech"] == "A follow-up answer."
+    else:
+        assert result.response.speech["plain"]["speech"] == "The test door is locked."
     assert len(tool_calls) == 1
     assert tool_calls[0].tool_name == "HassTestState"
-    assert len(calls) == 2
-    tool_outputs = [item for item in calls[1] if item.get("type") == "function_call_output"]
+    assert len(calls) == (3 if result_kind == "error" else 2)
+    tool_outputs = [item for item in calls[-1] if item.get("type") == "function_call_output"]
     assert len(tool_outputs) == 1
     assert tool_outputs[0]["call_id"] == "state-query-1"
     output = json.loads(tool_outputs[0]["output"])
@@ -328,6 +341,7 @@ async def test_conversation_finishes_after_tool_limit(
     requests = []
 
     class ReadOnlyTool(llm.Tool):
+        annotations = SimpleNamespace(read_only=True)
         name = "HassTestReading"
         description = "Return a harmless test reading."
         integration = DOMAIN
@@ -551,7 +565,7 @@ async def test_web_search_enabled_handoff_delivers_final_speech_without_source_c
 
     assert call_count == 2
     assert result.response.speech["plain"]["speech"] == (
-        "The harmless tool completed successfully."
+        "Home Assistant accepted that request."
     )
     assert not result.response.card
 

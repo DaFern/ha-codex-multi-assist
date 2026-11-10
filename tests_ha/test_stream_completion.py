@@ -461,6 +461,7 @@ async def test_native_tool_executes_only_after_completion(
     executed = []
 
     class Reading(llm.Tool):
+        annotations = type("ReadOnly", (), {"read_only": True})()
         name = "HassTestReading"
         description = "Return a synthetic reading."
         parameters = vol.Schema({})

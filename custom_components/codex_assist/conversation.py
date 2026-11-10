@@ -13,12 +13,21 @@ from homeassistant.components.conversation import AssistantContentDeltaDict
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import MATCH_ALL
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent, llm
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.json import json_dumps
 
 from . import DOMAIN
+from .action_control import (
+    ActionControlError,
+    ActionOutcome,
+    action_outcome,
+    async_action_reply,
+    async_native_request,
+    read_only_tools,
+)
 from .agent_profiles import PRIMARY_AGENT_ID, AgentProfile, get_agent_profiles
 from .codex_auth import (
     CodexAuthClient,
@@ -219,6 +228,36 @@ class CodexAssistConversationEntity(
         except conversation.ConverseError as err:
             return err.as_conversation_result()
 
+        readonly = read_only_tools(
+            getattr(chat_log.llm_api, "tools", []), getattr(llm, "GetLiveContextTool", ()),
+        )
+
+        async def publish_action(outcome: ActionOutcome, client: CodexClient | None = None):
+            text = outcome.speech
+            if client is not None:
+                text = await async_action_reply(
+                    outcome, codex=client, model=model,
+                    instructions=personal_instructions(
+                        _instructions_for_turn(chat_log, prompt, web_search=False),
+                        preferences, request_tag=prepared_request.diagnostic_tag,
+                        speaker_name=prepared_request.speaker_name,
+                    ) + f"\nUser language: {user_input.language}",
+                    reasoning_effort=reasoning_effort, reasoning_summary=reasoning_summary,
+                    text_verbosity=text_verbosity,
+                )
+            chat_log.async_add_assistant_content_without_tools(conversation.AssistantContent(
+                agent_id=user_input.agent_id, content=text,
+            ))
+            return conversation.async_get_result_from_chat_log(user_input, chat_log)
+
+        try:
+            native_start = len(chat_log.content)
+            native_handled = await async_native_request(self.hass, user_input, chat_log)
+            outcome = action_outcome(chat_log.content[native_start:], readonly)
+        except (HomeAssistantError, RuntimeError, ValueError, TypeError) as err:
+            _log_request_failure(err, stage="native_assist")
+            outcome = ActionOutcome("unconfirmed")
+
         http_client = get_async_client(self.hass)
         auth_client = CodexAuthClient(http_client=http_client)
         try:
@@ -231,11 +270,15 @@ class CodexAssistConversationEntity(
                 ),
             )
         except CodexReauthRequiredError as err:
+            if outcome.speech:
+                return await publish_action(outcome)
             _log_request_failure(
                 err, stage="authentication", reauth="start", level=logging.WARNING,
             )
             return _start_reauth_result(self.hass, self.entry, response, user_input)
         except (CodexAuthTemporaryError, RuntimeError) as err:
+            if outcome.speech:
+                return await publish_action(outcome)
             _log_request_failure(err, stage="authentication")
             chat_log.async_add_assistant_content_without_tools(
                 conversation.AssistantContent(
@@ -252,9 +295,12 @@ class CodexAssistConversationEntity(
                 self.entry.entry_id, self.profile, speaker_scope
             ),
         )
+        if outcome.speech:
+            return await publish_action(outcome, codex)
         try:
             for _iteration in range(MAX_TOOL_ITERATIONS + 1):
-                allow_tools = _iteration < MAX_TOOL_ITERATIONS
+                allow_tools = _iteration < MAX_TOOL_ITERATIONS and not native_handled
+                round_start = len(chat_log.content)
                 try:
                     tool_call_requested = await _stream_codex_turn_into_chat_log(
                         chat_log=chat_log,
@@ -277,6 +323,7 @@ class CodexAssistConversationEntity(
                         reasoning_summary=reasoning_summary,
                         text_verbosity=text_verbosity,
                         allow_tools=allow_tools,
+                        verify_actions=True,
                     )
                 except CodexAuthenticationError as err:
                     if not err.retry_allowed:
@@ -325,6 +372,7 @@ class CodexAssistConversationEntity(
                             reasoning_summary=reasoning_summary,
                             text_verbosity=text_verbosity,
                             allow_tools=allow_tools,
+                            verify_actions=True,
                         )
                     except CodexAuthenticationError as retry_err:
                         _log_request_failure(
@@ -336,6 +384,9 @@ class CodexAssistConversationEntity(
                             response,
                             user_input,
                         )
+                outcome = action_outcome(chat_log.content[round_start:], readonly)
+                if outcome.speech:
+                    return await publish_action(outcome, codex)
                 if not tool_call_requested:
                     break
         except CodexRateLimitError as err:
@@ -395,6 +446,8 @@ def _request_failure_text(err: BaseException) -> str:
     """Choose fixed conversation speech without exposing exception details."""
     if isinstance(err, CodexRateLimitError):
         return "Codex Assist cannot process this request because of an account or usage limit."
+    if isinstance(err, ActionControlError):
+        return "Sorry, I couldn't confirm that request completed."
     return "Sorry, I couldn't complete that."
 
 
@@ -428,6 +481,7 @@ async def _stream_codex_turn_into_chat_log(
     text_verbosity: str,
     text_format: dict[str, Any] | None = None,
     allow_tools: bool = True,
+    verify_actions: bool = False,
 ) -> bool:
     tool_call_requested = False
 
@@ -435,25 +489,62 @@ async def _stream_codex_turn_into_chat_log(
         nonlocal tool_call_requested
         tool_call_requested = True
 
+    stream_options = dict(
+        model=model,
+        instructions=instructions,
+        input_items=input_items,
+        tools=tools,
+        reasoning_effort=reasoning_effort,
+        reasoning_summary=reasoning_summary,
+        text_verbosity=text_verbosity,
+        text_format=text_format,
+    )
+    stream = codex.stream_turn(**stream_options)
+    if verify_actions:
+        stream = _action_aware_stream(stream)
     async for _delta in chat_log.async_add_delta_content_stream(
         entity_id,
         _codex_stream_to_assistant_deltas(
-            codex.stream_turn(
-                model=model,
-                instructions=instructions,
-                input_items=input_items,
-                tools=tools,
-                reasoning_effort=reasoning_effort,
-                reasoning_summary=reasoning_summary,
-                text_verbosity=text_verbosity,
-                text_format=text_format,
-            ),
+            stream,
             on_tool_call=mark_tool_call_requested,
             allow_tools=allow_tools,
         ),
     ):
         pass
     return tool_call_requested
+
+
+async def _action_aware_stream(
+    stream: AsyncIterator[CodexStreamDelta],
+) -> AsyncIterator[CodexStreamDelta]:
+    """Do not publish pre-action speech or dispatch calls from failed streams."""
+    items = []
+    calls = []
+    text = []
+    try:
+        async for delta in stream:
+            if isinstance(delta, CodexResponseItemDelta):
+                items.append(delta)
+            elif isinstance(delta, CodexToolCallDelta):
+                calls.append(delta)
+            elif isinstance(delta, CodexTextDelta):
+                text.append(delta)
+    except CodexAuthenticationError as err:
+        # Buffering must not widen the established authentication replay window.
+        # Even held text/calls make a late authentication error non-retryable.
+        if text or calls:
+            err.retry_allowed = False
+        raise
+    if not calls:
+        for delta in text:
+            yield delta
+    ids = [delta.tool_call.id for delta in calls]
+    if len(set(ids)) != len(ids):
+        raise ActionControlError("Duplicate native action call IDs")
+    for item in items:
+        yield item
+    for call in calls:
+        yield call
 
 
 async def _codex_stream_to_assistant_deltas(

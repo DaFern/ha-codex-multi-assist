@@ -4,6 +4,7 @@ The response script does not inspect instructions or simulate model compliance.
 These tests cannot establish live model behavior or satellite microphone state.
 """
 
+import json
 from copy import deepcopy
 
 import pytest
@@ -11,6 +12,7 @@ from homeassistant.components import ai_task, conversation
 from homeassistant.components.conversation.chat_log import async_subscribe_chat_logs
 from homeassistant.components.homeassistant.exposed_entities import async_expose_entity
 from homeassistant.core import Context
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from test_web_search_delivery import (
@@ -181,8 +183,9 @@ async def test_recovered_question_keeps_native_continuation_without_source_card(
 
 
 @pytest.mark.parametrize("web_search", [False, True])
+@pytest.mark.parametrize("native_followup", [True, False])
 async def test_clarification_then_native_action_preserves_guidance_through_retry_and_handoff(
-    hass, clarification_entry, backend, web_search,
+    hass, clarification_entry, backend, web_search, native_followup, monkeypatch,
 ):
     """A fixed script proves routing only, not that the model waits for clarification."""
     executed = []
@@ -210,37 +213,76 @@ async def test_clarification_then_native_action_preserves_guidance_through_retry
     assert result.continue_conversation is True
     assert executed == []
 
-    turn_on_tool = next(
-        tool["name"] for tool in requests[-1][1]["tools"]
-        if tool["name"].endswith("HassTurnOn")
-    )
-    model_round(planned, [call_event("action-1", turn_on_tool, {
-        "name": "Test alpha", "domain": ["light"],
-    }), COMPLETED])
-    model_round(planned, text_events("Test alpha is on.") + [COMPLETED])
-    followup = await conversation.async_converse(
-        hass, "Test alpha.", result.conversation_id, Context(),
-        agent_id="conversation.codex_assist",
-    )
+    # Older HA does not recognise a bare target as a continuation. Exercise
+    # both the portable explicit native command and an unrecognised follow-up
+    # that requires the model to request a real authorised action.
+    followup_text = "Turn on Test alpha." if native_followup else "Test alpha."
+    with monkeypatch.context() as patch:
+        if not native_followup:
+            agent = conversation.async_get_agent(hass, conversation.HOME_ASSISTANT_AGENT)
+
+            async def unrecognised(user_input, *, strict_intents_only):
+                assert user_input.text == followup_text
+                assert strict_intents_only is True
+                return None
+
+            patch.setattr(agent, "async_recognize_intent", unrecognised)
+            turn_on_tool = next(
+                tool["name"] for tool in requests[-1][1]["tools"]
+                if tool["name"].endswith("HassTurnOn")
+            )
+            model_round(planned, [call_event("action-1", turn_on_tool, {
+                "name": "Test alpha", "domain": ["light"],
+            }), COMPLETED])
+        model_round(planned, text_events(json.dumps({
+            "outcome": "accepted", "reply": "Of course. Home Assistant accepted that request.",
+        })) + [COMPLETED])
+        followup = await conversation.async_converse(
+            hass, followup_text, result.conversation_id, Context(),
+            agent_id="conversation.codex_assist",
+        )
     assert followup.conversation_id == result.conversation_id
     assert followup.continue_conversation is False
-    assert followup.response.speech["plain"]["speech"] == "Test alpha is on."
+    assert followup.response.speech["plain"]["speech"] == (
+        "Of course. Home Assistant accepted that request."
+    )
     assert len(executed) == 1, requests[-1][1]["input"][-1]
     assert executed[0]["entity_id"] == ["light.test_alpha"]
+    followup_requests = 3 if native_followup else 4
+    assert len([payload for path, payload in requests if path.endswith("/responses")]) == (
+        followup_requests
+    )
+    model_round(planned, text_events("A follow-up answer.") + [COMPLETED])
+    later = await conversation.async_converse(
+        hass, "Give a test answer.", followup.conversation_id, Context(),
+        agent_id="conversation.codex_assist",
+    )
+    assert later.response.speech["plain"]["speech"] == "A follow-up answer."
+    assert len(executed) == 1
     model_requests = [payload for path, payload in requests if path.endswith("/responses")]
-    assert len(model_requests) == 4
+    assert len(model_requests) == followup_requests + 1
     for payload in model_requests:
         assert_clarification_guidance(payload["instructions"])
-        assert_search_speech_guidance(payload["instructions"], web_search)
+        is_reply = payload.get("text", {}).get("format", {}).get("name") == (
+            "action_acknowledgement"
+        )
+        assert_search_speech_guidance(payload["instructions"], web_search and not is_reply)
+        if is_reply:
+            assert payload.get("tools", []) == []
     assert model_requests[0]["instructions"] == model_requests[1]["instructions"]
-    assert model_requests[2]["instructions"] == model_requests[3]["instructions"]
-    assert model_requests[2]["input"] == [
+    assert model_requests[-1]["input"][:3] == [
         {"role": "user", "content": "Turn on the test light."},
         message(question),
-        {"role": "user", "content": "Test alpha."},
+        {"role": "user", "content": followup_text},
     ]
-    assert model_requests[3]["input"][-1]["type"] == "function_call_output"
-    assert model_requests[3]["input"][-1]["call_id"] == "action-1"
+    outputs = [item for item in model_requests[-1]["input"]
+               if item.get("type") == "function_call_output"]
+    assert len(outputs) == 1
+    native_calls = [item for item in model_requests[-1]["input"]
+                    if item.get("type") == "function_call"]
+    assert len(native_calls) == 1
+    assert native_calls[0]["name"].endswith("HassTurnOn")
+    assert outputs[0]["call_id"] == native_calls[0]["call_id"]
 
 
 @pytest.mark.parametrize("web_search", [False, True])
@@ -260,3 +302,154 @@ async def test_ai_task_does_not_receive_conversation_clarification_guidance(
     assert requests[0][1]["input"] == [{"role": "user", "content": "Summarize the task."}]
     assert "When clarification is required" not in instructions
     assert "Resolve ambiguous actions or targets" not in instructions
+
+
+@pytest.mark.parametrize("domain,service,state,attributes,sentence", [
+    ("light", "turn_off", "on", {}, "Turn off Test device"),
+    ("switch", "turn_off", "on", {}, "Turn off Test device"),
+    ("fan", "turn_off", "on", {}, "Turn off Test device"),
+    ("lock", "lock", "unlocked", {}, "Lock Test device"),
+    ("cover", "close_cover", "open", {"device_class": "blind"}, "Close Test device"),
+    ("climate", "set_temperature", "heat", {
+        "temperature": 18, "min_temp": 7, "max_temp": 35, "supported_features": 1,
+    },
+     "Set Test device temperature to 21 degrees"),
+    ("media_player", "media_pause", "playing", {"supported_features": 1}, "Pause Test device"),
+    ("scene", "turn_on", "unknown", {}, "Activate Test device"),
+    ("script", "turn_on", "off", {}, "Run Test device"),
+])
+@pytest.mark.parametrize("fails", [False, True])
+@pytest.mark.parametrize("agent_id,entry_settings", [
+    ("conversation.codex_assist", ({}, {})), ("conversation.jarvis", ({}, {})),
+    ("conversation.f_r_i_d_a_y", ({}, {})), ("conversation.ultron", ({}, {})),
+    ("conversation.navigator", ({}, {"agents": [{
+        "id": "custom-navigator", "name": "Navigator", "prompt": "Speak in nautical metaphors.",
+        "model": "gpt-5.4", "reasoning_effort": "low", "reasoning_summary": "auto",
+        "text_verbosity": "low", "web_search": False,
+    }]})),
+])
+async def test_native_control_uses_selected_personality_without_reexecuting_actions(
+    hass, clarification_entry, monkeypatch, domain, service, state, attributes, sentence,
+    fails, agent_id,
+):
+    from custom_components.codex_assist.codex_client import CodexClient, CodexTextDelta
+
+    assert await async_setup_component(hass, domain, {})
+    await hass.async_block_till_done()
+    executed = []
+
+    async def handle(call):
+        executed.append(call.data)
+        if fails:
+            raise HomeAssistantError("Synthetic device failure")
+
+    # Acknowledge handling without pretending physical completion. In particular
+    # a cover can be moving, and scripts/scenes have no universal final state.
+    hass.services.async_register(domain, service, handle)
+    hass.states.async_set(f"{domain}.test", state, {"friendly_name": "Test device", **attributes})
+    async_expose_entity(hass, "conversation", f"{domain}.test", True)
+
+    requests = []
+
+    async def styled_reply(*args, **kwargs):
+        requests.append(kwargs)
+        assert len(executed) == 1
+        assert kwargs["tools"] == []
+        payload = json.loads(kwargs["input_items"][0]["content"])
+        assert payload["outcome"] == ("failed" if fails else "accepted")
+        yield CodexTextDelta(json.dumps({
+            "outcome": payload["outcome"], "reply": (
+                "Alas, the request could not be carried out." if fails
+                else "Consider your request duly received."
+            ),
+        }))
+
+    monkeypatch.setattr(CodexClient, "stream_turn", styled_reply)
+    result = await conversation.async_converse(
+        hass, sentence, None, Context(), language="en", agent_id=agent_id,
+    )
+    assert len(executed) == 1, result.response.as_dict()
+    expected = ("Alas, the request could not be carried out." if fails
+                else "Consider your request duly received.")
+    assert result.response.speech["plain"]["speech"] == expected
+    assert len(requests) == 1
+    selected = conversation.async_get_agent(hass, agent_id)
+    assert selected.profile.prompt in requests[0]["instructions"]
+    assert "Synthetic device failure" not in str(requests)
+
+
+async def test_group_alias_without_area_executes_instead_of_text_only_false_success(
+    hass, clarification_entry, monkeypatch, hass_admin_user,
+):
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.codex_assist.codex_client import CodexClient, CodexTextDelta
+
+    registry = er.async_get(hass)
+    entry = registry.async_get_or_create("light", "test", "group", original_name="Study")
+    registry.async_update_entity(entry.entity_id, aliases={"Study lights"})
+    hass.states.async_set(entry.entity_id, "on", {"friendly_name": "Study"})
+    async_expose_entity(hass, "conversation", entry.entity_id, True)
+    executed = []
+    callers = []
+
+    async def turn_off(call):
+        executed.append(call.data)
+        callers.append(call.context.user_id)
+        hass.states.async_set(entry.entity_id, "off", {"friendly_name": "Study"})
+
+    hass.services.async_register("light", "turn_off", turn_off)
+
+    async def false_success(*args, **kwargs):
+        yield CodexTextDelta("The lights are off.")
+
+    monkeypatch.setattr(CodexClient, "stream_turn", false_success)
+    result = await conversation.async_converse(
+        hass, "Turn off the Study lights.", None, Context(user_id=hass_admin_user.id),
+        language="en", agent_id="conversation.ultron",
+    )
+    assert result.response.speech["plain"]["speech"] != "The lights are off."
+    assert len(executed) == 1
+    assert callers == [hass_admin_user.id]
+    assert executed[0]["entity_id"] == [entry.entity_id]
+    assert hass.states.get(entry.entity_id).state == "off"
+    assert result.response.speech["plain"]["speech"] == "Home Assistant accepted that request."
+
+
+async def test_unexposed_target_cannot_be_controlled_by_native_or_model_path(
+    hass, clarification_entry, monkeypatch,
+):
+    from custom_components.codex_assist.codex_client import (
+        CodexClient,
+        CodexToolCall,
+        CodexToolCallDelta,
+    )
+
+    executed = []
+    requests = []
+
+    async def turn_off(call):
+        executed.append(call)
+
+    hass.services.async_register("light", "turn_off", turn_off)
+    hass.states.async_set("light.hidden", "on", {"friendly_name": "Hidden device"})
+    async_expose_entity(hass, "conversation", "light.hidden", False)
+
+    async def forbidden_call(*args, **kwargs):
+        requests.append(kwargs)
+        yield CodexToolCallDelta(CodexToolCall(
+            id="hidden-attempt", name="HassTurnOff",
+            arguments={"name": "Hidden device", "domain": ["light"]},
+        ))
+
+    monkeypatch.setattr(CodexClient, "stream_turn", forbidden_call)
+    result = await conversation.async_converse(
+        hass, "Turn off Hidden device.", None, Context(), language="en",
+        agent_id="conversation.ultron",
+    )
+    assert len(requests) == 2
+    assert executed == []
+    assert hass.states.get("light.hidden").state == "on"
+    assert result.response.speech["plain"]["speech"] == (
+        "Sorry, Home Assistant couldn't complete that request."
+    )

@@ -1,5 +1,24 @@
 # Testing
 
+## Personality-aware action replies and attribute tools
+
+The complete source checkout passed **916 fast tests plus 32 subtests**,
+**583 native HA 2026.10.0 tests / 1 skipped** and **363 minimum HA 2026.6.0 tests /
+193 skipped**. Ruff and the 56-file distribution projection passed. These are local
+synthetic results for the complete checkout, not remote CI or real-model/device
+acceptance. Separately, installed runtime bytes match the candidate, HA config
+validation passed, and recovery following the approved Core restart was verified
+after waiting at least 60 seconds. No live device commands were used to test wording.
+
+Added reply contracts cover all outcome categories, arbitrary profile instructions,
+category retention and fully rewritten replies without stock wording,
+malformed/oversized/incomplete replies, unexpected
+tool calls, stream closure, failure without retry and cancellation propagation.
+Native tests cover nine device domains, success/failure, all four starter agents
+and a custom profile, checking action-before-reply ordering and exactly one action.
+They establish payload/routing boundaries, not actual model obedience or speech
+style. Personality-generation failure must leave the factual result intact.
+
 ## Automated checks
 
 Run from a development checkout, not live HA:
@@ -59,6 +78,16 @@ skipped**. Runtime commit `013d69f` passed all seven remote CI jobs:
 These counts describe the current implementation baseline, not tests rerun by
 reading this guide or a qualified release candidate.
 
+The prepared, uncommitted [action-control draft](ACTION_CONTROL.md) passed
+868 fast tests plus 32 subtests, 536 current native tests / 1 skipped, and
+345 minimum-version tests / 192 skipped locally. These results do not update
+the exact-commit remote CI evidence above or imply deployment/live acceptance.
+
+With the prepared read-only attribute feature added, local results were 893 fast
+tests plus 32 subtests, 565 current native tests / 1 skipped, and 345 minimum-version
+tests / 193 skipped. The focused attribute-provider module passed 29 current-HA
+tests. See [ENTITY_ATTRIBUTES.md](ENTITY_ATTRIBUTES.md) for version/agent coverage.
+
 The app's rebuilt admin layout and existing-profile Android launch are confirmed.
 The owner reports the current combined phone journey passed **Privacy details**,
 pause/resume, cancellation at the resume prompt, **30-sample replacement/cleanup**
@@ -69,6 +98,11 @@ remain open. [BETA_ACCEPTANCE.md](BETA_ACCEPTANCE.md) separates this current-ins
 evidence from future candidate-specific qualification.
 
 ## Test ownership and covered contracts
+
+The read-only attribute feature's focused coverage is described in
+[ENTITY_ATTRIBUTES.md](ENTITY_ATTRIBUTES.md), including eight configured agents
+and a newly added ninth. HA 2026.6 skips this native-provider test module because
+the provider platform does not exist there; that skip is not feature acceptance.
 
 Before adding a test, identify its observable contract, credible regression and why
 existing coverage cannot catch it. Extend the owning boundary rather than duplicating
@@ -142,6 +176,12 @@ before recovery checks. Restore a known exact backup/revision, not an assumed
    and timeout. Native continuation recognizes final `?`, ASCII `;` and fullwidth
    `？`; other punctuation is not promised. Verify actual microphone reopening and
    exactly one intended action, not only a `continue_conversation` flag.
+   For native-first commands and shared result handling, inspect actual tool calls
+   rather than treating personality speech as proof. Cover switches, lights, fans,
+   locks, covers, climate, media players, scenes and scripts; exercise success,
+   partial failure, unavailable/excluded targets, caller identity and no replay.
+   Scripted fast/native coverage and the distinction between acknowledgement and
+   hardware completion are described in [ACTION_CONTROL.md](ACTION_CONTROL.md).
 5. Run Voice Match with multiple consenting people/devices: clean visible chat,
    names/preferences, A→B→A scope changes, neutral ambiguity, concurrent utterances,
    outages, phrase conflicts, reload, key changes and ordinary Whisper rollback.

@@ -260,6 +260,7 @@ async def test_search_then_ha_tool_preserves_native_tool_pair_and_evidence(
     ))
 
     class Reading(llm.Tool):
+        annotations = type("ReadOnly", (), {"read_only": True})()
         name = "HassTestReading"
         description = "Return a synthetic reading."
         parameters = vol.Schema({})
