@@ -92,8 +92,10 @@ async def test_real_automation_choose_speaker_and_return_response(
     assert len(seen) == 2
     assert len(model_calls) == 1
     # Same identity, unrelated phrase; no per-automation profile IDs.
-    result = await speak(hass, voice_packet(key, account_by_voice["alice"], "alice", "Good evening!"),
-                          Context(user_id=account_by_voice["alice"]))
+    result = await speak(
+        hass, voice_packet(key, account_by_voice["alice"], "alice", "Good evening!"),
+        Context(user_id=account_by_voice["alice"]),
+    )
     assert result.response.speech["plain"]["speech"] == "Hello alice."
     assert len(seen) == 3
     # An account-bound packet cannot borrow another HA caller's permissions.

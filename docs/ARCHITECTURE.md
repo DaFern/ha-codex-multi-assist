@@ -36,6 +36,42 @@ flowchart LR
 
 ## Main components
 
+### Inactive RBAC Assist foundation
+
+See [RBAC_ASSIST.md](RBAC_ASSIST.md). A proposed versioned in-process RBAC oracle
+and a fail-closed Codex consumer are under development. Neither is wired into
+conversation handling; no restricted tablet/satellite route is enabled. Existing
+voice account-binding and RBAC ingress denials remain unchanged. Protected context,
+target-bound execution and administrator satellite ceilings are prerequisites,
+not functionality provided by the oracle alone.
+
+The context stage now has a versioned RBAC projection plus a Codex snapshot/model
+envelope builder. It intersects kiosk/speaker read policies and native Assist
+exposure, omits hidden fields, accepts only curated scalars and binds single-use
+snapshots to the exact caller/voice turn. It sends no history, unrestricted live
+prompt, rendered HA templates or executable tools. This is not wired into live
+conversation handling; protected ingress and target-bound dispatch remain gates.
+
+The inactive `rbac_execution.py` adapter now seals exact direct light/fan on/off
+proposals to one caller/turn and registry identity. An entry-owned ledger consumes
+them before awaits, and the native ServiceIntentHandler execution task rechecks
+both policies/native permissions and current exposure before each exact service
+admission. A request-local facade refuses argument broadening; no global HA handler
+patch, arbitrary service bridge or unrestricted name re-resolution is used. Native
+background timeout detachment is disabled. Revocation stops remaining targets, not
+already-admitted integration I/O. Protected resolution, all live dispatch wiring,
+result handling and ingress remain incomplete; the model still receives no tools.
+
+The dormant protected ingress prototype now connects RBAC's explicit versioned
+provider registry to `rbac_dispatch.ProtectedDispatcher`: original kiosk Context and
+server source capability -> one-use task-bound admission -> same-task private STT
+handoff and nonce verification -> fresh dual-policy context -> exact execution guard.
+Caller/registration/key liveness is rechecked inside native admission. No setup or
+network route registers this chain, no ordinary Assist denial is relaxed and no
+model tools are enabled. Only structured exact on/off proposals are accepted;
+authenticated transport/source adapters and protected native/model resolution remain
+separate gates. Tests simulate authenticated server Contexts, not actual network login.
+
 ### Optional MCP read-only preview
 
 See [MCP.md](MCP.md) for configuration, trust and compatibility limits. The options

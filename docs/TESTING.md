@@ -1,5 +1,101 @@
 # Testing
 
+## Dormant ingress-to-command chain (not activated)
+
+Fifty-one new cases in the separate RBAC checkout's `tests/test_assist_ingress.py`
+exercise versioned registration, task-bound admission, actual paired clean-transcript
+handoff/nonce verification, compiled dual-account policy projection and native exact
+execution. They simulate authenticated server Contexts and trusted STT, not browser
+login, physical audio recognition or real satellite provenance. No network endpoint
+is registered by these modules or tests.
+
+The selected cross-checkout ingress/oracle/context/intent/policy/schedule/location run
+passed 191 cases on both current and minimum HA, with no skips. It includes forbidden
+and mixed batches (zero commands), forged source/identity fields, unbound/unknown
+speakers, serialized and cross-task handoffs, sequential/concurrent nonce replay,
+caller/key changes across awaits, revocation after context and native preflight,
+mutable-body freezing, concurrency, capacity/expiry and unregister/cancellation.
+Ordinary Assist baseline denials are also checked while the prototype is registered.
+
+Use the existing isolated native environments and expose both source checkouts for
+this selection: prepend Codex's root to `sys.path`, import `custom_components`, then
+append RBAC's `custom_components` directory to its `__path__` before `pytest.main`.
+Two PYTHONPATH entries alone do not work because Codex's package shadows RBAC.
+Cross-project fixtures intentionally skip when the Codex checkout is absent; a run
+with those skips is not integrated-chain validation. Full native Codex and full RBAC
+suites were not run. Deployment, actual authenticated transport, lifecycle setup,
+protected resolver/model integration and device acceptance remain pending.
+
+The full Codex fast suite remained 1,055 passed plus 32 subtests. Existing focused
+native execution/voice/MCP/history selections passed 55 on current HA and 46 on
+minimum HA (one unsupported-feature skip). Changed-file Ruff and the 65-file
+distribution projection passed. The final handoff fixed the formatting-only E501
+in `tests_ha/test_speaker_automation.py`; full-repository Ruff now passes. Including
+that file, fresh focused native selections passed 59 on current HA and 50 on minimum
+HA (one unsupported-feature skip); the fast suite still passed 1,055 plus 32 subtests.
+The companion RBAC dependency is local-only at `f15140c`, by owner choice. This
+publication checkpoint does not install it or enable any live routes, permissions
+or restart. See [RBAC_ASSIST.md](RBAC_ASSIST.md) for handoff and admission limits.
+
+## Protected exact-target execution stage (not activated)
+
+The inactive native adapter has 43 new native contract cases, run against both
+current and minimum HA. They cover exact light/fan on/off, duplicate names without
+target broadening, forbidden/mixed batches (zero commands), rechecks inside native
+execution tasks, revocation after preparation/preflight and between targets,
+concurrent replay/independent speakers, copied/altered proposals, registry replacement,
+expiry, capacity, unavailable providers, indirect targets, cancellation without native
+timeout detachment, errors without retry, and refused native argument broadening.
+
+The focused current-HA execution/voice/MCP/history selection passed 55 tests; minimum
+HA passed 46 with one pre-existing unsupported-feature skip. The RBAC selected
+oracle/context/policy/intent/schedule/location run passed 140 tests on each HA
+environment, including eight new actual paired-packet/compiled-policy/native-execution
+cross-checkout cases. Revoking either speaker or kiosk bindings, native permission,
+activity, exposure or hidden-state rights after preflight denies execution. These
+are synthetic local services, not commands to household devices.
+
+The fast suite remained 1,055 passed plus 32 subtests; the distribution projection
+passed with 64 files. Full native Codex and full RBAC suites were not run for this
+stage. Changed-file Ruff passed; the full-repository Ruff run still reports the
+pre-existing E501 at `tests_ha/test_speaker_automation.py:95` (left unchanged).
+No ingress exception, model tool enablement, live integration installation,
+permission change, commit/push or restart occurred. The boundary is service admission,
+not revocation of already-admitted device I/O or working end-to-end parental controls.
+See [RBAC_ASSIST.md](RBAC_ASSIST.md) for wiring and acceptance gates.
+
+## Protected RBAC context stage (not activated)
+
+The full fast suite passed 1,055 tests plus 32 subtests. Twenty-two new context tests
+cover schema/data bounds, unavailable/revoked providers, hidden-field omission,
+unknown/unbound speakers, concurrency, snapshot/turn/account binding, one-time model
+delivery, refused HA templates and no tools/history/global prompt merging. In the
+RBAC checkout, 132 selected projection/policy/intent/schedule/location tests passed,
+including two cross-checkout native contracts with both current role policies and
+the actual Codex consumer. Changed Python files passed Ruff. No full native Codex
+suite rerun or full RBAC-suite claim is made for this stage. No model/provider
+request, live account/policy edit, installation, commit/push or restart occurred.
+
+The protected client routes and action execution guards are still incomplete; the
+context stage must remain disconnected from live Assist. This does not establish
+working tablet/satellite parental controls. See [RBAC_ASSIST.md](RBAC_ASSIST.md).
+
+## Inactive RBAC policy foundation
+
+See [RBAC_ASSIST.md](RBAC_ASSIST.md). The initial compatibility consumer has twenty
+fail-closed tests for authenticated caller forwarding, missing callers/providers,
+incompatible API versions, provider faults, revocation, invalid responses and shared
+kiosk speaker/ceiling separation without HA Context replacement. The
+development RBAC checkout's oracle plus existing policy/intent/schedule/location
+regressions passed 121 tests. The unchanged intent-block tests remain passing.
+
+This is not a complete protected Assist route: target-bound
+dispatch, provider registration/ingress exception and opt-in satellite ceilings
+remain unimplemented. The later context-stage work is recorded above. No RBAC/HA
+settings or live source files were changed. The
+new modules are not wired into runtime and must not be deployed as parental-control
+functionality. No end-to-end tablet/satellite enforcement is claimed.
+
 ## Prepared conversational action outcomes for all personalities
 
 The owner requested normal “I've turned it off” wording after a successful HA-state
