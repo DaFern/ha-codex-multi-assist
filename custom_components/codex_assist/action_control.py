@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
@@ -15,6 +16,8 @@ from uuid import uuid4
 import httpx
 
 from .action_verification import TargetEvidence
+
+LOGGER = logging.getLogger(__name__)
 
 
 class ActionControlError(RuntimeError):
@@ -81,6 +84,13 @@ async def async_action_reply(
     fact = outcome.speech
     if fact is None:
         raise ValueError("An action outcome is required")
+
+    def finish(text, reason):
+        # Fixed diagnostic codes only: never names, speech, prompts or exceptions.
+        LOGGER.info("Action reply: result=%s reason=%s outcome=%s",
+                    "generated" if reason == "valid" else "fallback", reason, outcome.kind)
+        return text
+
     try:
         async with asyncio.timeout(15):
             chunks = []
@@ -106,6 +116,16 @@ async def async_action_reply(
                     "Accepted means HA accepted handling, "
                     "not verified physical completion. Never invent device state, change "
                     "failed/partial/unconfirmed into success, offer to retry, or issue commands. "
+                    "Now express those facts in the saved profile's distinctive diction, rhythm "
+                    "and tone, not as a neutral telemetry/status report. Merely adding a title "
+                    "or form of address to the factual fallback is not a personality rewrite. "
+                    "If the profile calls for wit, warmth, playfulness or theatricality, include "
+                    "one brief characteristic flourish that adds no factual claims. If it asks "
+                    "for plain/minimal/serious replies, respect that instead; do not force jokes "
+                    "or impose another character. Integrate the reported-state qualification "
+                    "naturally into the sentence; no particular 'reports as' wording is required. "
+                    "The fact field is a fallback reference, not a script to recite. Keep the "
+                    "device-specific result clear and the complete reply concise. "
                     "Do not include diagnostics, secrets, questions, or tool calls. Return only "
                     "JSON with outcome and reply."
                 ),
@@ -138,16 +158,16 @@ async def async_action_reply(
                     if isinstance(delta, CodexResponseItemDelta):
                         continue
                     if not isinstance(delta, CodexTextDelta):
-                        return fact
+                        return finish(fact, "unexpected_delta")
                     size += len(delta.text)
                     if size > 2048:
-                        return fact
+                        return finish(fact, "oversized_stream")
                     chunks.append(delta.text)
             finally:
                 await stream.aclose()
             result = json.loads("".join(chunks))
             if not isinstance(result, dict) or set(result) != {"outcome", "reply"}:
-                return fact
+                return finish(fact, "invalid_shape")
             reply = result["reply"]
             if (result["outcome"] != outcome.kind or not isinstance(reply, str)
                     or not reply.strip() or len(reply) > 480
@@ -155,7 +175,7 @@ async def async_action_reply(
                     or any(ActionOutcome(kind).speech in reply
                            for kind in ("accepted", "failed", "partial", "unconfirmed")
                            if kind != outcome.kind)):
-                return fact
+                return finish(fact, "invalid_reply")
             names = [target.name for target in outcome.targets]
             if not names and outcome.action_context and outcome.action_context.requested_target:
                 names = [outcome.action_context.requested_target]
@@ -165,10 +185,10 @@ async def async_action_reply(
                 target.name for target in outcome.targets if target.command_result == "failed"
             ])
             if any(name.casefold() not in reply.casefold() for name in required):
-                return fact
-            return reply.strip()
+                return finish(fact, "missing_target")
+            return finish(reply.strip(), "valid")
     except (RuntimeError, ValueError, TypeError, TimeoutError, OSError, httpx.HTTPError):
-        return fact
+        return finish(fact, "generation_failed")
 
 
 def intent_tool(tools: list[Any], intent_type: str, native_type: type | tuple) -> Any:

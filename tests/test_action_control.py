@@ -238,6 +238,42 @@ def test_fixed_partial_and_failure_replies_do_not_expose_raw_errors():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("profile,reply", [
+    ("Use dry British wit.", "Test lamp reports off. A triumph of restraint."),
+    ("Be warm and encouraging.", "Test lamp reports off. One less thing to worry about."),
+    ("Be theatrical and sarcastic.", "Test lamp reports off. Behold, civilisation advances."),
+    ("Be plain and minimal. No jokes.", "Test lamp reports off."),
+])
+async def test_reply_guidance_preserves_each_profile_without_forcing_one_character(
+    profile, reply, caplog,
+):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="custom_components.codex_assist.action_control")
+    calls = []
+
+    class Client:
+        async def stream_turn(self, **kwargs):
+            calls.append(kwargs)
+            yield CodexTextDelta(json.dumps({"outcome": "accepted", "reply": reply}))
+
+    result = await async_action_reply(
+        ActionOutcome("accepted"), codex=Client(), model="test", instructions=profile,
+        reasoning_effort="low", reasoning_summary="auto", text_verbosity="low",
+    )
+    assert result == reply  # Scripted output proves routing, not real-model style.
+    prompt = calls[0]["instructions"]
+    assert prompt.startswith(profile)
+    assert "one brief characteristic flourish" in prompt
+    assert "do not force jokes" in prompt
+    assert "fallback reference, not a script to recite" in prompt
+    assert "not verified physical completion" in prompt
+    assert calls[0]["tools"] == []
+    assert "Action reply: result=generated reason=valid outcome=accepted" in caplog.text
+    assert profile not in caplog.text and reply not in caplog.text
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("kind", ["accepted", "failed", "partial", "unconfirmed"])
 @pytest.mark.parametrize("personality", ["Speak like a pirate.", "Use quiet scientific wit."])
 async def test_action_reply_uses_any_personality_but_preserves_authoritative_outcome(

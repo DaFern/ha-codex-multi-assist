@@ -1,5 +1,23 @@
 # Testing
 
+## Prepared action-reply personality refinement
+
+The owner reported after deployment that conversational follow-up now worked and a
+light command gave useful device-specific feedback, but the reply lacked the desired
+personality flair. This is owner acceptance of that conversation flow, not exhaustive
+multi-speaker/privacy or physical-device verification. Its exact reply path was not
+logged, so model generation versus factual fallback remains unknown for that request.
+
+The refinement strengthens profile-specific wording guidance without forcing jokes
+on minimal/serious profiles, and adds fixed-code INFO diagnostics distinguishing
+generated replies from fallback reasons without logging personal content. The fast
+suite passed 997 tests plus 32 subtests; five focused native readback/personality
+contracts passed on each HA compatibility version. Changed-file Ruff passed. These
+scripted tests establish guidance/routing/log redaction, not real-model wit. Full HA
+suites were not rerun for this prompt/logging-only refinement; prior baseline failures
+below remain. Publication and deployment evidence is tracked separately in issue #1;
+these tests alone do not establish installation or live wording acceptance.
+
 ## Prepared device-specific action readback
 
 `tests/test_action_verification.py` covers exact native call/result pairing, class-

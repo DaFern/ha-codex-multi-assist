@@ -89,6 +89,22 @@ actions are never replayed to obtain a nicer reply.
 
 ## Personality-aware acknowledgements
 
+The prepared wording refinement explicitly follows the saved profile's diction,
+rhythm and tone rather than merely adding a form of address to a status sentence.
+Witty/warm/theatrical profiles are asked for one brief characteristic flourish;
+plain or serious profiles are not forced to joke. This changes guidance, not the
+verification, target-name checks, factual fallback or tools-disabled boundary.
+Real-model personality compliance remains an acceptance test.
+
+Minimal INFO diagnostics on `custom_components.codex_assist.action_control` distinguish
+`result=generated reason=valid` from `result=fallback` with fixed reasons such as
+`missing_target`, `invalid_reply` or `generation_failed`. Records include only those
+fixed codes and the outcome category, never device names, transcripts, instructions,
+exception text or credentials. They establish which reply path ran, not whether a
+generated reply had sufficient flair. No logging level is enabled by this change;
+turning on targeted INFO requires separate approval. Earlier replies cannot be
+retrospectively classified from their wording alone.
+
 The tools-disabled step receives the outcome category, a factual fallback, optional
 recognized operation/domain/requested label, and bounded per-target names, command
 results and verification evidence. Resolved IDs stay internal to readback; raw tool

@@ -304,8 +304,11 @@ async def test_personality_receives_only_authorized_target_facts_and_factual_fal
 @pytest.mark.asyncio
 @pytest.mark.parametrize("response", ["generic", "invalid", "failure"])
 async def test_generic_or_broken_personality_reply_keeps_device_specific_facts(
-    environment, response,
+    environment, response, caplog,
 ):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="custom_components.codex_assist.action_control")
     env = environment
     env.add(state="off")
     outcome = await async_verify_action(
@@ -324,3 +327,7 @@ async def test_generic_or_broken_personality_reply_keeps_device_specific_facts(
         outcome, codex=Client(), model="test", instructions="Be witty.",
         reasoning_effort="low", reasoning_summary="auto", text_verbosity="low",
     ) == "Test device: reports off."
+    reason = "missing_target" if response == "generic" else "generation_failed"
+    assert f"Action reply: result=fallback reason={reason} outcome=accepted" in caplog.text
+    for private in ("Test device", "light.test", "Be witty.", "synthetic"):
+        assert private not in caplog.text
