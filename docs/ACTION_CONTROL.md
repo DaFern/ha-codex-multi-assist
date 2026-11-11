@@ -62,8 +62,11 @@ only step can add personality, but cannot execute a completed action again.
 
 ## Personality-aware acknowledgements
 
-The tools-disabled step receives only a fixed outcome category and factual sentence,
-not raw tool responses, exception strings or the user's command/history. Its system
+The tools-disabled step receives a fixed outcome category and factual sentence,
+plus an optional sanitized summary containing only the recognized operation and an
+allow-listed target domain (for example, `turn_off` and `light`). It receives no
+entity name/ID, raw tool arguments, tool response, exception string or user
+command/history. The summary is context, not evidence of device state. Its system
 instructions use the current selected agent's rendered prompt and optional verified
 Voice Match name/preferences, never a hard-coded character or another agent's prompt.
 The model writes the entire reply in that personality and the requested language;

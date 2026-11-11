@@ -14,7 +14,7 @@ TO_REDACT = {
     "access_token", "refresh_token", "prompt", "voice_match_pairing_key",
     "key", "pairing_key", "learning_bridge_key", "personalisation_key",
     "personal_instructions", "instructions", "session_token", "capability",
-    "user_id", "voice_id", "profile_id", "url", "host", "voice_match_host",
+    "user_id", "voice_id", "profile_id", "url", "host", "voice_match_host", "bearer_token",
 }
 
 
@@ -23,8 +23,8 @@ async def async_get_config_entry_diagnostics(
     entry: ConfigEntry,
 ) -> dict[str, Any]:
     """Return redacted diagnostics for a Codex Assist config entry."""
-    del hass
     return {
+        "mcp_health": dict(hass.data.get("codex_assist_mcp_health", {}).get(entry.entry_id, {})),
         "entry": {
             "data": redact_sensitive(dict(entry.data)),
             "options": redact_sensitive(dict(entry.options)),

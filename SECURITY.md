@@ -21,7 +21,17 @@ Do not include raw access tokens, refresh tokens, device codes, cookies, full Ho
 
 ## Security stance
 
-Codex Assist uses Home Assistant's normal Assist LLM API and exposed-entity controls. It does not add a custom raw service-call bridge or bypass Home Assistant's Assist exposure model.
+Native device control uses Home Assistant's normal Assist LLM API and exposed-entity controls. It does not add a custom raw service-call bridge or change Home Assistant's Assist exposure model.
+
+The optional [MCP read-only preview](docs/MCP.md) is a separate, administrator-only
+data boundary. Approved remote reads can access data beyond Assist-exposed entities
+using the server's own credentials. No MCP server or tool is authorized by default.
+An active authenticated HA administrator must explicitly trust the endpoint and
+review tools as read-only; remote annotations cannot prove their implementation is
+safe. Voice Match does not authorize MCP. Tool definitions and results leave HA for
+Codex when used and can appear in native history/traces. Secret connect URLs and
+bearer tokens are redacted from integration diagnostics but remain in HA backups.
+Writes, voice-account authentication and non-admin MCP access are not implemented.
 
 The diagram below covers the device-control path. Hosted search and AI Task have separate data paths described after it.
 

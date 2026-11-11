@@ -154,6 +154,7 @@
   },
   "options": {
     "abort": {
+      "mcp_requires_current_ha": "MCP tools require Home Assistant 2026.10 or later.",
       "learning_requires_current_ha": "Voice Match learning requires Home Assistant 2026.10 or later. Codex assistants remain available on this version.",
       "learning_reconfigure_required": "Use the Voice Match learning entry's own configuration."
     },
@@ -199,8 +200,28 @@
         "menu_options": {
           "settings": "Shared AI Task defaults",
           "agents": "Manage conversation assistants",
-          "voice_match": "Voice Match"
+          "voice_match": "Voice Match",
+          "mcp": "MCP servers (read-only preview)"
         }
+      },
+      "mcp": {
+        "title": "MCP servers — read-only preview",
+        "description": "Only authenticated HA administrators can use explicitly approved read-only tools. Voice Match grants no access. Native Assist tools are unchanged.",
+        "menu_options": {"mcp_add": "Add server", "mcp_edit": "Edit or disable server", "init": "Back to options"}
+      },
+      "mcp_edit": {
+        "title": "Choose an MCP server",
+        "data": {"server_id": "Server"}
+      },
+      "mcp_server": {
+        "title": "MCP connection",
+        "description": "Use a Streamable HTTP connect URL with a literal IP address (no hostname). Local network access is off by default; enabling it trusts this exact endpoint and permits unencrypted HTTP. Loopback is a separate opt-in for a service on this HA machine, such as the local HA-MCP server. Only enable it for a server you trust; never expose this endpoint publicly without authentication. Metadata addresses and redirects remain blocked. Leave the bearer token blank to keep it; select Clear token to remove it. Saving reloads this integration. Enabling probes tool discovery only; it does not execute tools.",
+        "data": {"id": "Stable server ID (lowercase letters, digits, underscore)", "url": "Secret connect URL", "enabled": "Enable connection", "allow_local": "Allow this local network endpoint (HTTP may expose credentials)", "allow_loopback": "Allow loopback endpoint on this Home Assistant machine (required for local HA-MCP)", "bearer_token": "Bearer token (optional)", "clear_token": "Clear saved bearer token"}
+      },
+      "mcp_tools": {
+        "title": "Connection verified — approve tools",
+        "description": "Connected successfully. Found {tool_count} tools declaring themselves read-only. Nothing is approved by default. Review the server's documentation and select only tools you know cannot mutate state or expose unwanted information. Remote annotations are not a security guarantee. Shared server credentials may have administrator access. Approval applies to every assistant for authenticated HA admins only. Changed tool definitions require fresh approval. No writes or Voice Match privileges are supported.",
+        "data": {"tools": "Approved read-only tools", "confirm_read_only": "I verified that these tools are read-only and suitable for HA administrators"}
       },
       "voice_match": {
         "title": "Voice Match",
@@ -312,6 +333,13 @@
     },
     "error": {
       "invalid_target": "Choose an enabled Codex entry from the displayed list.",
+      "invalid_server": "Use a unique server ID starting with a lowercase letter (24 characters maximum). Up to eight servers are supported.",
+      "invalid_endpoint": "Use an HTTP(S) URL with a literal IP, no embedded login or fragment. Local addresses require local access approval; public addresses require HTTPS. Hostnames, loopback and metadata addresses are unsupported.",
+      "connection_failed": "MCP connection failed. Check the endpoint, authentication and network access.",
+      "invalid_response": "The server returned an unsupported or invalid MCP response.",
+      "response_too_large": "The MCP response exceeded the preview's safety limits.",
+      "unsupported_protocol": "The server must support MCP protocol 2025-03-26.",
+      "mcp_approval_required": "Select only listed tools and confirm that you verified their read-only behavior.",
       "invalid_stt_source": "Select an available ordinary Wyoming Whisper source with English support, not the learning entity.",
       "invalid_model": "Choose a listed model or keep your saved model.",
       "invalid_agent_name": "Enter a name for this assistant.",

@@ -82,7 +82,7 @@ async def test_invalid_personal_sources_are_rejected(hass, discovered, invalid, 
 
 async def clean_options(hass, entry):
     result = await hass.config_entries.options.async_init(entry.entry_id)
-    assert set(result["menu_options"]) == {"settings", "agents", "voice_match"}
+    assert set(result["menu_options"]) == {"settings", "agents", "voice_match", "mcp"}
     return await hass.config_entries.options.async_configure(
         result["flow_id"], user_input={"next_step_id": "voice_match"},
     )

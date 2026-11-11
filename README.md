@@ -23,6 +23,13 @@ Codex Assist signs in with Codex-style ChatGPT device-code auth. It keeps device
 
 ## Quick start
 
+**Optional MCP development preview:** on HA 2026.10+, configure multiple Streamable
+HTTP servers under **Configure → MCP servers**. Connections and tools default to
+denied. Only authenticated HA administrators can use explicitly reviewed read-only
+tools; Voice Match grants no access. Literal-IP endpoints only in this first
+milestone; no writes, OAuth, stdio or legacy SSE-only transport. Read the
+[setup, permissions and limitations](docs/MCP.md) before enabling it.
+
 For Codex you need Home Assistant `2026.6.0` or newer and a ChatGPT account or
 plan with Codex access. Optional voice learning requires **HA 2026.10+**, the
 separate [Voice Match add-on](https://github.com/DaFern/wyoming-voice-match-ha),

@@ -1,5 +1,15 @@
 # Testing
 
+## MCP read-only preview
+
+`tests/test_mcp_client.py` exercises synthetic HTTP protocol/security boundaries.
+`tests_ha/test_mcp_options.py`, `test_mcp_tools.py`, `test_mcp_history.py` and
+`test_mcp_delivery.py` exercise supported options saving, real native schemas/results,
+account revocation, cross-user history isolation and model/tool replay across agents.
+The preview is HA 2026.10+; older lanes verify its setup gate and skip unsupported
+native features. See [MCP.md](MCP.md) for explicit live acceptance limits. No real
+server credentials, device calls, code deployment or restarts belong in these tests.
+
 ## Personality-aware action replies and attribute tools
 
 The complete source checkout passed **916 fast tests plus 32 subtests**,

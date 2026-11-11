@@ -31,6 +31,7 @@ from .codex_models import ModelCatalog, ModelDiscoveryCache, fetch_codex_model_i
 from .codex_runtime import runtime_token_coordinator
 from .entry_modules import CONF_MODULE, EntryModule, entry_module
 from .learning.config_flow import LearningConfigFlowMixin, LearningOptionsFlow
+from .mcp_config_flow import MCPOptionsMixin
 from .model_discovery import async_entry_model_catalog
 from .speaker_packet import valid_key
 from .voice_match import (
@@ -249,7 +250,7 @@ def _clear_model_cache(entry) -> None:
     runtime_token_coordinator(entry).model_cache.clear()
 
 
-class CodexAssistOptionsFlow(config_entries.OptionsFlow):
+class CodexAssistOptionsFlow(MCPOptionsMixin, config_entries.OptionsFlow):
     def __init__(self) -> None:
         self._catalog: ModelCatalog | None = None
         self._agents: list[dict[str, Any]] | None = None
@@ -261,7 +262,7 @@ class CodexAssistOptionsFlow(config_entries.OptionsFlow):
             return self.async_abort(reason="learning_reconfigure_required")
         return self.async_show_menu(
             step_id="init",
-            menu_options=["settings", "agents", "voice_match"],
+            menu_options=["settings", "agents", "voice_match", "mcp"],
         )
 
     async def async_step_voice_match(self, user_input=None):

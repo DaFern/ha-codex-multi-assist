@@ -36,6 +36,21 @@ flowchart LR
 
 ## Main components
 
+### Optional MCP read-only preview
+
+See [MCP.md](MCP.md) for configuration, trust and compatibility limits. The options
+flow stores independently enabled connections and definition-bound read approvals.
+`mcp_client.py` provides bounded Streamable HTTP sessions without redirects, DNS,
+proxies, retries or subprocesses. `mcp_tools.py` prepares request-local native LLM
+tools only for current HA administrators. The synchronous native LLM provider
+consumes that exact-context preparation, while every invocation independently
+rechecks identity, current options and remote tool definitions. Remote annotations
+alone are never authority. Voice Match packets are excluded, not mapped to accounts.
+`mcp_history.py` binds native conversation ownership to the HA account/admin class,
+starting a fresh supported native chat session after changes or lost ownership.
+Native Assist controls and AI Task remain separate. This is issue #8's restricted
+first milestone, not its full identity, per-user policy or write-approval design.
+
 - **Config flow** handles Codex-style device-code sign-in. It stores OAuth tokens in the Home Assistant config entry and exposes integration options.
 - **Model discovery** uses only visible model IDs returned for the signed-in account. An entry-scoped, in-memory cache survives temporary failures; a small, explicitly unverified fallback list is used only before a successful result.
 - **Conversation agents** register the retained primary entity and independent
@@ -147,8 +162,10 @@ first recognises supported commands with HA's native recogniser, then dispatches
 only an existing authorised intent tool via ChatLog. Caller/exposure controls are
 unchanged. Recognised device commands do not need model-generated success text.
 Both native and model-requested tools use paired current-round result checks;
-accepted/failed/partial/unconfirmed replies are integration-owned, neutral and do
-not claim physical completion. Native query results can feed an otherwise normal
+accepted/failed/partial/unconfirmed replies are integration-owned and do not claim
+physical completion. For recognized turn-on/turn-off/toggle actions, the personality
+reply receives only the fixed operation label and an allow-listed target domain;
+entity names, IDs, raw arguments and device state are excluded. Native query results can feed an otherwise normal
 model answer, with tools disabled to avoid executing the recognised request twice.
 Unknown sentences and unavailable intent tools retain the model path; this is not
 a universal intent or semantic truth classifier. No arbitrary service bridge or

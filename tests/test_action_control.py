@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from custom_components.codex_assist.action_control import (
+    ActionContext,
     ActionOutcome,
     action_outcome,
     async_action_reply,
@@ -171,7 +172,10 @@ async def test_native_recognition_uses_existing_tool_contract_and_original_input
             received.append(content)
             yield None
 
-    assert await async_native_request(object(), user_input, Chat())
+    native_result = await async_native_request(object(), user_input, Chat())
+    assert native_result is not None
+    assert native_result.action_context.operation == "turn_off"
+    assert native_result.action_context.target_domain == "fan"
     assert len(received) == 1
     call = received[0].tool_calls[0]
     assert call.tool_name == "HassTurnOff"
@@ -262,6 +266,32 @@ async def test_action_reply_uses_any_personality_but_preserves_authoritative_out
     assert json.loads(calls[0]["input_items"][0]["content"]) == {
         "outcome": kind, "fact": outcome.speech,
     }
+
+
+@pytest.mark.asyncio
+async def test_action_reply_gets_only_sanitized_action_context():
+    calls = []
+
+    class Client:
+        async def stream_turn(self, **kwargs):
+            calls.append(kwargs)
+            yield CodexTextDelta(json.dumps({
+                "outcome": "accepted", "reply": "The lights are having a quiet moment.",
+            }))
+
+    outcome = ActionOutcome("accepted", ActionContext("turn_off", "light"))
+    assert await async_action_reply(
+        outcome, codex=Client(), model="test", instructions="Use dry wit.",
+        reasoning_effort="low", reasoning_summary="auto", text_verbosity="low",
+    ) == "The lights are having a quiet moment."
+    payload = json.loads(calls[0]["input_items"][0]["content"])
+    assert payload == {
+        "outcome": "accepted",
+        "fact": outcome.speech,
+        "action": {"operation": "turn_off", "target_domain": "light"},
+    }
+    assert "office" not in str(payload)
+    assert "entity_id" not in str(payload)
 
 
 @pytest.mark.asyncio

@@ -18,6 +18,7 @@ def _load_diagnostics(monkeypatch):
 async def test_diagnostics_redacts_tokens_and_prompts_but_keeps_settings(monkeypatch):
     module = _load_diagnostics(monkeypatch)
     entry = types.SimpleNamespace(
+        entry_id="test",
         data={
             "access_token": "secret-access",
             "refresh_token": "secret-refresh",
@@ -35,11 +36,14 @@ async def test_diagnostics_redacts_tokens_and_prompts_but_keeps_settings(monkeyp
     original_data = deepcopy(entry.data)
     original_options = deepcopy(entry.options)
 
-    diagnostics = await module.async_get_config_entry_diagnostics(object(), entry)
+    diagnostics = await module.async_get_config_entry_diagnostics(
+        types.SimpleNamespace(data={}), entry,
+    )
 
     assert entry.data == original_data
     assert entry.options == original_options
     assert diagnostics == {
+        "mcp_health": {},
         "entry": {
             "data": {
                 "access_token": "**REDACTED**",
@@ -65,11 +69,14 @@ async def test_diagnostics_redacts_tokens_and_prompts_but_keeps_settings(monkeyp
 async def test_diagnostics_never_contains_raw_token_values(monkeypatch):
     module = _load_diagnostics(monkeypatch)
     entry = types.SimpleNamespace(
+        entry_id="test",
         data={"access_token": "raw-token-value", "refresh_token": "raw-refresh-value"},
         options={},
     )
 
-    diagnostics = await module.async_get_config_entry_diagnostics(object(), entry)
+    diagnostics = await module.async_get_config_entry_diagnostics(
+        types.SimpleNamespace(data={}), entry,
+    )
 
     assert "raw-token-value" not in str(diagnostics)
     assert "raw-refresh-value" not in str(diagnostics)
@@ -77,10 +84,10 @@ async def test_diagnostics_never_contains_raw_token_values(monkeypatch):
 
 async def test_direct_backend_address_is_redacted(monkeypatch):
     module = _load_diagnostics(monkeypatch)
-    entry = types.SimpleNamespace(data={}, options={
+    entry = types.SimpleNamespace(entry_id="test", data={}, options={
         "voice_match_host": "synthetic-private.invalid", "voice_match_port": 10352,
     })
-    result = await module.async_get_config_entry_diagnostics(object(), entry)
+    result = await module.async_get_config_entry_diagnostics(types.SimpleNamespace(data={}), entry)
     assert result["entry"]["options"]["voice_match_host"] == module.REDACTED
     assert "synthetic-private.invalid" not in str(result)
 
@@ -91,6 +98,7 @@ async def test_nested_module_secrets_and_agent_prompts_are_redacted_without_muta
         key: f"synthetic-sensitive-{key}" for key in module.TO_REDACT
     }
     entry = types.SimpleNamespace(
+        entry_id="test",
         data={"module": "voice_match", "modules": {"learning": sensitive}},
         options={
             "agents": [{"name": "Example", "prompt": "synthetic-personality"}],
@@ -100,7 +108,7 @@ async def test_nested_module_secrets_and_agent_prompts_are_redacted_without_muta
     )
     original = deepcopy(vars(entry))
 
-    result = await module.async_get_config_entry_diagnostics(object(), entry)
+    result = await module.async_get_config_entry_diagnostics(types.SimpleNamespace(data={}), entry)
 
     assert vars(entry) == original
     assert result["entry"]["data"]["module"] == "voice_match"

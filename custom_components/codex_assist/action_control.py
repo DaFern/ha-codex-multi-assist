@@ -20,8 +20,17 @@ class ActionControlError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class ActionContext:
+    """Small, allow-listed description of a natively recognised action."""
+
+    operation: str
+    target_domain: str | None = None
+
+
+@dataclass(frozen=True)
 class ActionOutcome:
     kind: str = "none"
+    action_context: ActionContext | None = None
 
     @property
     def speech(self) -> str | None:
@@ -41,7 +50,8 @@ async def async_action_reply(
 ) -> str:
     """Add personality without allowing a second action or losing the result.
 
-    Only a fixed outcome is input, not tool payloads, exceptions or user commands.
+    Only a fixed outcome and optional allow-listed action summary are input, not
+    tool payloads, exceptions, raw arguments or user commands.
     The model writes the entire reply; outcome facts constrain its instructions.
     Model prose is guidance, not independently verified device-state evidence.
     """
@@ -62,6 +72,8 @@ async def async_action_reply(
                     "and the user's language. Write the entire reply in that voice: no stock "
                     "sentence or fixed prefix/suffix is required. The provided outcome and its "
                     "explanation are facts to express naturally, not text to copy. "
+                    "The optional action summary describes only the recognised "
+                    "operation and target domain; it is not device-state evidence. "
                     "Accepted means HA accepted handling, "
                     "not verified physical completion. Never claim a final device state, change "
                     "failed/partial/unconfirmed into success, offer to retry, or issue commands. "
@@ -69,7 +81,12 @@ async def async_action_reply(
                     "JSON with outcome and reply."
                 ),
                 input_items=[{"role": "user", "content": json.dumps({
-                    "outcome": outcome.kind, "fact": fact,
+                    "outcome": outcome.kind,
+                    "fact": fact,
+                    **({"action": {
+                        "operation": outcome.action_context.operation,
+                        "target_domain": outcome.action_context.target_domain,
+                    }} if outcome.action_context else {}),
                 })}],
                 tools=[], reasoning_effort=reasoning_effort,
                 reasoning_summary=reasoning_summary, text_verbosity=text_verbosity,
@@ -140,7 +157,16 @@ def read_only_tools(tools: list[Any], legacy_types: type | tuple = ()) -> set[st
     return names
 
 
-async def async_native_request(hass: Any, user_input: Any, chat_log: Any) -> bool:
+@dataclass(frozen=True)
+class NativeRequestResult:
+    """Indicate native handling and optionally carry sanitized action context."""
+
+    action_context: ActionContext | None = None
+
+
+async def async_native_request(
+    hass: Any, user_input: Any, chat_log: Any,
+) -> NativeRequestResult | None:
     """Route native-recognised requests through already-authorised Assist tools.
 
     No per-language verb regex, device list, direct service call or recursive
@@ -154,19 +180,19 @@ async def async_native_request(hass: Any, user_input: Any, chat_log: Any) -> boo
 
     get_agent = getattr(conversation, "async_get_agent", None)
     if get_agent is None or not getattr(user_input, "text", ""):
-        return False
+        return None
     agent = get_agent(hass, conversation.HOME_ASSISTANT_AGENT)
     if agent is None or not hasattr(agent, "async_recognize_intent"):
-        return False
+        return None
     recognised = await agent.async_recognize_intent(user_input, strict_intents_only=True)
     if recognised is None:
-        return False
+        return None
     tool = intent_tool(
         getattr(chat_log.llm_api, "tools", []), recognised.intent.name,
         getattr(llm, "IntentTool", ()),
     )
     if tool is None:
-        return False
+        return None
     if recognised.unmatched_entities:
         raise ActionControlError("Native request has unmatched targets")
     schema = to_openapi(tool.parameters, custom_serializer=chat_log.llm_api.custom_serializer)
@@ -189,7 +215,27 @@ async def async_native_request(hass: Any, user_input: Any, chat_log: Any) -> boo
         agent_id=user_input.agent_id, content=None, tool_calls=[tool_input],
     )):
         pass
-    return True
+    # Pass only fixed operation labels and a recognized, allow-listed entity
+    # domain. Never forward names, IDs, or any of the native tool arguments.
+    operations = {
+        "HassTurnOn": "turn_on",
+        "HassTurnOff": "turn_off",
+        "HassToggle": "toggle",
+    }
+    operation = operations.get(recognised.intent.name)
+    allowed_domains = {
+        "alarm_control_panel", "automation", "climate", "cover", "fan",
+        "humidifier", "input_boolean", "light", "lock", "media_player",
+        "scene", "script", "switch", "vacuum", "water_heater",
+    }
+    domains = {
+        entity.value.lower()
+        for entity in recognised.entities_list
+        if entity.name == "domain" and isinstance(entity.value, str)
+        and entity.value.lower() in allowed_domains
+    }
+    context = ActionContext(operation, next(iter(domains)) if len(domains) == 1 else None)
+    return NativeRequestResult(action_context=context if operation else None)
 
 
 def action_outcome(contents: list[Any], read_only: set[str] | None = None) -> ActionOutcome:

@@ -118,4 +118,10 @@ def async_get_tools(hass: HomeAssistant, llm_context: llm.LLMContext, api_id: st
     """Contribute once per API request, independently of agent count or names."""
     if api_id != llm.LLM_API_ASSIST or not _context_allowed(llm_context):
         return None
-    return LLMTools(tools=[EntityAttributesTool()], prompt=PROMPT)
+    tools = [EntityAttributesTool()]
+    # Import only on current HA: older native providers keep their existing path.
+    if hasattr(llm, "ToolResult"):
+        from .mcp_tools import tools_for_context
+
+        tools.extend(tools_for_context(llm_context.context))
+    return LLMTools(tools=tools, prompt=PROMPT)

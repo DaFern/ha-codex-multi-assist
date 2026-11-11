@@ -132,6 +132,14 @@ class CodexAssistConversationEntity(
             conversation.async_unset_agent(self.hass, self.entry)
         await super().async_will_remove_from_hass()
 
+    async def async_process(self, user_input):
+        from .mcp_history import history_input, remember_history
+
+        scoped_input, actor = await history_input(self.hass, self.entry, user_input)
+        result = await super().async_process(scoped_input)
+        remember_history(self.hass, result, actor)
+        return result
+
     async def _async_handle_message(
         self,
         user_input: conversation.ConversationInput,
@@ -219,12 +227,24 @@ class CodexAssistConversationEntity(
             ))
             return conversation.async_get_result_from_chat_log(user_input, chat_log)
         try:
-            await chat_log.async_provide_llm_data(
-                user_input.as_llm_context(DOMAIN),
-                llm.LLM_API_ASSIST,
-                prompt,
-                user_input.extra_system_prompt,
-            )
+            if self.entry.options.get("mcp_servers"):
+                from .mcp_tools import request_tools
+
+                async with request_tools(
+                    self.hass, self.entry, user_input.context,
+                    voice_packet=prepared_request.verified,
+                ):
+                    await chat_log.async_provide_llm_data(
+                        user_input.as_llm_context(DOMAIN), llm.LLM_API_ASSIST,
+                        prompt, user_input.extra_system_prompt,
+                    )
+            else:
+                await chat_log.async_provide_llm_data(
+                    user_input.as_llm_context(DOMAIN),
+                    llm.LLM_API_ASSIST,
+                    prompt,
+                    user_input.extra_system_prompt,
+                )
         except conversation.ConverseError as err:
             return err.as_conversation_result()
 
@@ -252,8 +272,11 @@ class CodexAssistConversationEntity(
 
         try:
             native_start = len(chat_log.content)
-            native_handled = await async_native_request(self.hass, user_input, chat_log)
+            native_result = await async_native_request(self.hass, user_input, chat_log)
+            native_handled = native_result is not None
             outcome = action_outcome(chat_log.content[native_start:], readonly)
+            if outcome.speech and native_result and native_result.action_context:
+                outcome = ActionOutcome(outcome.kind, native_result.action_context)
         except (HomeAssistantError, RuntimeError, ValueError, TypeError) as err:
             _log_request_failure(err, stage="native_assist")
             outcome = ActionOutcome("unconfirmed")
