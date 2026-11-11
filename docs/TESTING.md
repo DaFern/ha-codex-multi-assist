@@ -1,5 +1,21 @@
 # Testing
 
+## Prepared conversational action outcomes for all personalities
+
+The owner requested normal “I've turned it off” wording after a successful HA-state
+check instead of “reports as”, with personality-appropriate uncertainty or failure
+otherwise. The prepared refinement supplies per-target reply statuses independently
+of agent identity, keeps technical verification internal, and updates successful
+factual fallbacks. Sixteen scripted cases cover success, missing feedback, a result
+not reached, and command failure across dry, friendly, theatrical and minimal profiles.
+They prove evidence/guidance delivery, not live model obedience or physical feedback.
+
+Validation: 1,013 fast tests plus 32 subtests passed; five focused native contracts
+passed on each HA compatibility version. Changed-file Ruff passed. Full native suites
+were not rerun for this wording/status-projection change; earlier documented baseline
+failures remain. Publication and deployment evidence is tracked separately in issue #1;
+these checks do not establish live wording or physical-feedback acceptance.
+
 ## Prepared action-reply personality refinement
 
 The owner reported after deployment that conversational follow-up now worked and a

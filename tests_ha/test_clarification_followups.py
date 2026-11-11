@@ -419,7 +419,7 @@ async def test_group_alias_without_area_executes_instead_of_text_only_false_succ
     assert callers == [hass_admin_user.id]
     assert executed[0]["entity_id"] == [entry.entity_id]
     assert hass.states.get(entry.entity_id).state == "off"
-    assert result.response.speech["plain"]["speech"] == "Study: reports off."
+    assert result.response.speech["plain"]["speech"] == "I've turned Study off."
 
 
 @pytest.mark.parametrize("model_path", [False, True])
@@ -472,10 +472,11 @@ async def test_device_specific_reply_uses_exact_native_result_and_state_feedback
         assert target["command_result"] == "accepted"
         assert target["verification"] == "reported_requested_state"
         assert target["reported_state"] == target["expected_state"] == "off"
+        assert target["reply_status"] == "success"
         assert "entity_id" not in target
         assert kwargs["instructions"].startswith("You are J.A.R.V.I.S.")
         yield CodexTextDelta(json.dumps({
-            "outcome": "accepted", "reply": "Test lamp reports off, sir. Sensibly economical.",
+            "outcome": "accepted", "reply": "I've turned Test lamp off. Sensibly economical.",
         }))
 
     monkeypatch.setattr(CodexClient, "stream_turn", model)
@@ -493,7 +494,7 @@ async def test_device_specific_reply_uses_exact_native_result_and_state_feedback
     finally:
         await asyncio.gather(*updates)
     assert result.response.speech["plain"]["speech"] == (
-        "Test lamp reports off, sir. Sensibly economical."
+        "I've turned Test lamp off. Sensibly economical."
     )
     assert len(executed) == 1
     assert requests[-1]["tools"] == []

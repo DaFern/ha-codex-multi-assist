@@ -8,7 +8,7 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 from custom_components.codex_assist.action_control import ActionOutcome, async_action_reply
-from custom_components.codex_assist.action_verification import async_verify_action
+from custom_components.codex_assist.action_verification import TargetEvidence, async_verify_action
 from custom_components.codex_assist.codex_client import CodexTextDelta
 from tests.ha_fakes import install_homeassistant_fakes
 
@@ -69,7 +69,7 @@ async def test_exact_native_targets_receive_named_reported_state(environment, wr
     assert report.entity_id == "light.test" and report.name == "Test device"
     assert report.verification == "reported_requested_state"
     assert report.expected_state == report.reported_state == "off"
-    assert outcome.speech == "Test device: reports off."
+    assert outcome.speech == "I've turned Test device off."
 
 
 @pytest.mark.asyncio
@@ -326,8 +326,55 @@ async def test_generic_or_broken_personality_reply_keeps_device_specific_facts(
     assert await async_action_reply(
         outcome, codex=Client(), model="test", instructions="Be witty.",
         reasoning_effort="low", reasoning_summary="auto", text_verbosity="low",
-    ) == "Test device: reports off."
+    ) == "I've turned Test device off."
     reason = "missing_target" if response == "generic" else "generation_failed"
     assert f"Action reply: result=fallback reason={reason} outcome=accepted" in caplog.text
     for private in ("Test device", "light.test", "Be witty.", "synthetic"):
         assert private not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("profile,flourish", [
+    ("Use dry wit.", "An admirable concession to efficiency."),
+    ("Be friendly and encouraging.", "One less thing to worry about."),
+    ("Be theatrical and sarcastic.", "A magnificent display of domestic drama."),
+    ("Be plain and minimal; no jokes.", ""),
+])
+@pytest.mark.parametrize("status,command,verification,state,body", [
+    ("success", "accepted", "reported_requested_state", "off", "I've turned Test lamp off."),
+    ("unconfirmed", "accepted", "unavailable", "unavailable",
+     "I sent the command to Test lamp, but can't confirm its response."),
+    ("not_reached", "accepted", "not_observed", "on", "Test lamp is still on."),
+    ("failed", "failed", "command_failed", None, "The command to Test lamp failed."),
+])
+async def test_conversational_outcomes_apply_to_any_profile_without_weakening_evidence(
+    profile, flourish, status, command, verification, state, body,
+):
+    target = TargetEvidence("light.test", "Test lamp", "light", "turn_off", command,
+                            verification=verification, reported_state=state, expected_state="off")
+    outcome = ActionOutcome("failed" if command == "failed" else "accepted", targets=(target,))
+    calls = []
+    expected = body + (f" {flourish}" if flourish else "")
+
+    class Client:
+        async def stream_turn(self, **kwargs):
+            calls.append(kwargs)
+            yield CodexTextDelta(json.dumps({"outcome": outcome.kind, "reply": expected}))
+
+    result = await async_action_reply(
+        outcome, codex=Client(), model="test", instructions=profile,
+        reasoning_effort="low", reasoning_summary="auto", text_verbosity="low",
+    )
+    assert result == expected  # Scripted delivery, not proof of real-model tone.
+    payload = json.loads(calls[0]["input_items"][0]["content"])
+    assert payload["targets"][0]["reply_status"] == status
+    assert payload["targets"][0]["command_result"] == command
+    assert calls[0]["instructions"].startswith(profile)
+    assert "do not say 'reports', 'reports as'" in calls[0]["instructions"]
+    assert "not that it definitely failed" in calls[0]["instructions"]
+    assert "do not force jokes" in calls[0]["instructions"]
+    assert calls[0]["tools"] == []
+    if status == "success":
+        assert "reports" not in outcome.speech
+    else:
+        assert "I've turned" not in outcome.speech

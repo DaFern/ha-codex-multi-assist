@@ -80,14 +80,27 @@ and timeouts are not successful verification. Toggle has no verifiable requested
 postcondition without a pre-action snapshot. Scripts, scenes and unsupported
 operations can be named and acknowledged but their completion is not inferred.
 
-A matching state permits “Test lamp reports off”, **not** proof the device changed
-from another state, received a hardware acknowledgement or physically responded.
+A matching state permits an ordinary conversational completion confirmation such
+as “I've turned Test lamp off”, without narrating telemetry. This is confirmation
+based on HA state, **not** independent proof the device changed from another state,
+received a hardware acknowledgement or physically responded.
 A thermostat reporting its requested setpoint is not proof the room reached that
 temperature. Integration state can itself be optimistic even without advertising
 `assumed_state`; no physical-feedback guarantee is made. Partial/failed/unconfirmed
 actions are never replayed to obtain a nicer reply.
 
 ## Personality-aware acknowledgements
+
+The prepared conversational-outcome refinement supplies a personality-independent
+`reply_status` for each target: `success`, `unconfirmed`, `not_reached` or `failed`.
+Success permits normal completed-action wording, not “reports as”; missing reliable
+feedback requires uncertainty, and feedback still disagreeing after the wait stays
+`not_reached`, distinct from command failure. Agents can express reluctance or
+non-cooperation figuratively in their own style without inventing a technical cause.
+No JARVIS-specific dialogue is embedded. Verification, permissions, no-retry behavior
+and the distinction between a setpoint and room temperature are unchanged. Named
+success fallbacks also use ordinary language. Unsupported/script/scene postconditions
+still cannot become completion claims. This refinement requires deployment separately.
 
 The prepared wording refinement explicitly follows the saved profile's diction,
 rhythm and tone rather than merely adding a form of address to a status sentence.

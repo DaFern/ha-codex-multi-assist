@@ -39,19 +39,40 @@ class TargetEvidence:
 
     def as_dict(self):
         # Identifiers are retained internally for exact readback, not spoken IDs.
-        return {key: value for key, value in vars(self).items()
-                if key != "entity_id" and value is not None}
+        return {**{key: value for key, value in vars(self).items()
+                   if key != "entity_id" and value is not None},
+                "reply_status": self.reply_status}
+
+    @property
+    def reply_status(self):
+        if self.command_result == "failed":
+            return "failed"
+        if self.verification in {"reported_requested_state", "reported_requested_setting"}:
+            return "success"
+        if self.verification == "not_observed":
+            return "not_reached"
+        return "unconfirmed"
 
     @property
     def speech(self):
         if self.command_result == "failed":
             return f"{self.name}: the command failed."
         if self.verification == "reported_requested_state":
-            return f"{self.name}: reports {self.reported_state}."
+            return {
+                "on": f"I've turned {self.name} on.",
+                "off": f"I've turned {self.name} off.",
+                "open": f"I've opened {self.name}.",
+                "closed": f"I've closed {self.name}.",
+                "locked": f"I've locked {self.name}.",
+                "unlocked": f"I've unlocked {self.name}.",
+                "paused": f"I've paused {self.name}.",
+                "playing": f"I've resumed {self.name}.",
+            }.get(self.reported_state, f"{self.name}: the requested state is confirmed.")
         if self.verification == "reported_requested_setting":
-            return (f"{self.name}: reports a target temperature of "
+            return (f"I've set {self.name}'s target temperature to "
                     f"{self.reported_temperature:g} {self.temperature_unit}.")
-        observed = f" It currently reports {self.reported_state}." if self.reported_state else ""
+        observed = (f" It is still {self.reported_state}."
+                    if self.verification == "not_observed" and self.reported_state else "")
         return (f"{self.name}: command accepted, but the requested result is not confirmed."
                 f"{observed}")
 
