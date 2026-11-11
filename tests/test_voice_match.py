@@ -83,22 +83,92 @@ def test_same_person_same_active_conversation_keeps_only_current_scope():
     ]
 
 
-def test_uncertain_turns_start_fresh_and_do_not_reuse_preferences():
+def test_uncertain_turns_keep_ordinary_dialogue_but_not_identity_or_preferences():
     key = Fernet.generate_key().decode()
     runtime = SpeakerRuntime()
     content = []
     scopes = []
-    for voice in ("alice", None, None):
+    for voice in ("alice", None, None, "alice"):
         wire = packet(key, voice=voice)
         content.append(user(wire))
-        _, instructions, boundary, scope = runtime.prepare(
+        request = runtime.prepare_request(
             key, wire, content, "one", "jarvis", now=1000
         )
-        assert len(scoped_contents(content, boundary)) == 1
+        instructions, boundary, scope = request.instructions, request.boundary, request.scope
+        assert len(scoped_contents(content, boundary)) == len(content)
         if voice is None:
             assert not instructions
+            assert request.voice is None and request.speaker_name is None
+            assert request.ha_user_id is None
         scopes.append(scope)
-    assert len(set(scopes)) == 3
+    assert len(set(scopes)) == 1
+
+
+@pytest.mark.parametrize("history_item", [
+    SimpleNamespace(role="tool_result", content="private calendar result"),
+    SimpleNamespace(role="assistant", tool_calls=[object()]),
+    SimpleNamespace(role="assistant", native=SimpleNamespace(items=[
+        {"type": "function_call_output", "output": "private result"},
+    ])),
+])
+def test_uncertain_turn_does_not_replay_tool_bearing_history(history_item):
+    key = Fernet.generate_key().decode()
+    runtime = SpeakerRuntime()
+    wire = packet(key)
+    content = [user(wire)]
+    first = runtime.prepare_request(key, wire, content, "chat", "jarvis", now=1000)
+    content.extend([history_item, SimpleNamespace(role="assistant", content="What next?")])
+    wire = packet(key, voice=None)
+    content.append(user(wire))
+    neutral = runtime.prepare_request(key, wire, content, "chat", "jarvis", now=1000)
+    assert neutral.scope != first.scope
+    assert scoped_contents(content, neutral.boundary) == [content[-1]]
+
+
+def test_neutral_followup_keeps_question_and_same_speaker_return_but_not_other_speaker():
+    key = Fernet.generate_key().decode()
+    runtime = SpeakerRuntime()
+    content = []
+    scopes = []
+    for voice, text in (("alice", "Help me set up a calendar"),
+                        (None, "I use Google"), (None, "How do I connect it?"),
+                        ("alice", "Please explain"), ("bob", "What were we discussing?")):
+        wire = encode(key, text, voice=voice, revision="a" * 32 if voice else None,
+                      now=1000)
+        content.append(user(wire))
+        request = runtime.prepare_request(key, wire, content, "chat", "jarvis", now=1000)
+        scopes.append(request.scope)
+        selected = [item.content for item in scoped_contents(content, request.boundary)]
+        if voice == "bob":
+            assert selected == [text]
+        elif len(scopes) > 1:
+            assert "Which calendar do you use?" in selected
+        content.append(SimpleNamespace(role="assistant", content="Which calendar do you use?"))
+    assert len(set(scopes[:4])) == 1
+    assert scopes[-1] != scopes[0]
+
+
+@pytest.mark.parametrize("change", ["agent", "conversation", "key", "expiry", "boundary"])
+def test_neutral_continuity_respects_scope_boundaries(change):
+    key = Fernet.generate_key().decode()
+    runtime = SpeakerRuntime()
+    wire = packet(key)
+    content = [user(wire)]
+    first = runtime.prepare_request(key, wire, content, "chat", "jarvis", now=1000)
+    content.append(SimpleNamespace(role="assistant", content="Which calendar?"))
+    if change == "boundary":
+        content = []
+    if change == "key":
+        key = Fernet.generate_key().decode()
+    now = 1301 if change == "expiry" else 1000
+    wire = packet(key, voice=None, now=now)
+    content.append(user(wire))
+    request = runtime.prepare_request(
+        key, wire, content, "other" if change == "conversation" else "chat",
+        "friday" if change == "agent" else "jarvis", now=now,
+    )
+    assert request.scope != first.scope
+    assert scoped_contents(content, request.boundary) == [content[-1]]
 
 
 def test_agents_conversations_preference_changes_and_idle_expiry_reset_scope():
@@ -248,7 +318,8 @@ def test_name_is_request_local_and_legacy_packets_still_work():
             assert result == "Base"
         else:
             assert name in result
-    assert len(set(scopes)) == len(scopes)
+    assert scopes[3] == scopes[2]  # Neutral continuity carries no current identity.
+    assert len(set(scopes)) == len(scopes) - 1
     plain = runtime.prepare_request(key, "hello", [user("hello")], "chat", "agent", now=1000)
     assert plain.speaker_name is None and not plain.verified
 

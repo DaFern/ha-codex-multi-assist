@@ -46,6 +46,7 @@ class FakeUserInput:
     conversation_id = "conversation-1"
     agent_id = "conversation.codex_assist"
     extra_system_prompt = None
+    context = SimpleNamespace(user_id=None)
 
     def as_llm_context(self, domain):
         return {"domain": domain}
@@ -403,3 +404,71 @@ async def test_voice_account_mismatch_strips_private_context_and_disables_tools(
     assert "Do not claim to have read or changed any Home Assistant state" in seen["instructions"]
     assert [item["content"] for item in seen["input_items"]] == ["hello"]
     assert seen["tools"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tool_history", [False, True])
+async def test_neutral_voice_followup_continues_only_ordinary_dialogue_without_tools(
+    conversation_module, monkeypatch, tool_history,
+):
+    from cryptography.fernet import Fernet
+
+    from custom_components.codex_assist.speaker_packet import encode
+    from custom_components.codex_assist.voice_match import runtime_for_entry
+
+    key = Fernet.generate_key().decode()
+    entry = FakeEntry()
+    entry.options = {"voice_match_pairing_key": key}
+    entity = conversation_module.CodexAssistConversationEntity(entry)
+    entity.hass = SimpleNamespace(
+        http_client=None, config_entries=FakeConfigEntries(), data={},
+        auth=SimpleNamespace(async_get_user=AsyncMock(return_value=SimpleNamespace(
+            id="caller", is_active=True, system_generated=False,
+        ))),
+    )
+    entity.entity_id = "conversation.codex_assist"
+    user_input = FakeUserInput()
+    user_input.context = SimpleNamespace(user_id="caller")
+    first = encode(key, "Help with a calendar", voice="alice", revision="a" * 32,
+                   ha_user_id="caller", instructions="Earlier private preference")
+    chat_log = FakeHandleMessageChatLog()
+    chat_log.content = [SimpleNamespace(role="system", content="Rendered personality"),
+                        SimpleNamespace(role="user", content=first)]
+    runtime_for_entry(entry).prepare_request(
+        key, first, chat_log.content, user_input.conversation_id, user_input.agent_id,
+    )
+    if tool_history:
+        chat_log.content.append(SimpleNamespace(role="tool_result", content="Private events"))
+    chat_log.content.append(SimpleNamespace(
+        role="assistant", content="Which calendar do you use?", agent_id=user_input.agent_id,
+    ))
+    user_input.text = encode(key, "I use Google")
+    chat_log.content.append(SimpleNamespace(role="user", content=user_input.text))
+
+    class Coordinator:
+        async def resolve(self, *args, **kwargs):
+            return CodexTokenSet("access-1", "refresh-1")
+
+    seen = {}
+
+    async def capture(**kwargs):
+        seen.update(kwargs)
+        return False
+
+    native = AsyncMock(return_value=None)
+    monkeypatch.setattr(conversation_module, "async_native_request", native)
+    monkeypatch.setattr(
+        conversation_module, "runtime_token_coordinator", lambda entry: Coordinator(),
+    )
+    monkeypatch.setattr(conversation_module, "_stream_codex_turn_into_chat_log", capture)
+    await entity._async_handle_message(user_input, chat_log)
+
+    native.assert_awaited_once()
+    assert native.call_args.kwargs["allow_execution"] is False
+    assert seen["tools"] == [] and seen["allow_tools"] is False
+    assert "Earlier private preference" not in seen["instructions"]
+    assert "History does not identify" in seen["instructions"]
+    expected = (["I use Google"] if tool_history else [
+        "Help with a calendar", "Which calendar do you use?", "I use Google",
+    ])
+    assert [item["content"] for item in seen["input_items"]] == expected

@@ -91,8 +91,14 @@ names section in the connector guide for privacy and compatibility limits.
 The bounded entry-scoped in-memory speaker runtime retains only current-scope
 boundaries, not a private-history database. Model input is filtered by boundary
 and agent, excluding later concurrent user turns; provider session/cache IDs vary
-with scope. Switching speaker/agent/revision, uncertainty, expiry or loss of state
-starts fresh. Missing or forged metadata never selects another person's prompt.
+with scope. Continuity uses the HA-owned ChatLog conversation ID, including the
+first request before the incoming ConversationInput has a conversation ID. Switching
+speaker/agent/revision, expiry or loss of state starts fresh.
+Neutral acoustic matches may retain the same active conversation's ordinary dialogue
+only when the scope contains no tool calls/results or provider tool/search replay.
+This does not inherit profile identity, preferences, account binding or tool authority;
+account mismatches and positively recognized different speakers still start fresh.
+Missing or forged metadata never selects another person's prompt.
 Pairing keys are redacted from integration diagnostics. Acoustic recognition remains
 fallible and does not establish who spoke; account binding prevents it from borrowing
 another HA caller's existing permissions.
@@ -171,9 +177,13 @@ only an existing authorised intent tool via ChatLog. Caller/exposure controls ar
 unchanged. Recognised device commands do not need model-generated success text.
 Both native and model-requested tools use paired current-round result checks;
 accepted/failed/partial/unconfirmed replies are integration-owned and do not claim
-physical completion. For recognized turn-on/turn-off/toggle actions, the personality
-reply receives only the fixed operation label and an allow-listed target domain;
-entity names, IDs, raw arguments and device state are excluded. Native query results can feed an otherwise normal
+physical completion. The prepared `action_verification.py` step retains exact native
+result target IDs internally and reads only currently exposed, caller-readable states
+within one bounded wait. The personality reply receives target names, per-target
+command results and projected reported-state/setting evidence, not raw arguments,
+arbitrary attributes, IDs or exceptions. Matching state is not proof of a transition
+or physical completion; unsupported postconditions stay unconfirmed. Generic replies
+omitting required target names fall back to device-specific facts. Native query results can feed an otherwise normal
 model answer, with tools disabled to avoid executing the recognised request twice.
 Unknown sentences and unavailable intent tools retain the model path; this is not
 a universal intent or semantic truth classifier. No arbitrary service bridge or

@@ -137,11 +137,17 @@ If something fails, start with [Troubleshooting](https://github.com/itsreverence
 Device commands recognised by native Assist are routed through existing authorised
 intent tools before asking the model. Shared result handling covers all tool/device
 types: replies acknowledge accepted, failed or partial requests without inventing
-physical completion. A tools-disabled reply step uses the selected agent's saved
+physical completion. The prepared device-readback update retains exact native-result
+targets and checks their reported state for up to two seconds total. It distinguishes
+accepted commands, matching reported states/settings and unconfirmed results; optimistic
+state is not confirmation. It never treats a script/scene acknowledgement as completed
+work. This update requires separate deployment/restart approval.
+A tools-disabled reply step uses the selected agent's saved
 instructions to write the entire acknowledgement in its personality, without a
 mandatory stock sentence or fixed prefix/suffix.
 This supports user-created agents as well as starter personalities. If generation
-fails or its result is invalid, the factual acknowledgement remains the fallback;
+fails, omits the required target names or its result is invalid, the device-specific
+factual acknowledgement remains the fallback;
 actions are never repeated just to improve wording. This adds a model call/latency.
 Unrecognised wording still uses the model path, so this is not a
 universal language or truth verifier. See [scope and limitations](docs/ACTION_CONTROL.md).
@@ -160,6 +166,11 @@ permissions. It requires explicit pairing and reviewed add-on/integration update
 personal instructions are optional, not a separate STT mode.
 See [setup, privacy boundaries and rollback](docs/VOICE_MATCH.md). It does not
 authenticate speakers or retrieve private conversations by recognised identity.
+
+Neutral voice matches can continue recent ordinary dialogue in the same active chat,
+without inheriting the earlier speaker's identity or restricted tools. Tool-bearing
+history and positively identified speaker changes still reset that continuity; see
+the [conversation scope and privacy limits](docs/VOICE_MATCH.md#transport-and-conversation-scope).
 
 Voice Match supplies the matched voice profile's display name to
 the agent, even without saved personal instructions. This lets it acknowledge a

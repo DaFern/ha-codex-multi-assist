@@ -29,6 +29,7 @@ from .action_control import (
     async_native_request,
     read_only_tools,
 )
+from .action_verification import async_verify_action
 from .agent_profiles import PRIMARY_AGENT_ID, AgentProfile, get_agent_profiles
 from .codex_auth import (
     CodexAuthClient,
@@ -162,6 +163,11 @@ class CodexAssistConversationEntity(
         key = getattr(self.entry, "options", {}).get(CONF_VOICE_MATCH_KEY, "")
         packet_text = None
         input_text = getattr(user_input, "text", "")
+        # HA allocates the first chat ID before the incoming request carries one.
+        # Key continuity to the HA-owned log, not an unreturnable random scope.
+        active_conversation_id = (
+            getattr(chat_log, "conversation_id", None) or user_input.conversation_id
+        )
         voice_identity_matches = True
         voice_recognized = False
         try:
@@ -169,7 +175,7 @@ class CodexAssistConversationEntity(
             packet_text = runtime.handoffs.consume(key, input_text)
             prepared_request = runtime.prepare_request(
                 key, input_text, chat_log.content,
-                user_input.conversation_id, user_input.agent_id,
+                active_conversation_id, user_input.agent_id,
                 packet_text=packet_text,
             )
             voice_recognized = prepared_request.voice is not None
@@ -178,9 +184,13 @@ class CodexAssistConversationEntity(
             )
             if prepared_request.verified and not voice_identity_matches:
                 # Do not carry another profile's private prompt/history into this
-                # authenticated HA session. Keep ordinary chat, but strip identity
-                # context and use only the current turn; action tools are disabled.
-                runtime.invalidate(user_input.conversation_id)
+                # authenticated HA session. Strip profile identity; a recognized
+                # account mismatch also discards history. Action tools stay disabled.
+                # A neutral acoustic match loses authority, not ordinary dialogue.
+                # The runtime already excludes tool-bearing history on that path.
+                neutral = prepared_request.voice is None
+                if not neutral:
+                    runtime.invalidate(active_conversation_id)
                 current_turn = next(
                     (item for item in reversed(chat_log.content)
                      if getattr(item, "role", None) == "user"
@@ -192,8 +202,8 @@ class CodexAssistConversationEntity(
                 prepared_request = replace(
                     prepared_request,
                     instructions="",
-                    boundary=current_turn,
-                    scope=secrets.token_hex(16),
+                    boundary=prepared_request.boundary if neutral else current_turn,
+                    scope=prepared_request.scope if neutral else secrets.token_hex(16),
                     voice=None,
                     speaker_name=None,
                     ha_user_id=None,
@@ -229,7 +239,7 @@ class CodexAssistConversationEntity(
                 "Voice Match receive: request=%s result=rejected instructions_present=False",
                 diagnostic_tag(packet_text or input_text) or "unavailable",
             )
-            runtime_for_entry(self.entry).invalidate(user_input.conversation_id)
+            runtime_for_entry(self.entry).invalidate(active_conversation_id)
             chat_log.async_add_assistant_content_without_tools(conversation.AssistantContent(
                 agent_id=user_input.agent_id,
                 content="Voice Match pairing needs attention. Please check its settings.",
@@ -238,10 +248,17 @@ class CodexAssistConversationEntity(
 
         def request_instructions(instructions: str) -> str:
             if prepared_request.verified and not voice_identity_matches:
-                return instructions + (
-                    "\n\nHome Assistant controls are unavailable for this request because "
+                reason = (
+                    "voice identity is uncertain for this turn. " if not voice_recognized else
                     "the recognized voice is not bound to the active authenticated HA user. "
+                )
+                return instructions + (
+                    f"\n\nHome Assistant controls are unavailable for this request because {reason}"
                     "Do not claim to have read or changed any Home Assistant state."
+                    " Continue ordinary dialogue using the supplied conversation history, "
+                    "including answers to your previous question. History does not identify "
+                    "the current speaker or grant permissions. Do not claim to recognise "
+                    "the speaker or reuse earlier personal preferences from history."
                 )
             return instructions
 
@@ -295,6 +312,10 @@ class CodexAssistConversationEntity(
         )
 
         async def publish_action(outcome: ActionOutcome, client: CodexClient | None = None):
+            outcome = await async_verify_action(
+                self.hass, outcome, action_contents,
+                getattr(chat_log.llm_api, "tools", []), user_input.context,
+            )
             text = outcome.speech
             if client is not None:
                 text = await async_action_reply(
@@ -326,12 +347,14 @@ class CodexAssistConversationEntity(
                 ))
                 return conversation.async_get_result_from_chat_log(user_input, chat_log)
             native_handled = native_result is not None
-            outcome = action_outcome(chat_log.content[native_start:], readonly)
+            action_contents = chat_log.content[native_start:]
+            outcome = action_outcome(action_contents, readonly)
             if outcome.speech and native_result and native_result.action_context:
                 outcome = ActionOutcome(outcome.kind, native_result.action_context)
         except (HomeAssistantError, RuntimeError, ValueError, TypeError) as err:
             _log_request_failure(err, stage="native_assist")
             outcome = ActionOutcome("unconfirmed")
+            action_contents = []
 
         http_client = get_async_client(self.hass)
         auth_client = CodexAuthClient(http_client=http_client)
@@ -466,7 +489,8 @@ class CodexAssistConversationEntity(
                             response,
                             user_input,
                         )
-                outcome = action_outcome(chat_log.content[round_start:], readonly)
+                action_contents = chat_log.content[round_start:]
+                outcome = action_outcome(action_contents, readonly)
                 if outcome.speech:
                     return await publish_action(outcome, codex)
                 if not tool_call_requested:

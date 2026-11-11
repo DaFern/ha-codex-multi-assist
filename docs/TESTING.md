@@ -1,5 +1,45 @@
 # Testing
 
+## Prepared device-specific action readback
+
+`tests/test_action_verification.py` covers exact native call/result pairing, class-
+checked tool origin, exposure/read-permission revalidation, delayed feedback,
+one shared deadline, optimistic/unavailable/mismatching states, bounded targets,
+partial failures, unsupported postconditions, setpoint-versus-room-temperature,
+unit mismatch, duplicate/missing results, cancellation and named factual fallbacks.
+Native ChatLog contracts cover immediate/delayed feedback through both native-first
+and model-requested tools, original personality delivery, exact target evidence and
+one execution. The nine-domain/five-personality matrix deliberately leaves states
+unchanged and now expects device-specific unconfirmed facts, not invented completion.
+These are synthetic devices/model responses, not live hardware/model acceptance.
+
+The candidate check passed 993 fast tests plus 32 subtests, 599 current-HA
+contracts (1 skipped) and 370 minimum-HA contracts (197 skipped). The same three
+backend pipeline failures recorded below remained on current HA; no new native
+failures remained after updating obsolete generic-response fixtures. The final fast
+suite includes rejection of generic, invalid and failed personality generation.
+Changed Python files and the 61-file distribution projection passed their checks;
+the pre-existing full-repository Ruff failure below remained untouched.
+Installation, restart, commit/push and GitHub implementation updates remain pending.
+
+## Prepared neutral-voice dialogue continuity
+
+The development candidate retains tool-free dialogue across neutral voice matches
+without carrying profile identity/preferences or HA/MCP tool authority. Fast tests
+cover repeated uncertainty, the same speaker returning, a different speaker,
+tool-bearing history, agent/key/conversation changes, expiry and lost boundaries.
+Native ChatLog tests check the question/answer sequence delivered to the model,
+first-request ChatLog ID continuity and empty tool catalogs on repeated neutral turns.
+These use stubbed model responses, not live
+speech or real-model compliance. Deployment and restart require separate approval.
+
+The candidate check passed 967 fast tests plus 32 subtests, 595 current-HA
+contracts (1 skipped), and 366 minimum-HA contracts (197 skipped). Three current-HA
+backend pipeline tests failed; all three also failed on an isolated clean `b141d66`
+baseline. Full-repository Ruff also found an existing overlong line in
+`tests_ha/test_speaker_automation.py`; changed Python files passed Ruff. The
+distribution projection passed. These baseline failures were left unchanged.
+
 ## MCP read-only preview
 
 `tests/test_mcp_client.py` exercises synthetic HTTP protocol/security boundaries.

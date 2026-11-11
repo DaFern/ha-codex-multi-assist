@@ -50,6 +50,30 @@ def replace_text(value, text):
     return result
 
 
+def _ordinary_dialogue(contents, boundary):
+    """Only bridge a confidence drop across dialogue without tool evidence.
+
+    Never replay tool results (including private provider tool/search replay) to
+    an uncertain speaker. Missing boundaries fail closed. This is continuity in
+    an already active chat, not lookup by voice or a grant of permissions.
+    """
+    active = False
+    for item in contents:
+        if item is boundary:
+            active = True
+        if not active:
+            continue
+        if (getattr(item, "role", None) == "tool_result"
+                or getattr(item, "tool_calls", None)):
+            return False
+        native = getattr(item, "native", None)
+        for output in getattr(native, "items", ()):
+            if (not isinstance(output, dict)
+                    or output.get("type") not in {"message", "reasoning"}):
+                return False
+    return active
+
+
 class SpeakerRuntime:
     def __init__(self):
         self.seen = OrderedDict()
@@ -133,7 +157,7 @@ class SpeakerRuntime:
             )
         if not key and not self.managed and not text.startswith(WIRE_PREFIX):
             return PreparedRequest(clean, "", None, None)
-        # The current user turn is the boundary after a switch/uncertain result.
+        # A speaker switch starts fresh; confidence alone is not conversation identity.
         positions = [
             index for index, item in enumerate(contents)
             if getattr(item, "role", None) == "user"
@@ -147,11 +171,24 @@ class SpeakerRuntime:
             contents[current] = replace_text(contents[current], clean)
         scope_key = conversation_id or secrets.token_hex(16)
         previous = self.scopes.get(scope_key)
-        if (uncertain or previous is None or previous["identity"] != identity
-                or previous["expires"] < now
-                or not any(item is previous["boundary"] for item in contents)):
+        channel = (hashlib.sha256(key.encode()).hexdigest(), agent_id)
+        active = (previous is not None and previous["expires"] >= now
+                  and any(item is previous["boundary"] for item in contents))
+        same_identity = active and previous["identity"] == identity and not uncertain
+        ordinary_continuation = (
+            active and verified and previous["voice_packet"]
+            and previous["channel"] == channel
+            # Keep the last known identity as a continuity anchor, never as the
+            # current request's voice/account/name/preferences or tool authority.
+            and (uncertain or previous["identity"][1] is None)
+            and _ordinary_dialogue(contents, previous["boundary"])
+        )
+        if not same_identity and not ordinary_continuation:
             previous = {"identity": identity, "boundary": contents[current],
-                        "scope": secrets.token_hex(16)}
+                        "scope": secrets.token_hex(16), "channel": channel,
+                        "voice_packet": verified}
+        elif not uncertain:
+            previous["identity"] = identity
         previous["expires"] = now + 300
         self.scopes[scope_key] = previous
         self.scopes.move_to_end(scope_key)

@@ -235,7 +235,8 @@ async def test_clarification_then_native_action_preserves_guidance_through_retry
                 "name": "Test alpha", "domain": ["light"],
             }), COMPLETED])
         model_round(planned, text_events(json.dumps({
-            "outcome": "accepted", "reply": "Of course. Home Assistant accepted that request.",
+            "outcome": "accepted",
+            "reply": "Test alpha: request accepted; its state is unconfirmed.",
         })) + [COMPLETED])
         followup = await conversation.async_converse(
             hass, followup_text, result.conversation_id, Context(),
@@ -244,7 +245,7 @@ async def test_clarification_then_native_action_preserves_guidance_through_retry
     assert followup.conversation_id == result.conversation_id
     assert followup.continue_conversation is False
     assert followup.response.speech["plain"]["speech"] == (
-        "Of course. Home Assistant accepted that request."
+        "Test alpha: request accepted; its state is unconfirmed."
     )
     assert len(executed) == 1, requests[-1][1]["input"][-1]
     assert executed[0]["entity_id"] == ["light.test_alpha"]
@@ -357,10 +358,15 @@ async def test_native_control_uses_selected_personality_without_reexecuting_acti
         assert kwargs["tools"] == []
         payload = json.loads(kwargs["input_items"][0]["content"])
         assert payload["outcome"] == ("failed" if fails else "accepted")
+        if not fails:
+            assert payload["targets"][0]["name"] == "Test device"
+            assert payload["targets"][0]["verification"] not in {
+                "reported_requested_state", "reported_requested_setting",
+            }  # This fixture deliberately acknowledges without updating state.
         yield CodexTextDelta(json.dumps({
             "outcome": payload["outcome"], "reply": (
-                "Alas, the request could not be carried out." if fails
-                else "Consider your request duly received."
+                "Test device: alas, the request could not be carried out." if fails
+                else "Test device: request received, but its resulting state is unconfirmed."
             ),
         }))
 
@@ -369,8 +375,8 @@ async def test_native_control_uses_selected_personality_without_reexecuting_acti
         hass, sentence, None, Context(), language="en", agent_id=agent_id,
     )
     assert len(executed) == 1, result.response.as_dict()
-    expected = ("Alas, the request could not be carried out." if fails
-                else "Consider your request duly received.")
+    expected = ("Test device: alas, the request could not be carried out." if fails
+                else "Test device: request received, but its resulting state is unconfirmed.")
     assert result.response.speech["plain"]["speech"] == expected
     assert len(requests) == 1
     selected = conversation.async_get_agent(hass, agent_id)
@@ -413,7 +419,85 @@ async def test_group_alias_without_area_executes_instead_of_text_only_false_succ
     assert callers == [hass_admin_user.id]
     assert executed[0]["entity_id"] == [entry.entity_id]
     assert hass.states.get(entry.entity_id).state == "off"
-    assert result.response.speech["plain"]["speech"] == "Home Assistant accepted that request."
+    assert result.response.speech["plain"]["speech"] == "Study: reports off."
+
+
+@pytest.mark.parametrize("model_path", [False, True])
+@pytest.mark.parametrize("delayed", [False, True])
+async def test_device_specific_reply_uses_exact_native_result_and_state_feedback(
+    hass, clarification_entry, monkeypatch, model_path, delayed,
+):
+    import asyncio
+
+    from custom_components.codex_assist.codex_client import (
+        CodexClient,
+        CodexTextDelta,
+        CodexToolCall,
+        CodexToolCallDelta,
+    )
+
+    executed = []
+    updates = []
+    eid = "light.readback_test"
+    hass.states.async_set(eid, "on", {"friendly_name": "Test lamp"})
+    async_expose_entity(hass, "conversation", eid, True)
+
+    async def update():
+        if delayed:
+            await asyncio.sleep(0.02)
+        hass.states.async_set(eid, "off", {"friendly_name": "Test lamp"})
+
+    async def turn_off(call):
+        executed.append(call.data)
+        if delayed:
+            updates.append(asyncio.create_task(update()))
+        else:
+            await update()
+
+    hass.services.async_register("light", "turn_off", turn_off)
+    requests = []
+
+    async def model(self, **kwargs):
+        requests.append(kwargs)
+        if kwargs["tools"]:
+            tool = next(t["name"] for t in kwargs["tools"] if t["name"].endswith("HassTurnOff"))
+            yield CodexToolCallDelta(CodexToolCall(
+                id="one", name=tool, arguments={"name": "Test lamp", "domain": ["light"]},
+            ))
+            return
+        assert len(executed) == 1
+        payload = json.loads(kwargs["input_items"][0]["content"])
+        target, = payload["targets"]
+        assert target["name"] == "Test lamp" and target["domain"] == "light"
+        assert target["command_result"] == "accepted"
+        assert target["verification"] == "reported_requested_state"
+        assert target["reported_state"] == target["expected_state"] == "off"
+        assert "entity_id" not in target
+        assert kwargs["instructions"].startswith("You are J.A.R.V.I.S.")
+        yield CodexTextDelta(json.dumps({
+            "outcome": "accepted", "reply": "Test lamp reports off, sir. Sensibly economical.",
+        }))
+
+    monkeypatch.setattr(CodexClient, "stream_turn", model)
+    if model_path:
+        agent = conversation.async_get_agent(hass, conversation.HOME_ASSISTANT_AGENT)
+
+        async def unrecognised(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(agent, "async_recognize_intent", unrecognised)
+    try:
+        result = await conversation.async_converse(
+            hass, "Turn off Test lamp", None, Context(), agent_id="conversation.jarvis",
+        )
+    finally:
+        await asyncio.gather(*updates)
+    assert result.response.speech["plain"]["speech"] == (
+        "Test lamp reports off, sir. Sensibly economical."
+    )
+    assert len(executed) == 1
+    assert requests[-1]["tools"] == []
+    assert len(requests) == (2 if model_path else 1)
 
 
 async def test_unexposed_target_cannot_be_controlled_by_native_or_model_path(

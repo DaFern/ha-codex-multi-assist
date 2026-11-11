@@ -6,6 +6,11 @@ entity list. The shared action handler and personality replies are installed on 
 test system. Startup recovery is verified; real-model/device acceptance of the new
 full-personality wording remains pending. This is not a published release.
 
+**Prepared, not deployed:** device-specific readback adds the result/verification
+flow below. It requires separately approved installation and Core restart. Existing
+deployment statements elsewhere in this guide describe the older acknowledgement
+baseline, not this candidate's live acceptance.
+
 ## Native-first control
 
 After verified speaker automations and HA prompt/API preparation, the integration
@@ -51,22 +56,44 @@ protocol; legacy generic tools need an explicit success flag. Read/query results
 are distinguished using native response types and tool read-only capabilities,
 with a class-checked adapter for the older HA live-context tool.
 
-The replies distinguish accepted, failed, partial and unconfirmed requests. They
-do **not** turn an acknowledgement into a physical postcondition: a cover may be
-moving, a thermostat may be adjusting, and a scene or script may still be running.
-The generic acknowledgement is “Home Assistant accepted that request”, never a
-fabricated “the lights are off” or “the door is locked”. Device state/readback can
-be requested separately. Partial/failed/unconfirmed actions are never replayed to
-obtain a nicer reply. Action processing stops after the result. A separate speech-
-only step can add personality, but cannot execute a completed action again.
+The replies distinguish accepted, failed, partial and unconfirmed requests. The
+prepared readback step retains exact entity IDs only from paired native `action_done`
+success/failed results. It never guesses targets from model prose or expands an area
+to additional devices. Real native `IntentTool` class checks prevent arbitrary MCP
+tools from supplying fake native action evidence. Generic results without resolved
+IDs stay unverified; a bounded requested name/alias can label a native request but
+is explicitly not a resolved device identity.
+
+Before reading each result target, the verifier checks current Assist exposure and
+the original caller's read permissions. It rechecks after waits and discards details
+if the account disappears/becomes inactive or exposure/read permission is revoked.
+Names and projected state values are bounded data, not instructions. Readback is
+limited to 16 targets and one two-second total deadline, not two seconds per device.
+Extra/withheld target details are identified as unavailable. No service refresh,
+action retry, corrective action, arbitrary service bridge or broad state dump occurs.
+
+Supported postconditions include binary on/off states, lock/unlock, cover open/close
+(with position where provided), media pause/resume/off, climate off and a numeric
+target-temperature setting with matching explicit units. Expected values are frozen
+on the first read. Unknown/unavailable, optimistic `assumed_state`, stale mismatches
+and timeouts are not successful verification. Toggle has no verifiable requested
+postcondition without a pre-action snapshot. Scripts, scenes and unsupported
+operations can be named and acknowledged but their completion is not inferred.
+
+A matching state permits “Test lamp reports off”, **not** proof the device changed
+from another state, received a hardware acknowledgement or physically responded.
+A thermostat reporting its requested setpoint is not proof the room reached that
+temperature. Integration state can itself be optimistic even without advertising
+`assumed_state`; no physical-feedback guarantee is made. Partial/failed/unconfirmed
+actions are never replayed to obtain a nicer reply.
 
 ## Personality-aware acknowledgements
 
-The tools-disabled step receives a fixed outcome category and factual sentence,
-plus an optional sanitized summary containing only the recognized operation and an
-allow-listed target domain (for example, `turn_off` and `light`). It receives no
-entity name/ID, raw tool arguments, tool response, exception string or user
-command/history. The summary is context, not evidence of device state. Its system
+The tools-disabled step receives the outcome category, a factual fallback, optional
+recognized operation/domain/requested label, and bounded per-target names, command
+results and verification evidence. Resolved IDs stay internal to readback; raw tool
+arguments/results, arbitrary attributes, exception strings and user command/history
+are not forwarded. Target labels are untrusted data, never instructions. Its system
 instructions use the current selected agent's rendered prompt and optional verified
 Voice Match name/preferences, never a hard-coded character or another agent's prompt.
 The model writes the entire reply in that personality and the requested language;
@@ -79,13 +106,17 @@ The structured result must carry the same outcome category, only the allowed fie
 a bounded reply and no other category's factual sentence. Unexpected tool calls,
 incomplete/invalid responses, excessive size, errors and a 15-second generation
 deadline fall back to the existing factual sentence. Responses are buffered until
-validated, and the stream is closed on every exit. Cancellation propagates. There
+validated. A generic reply omitting required target names also falls back to the
+device-specific facts: all names for up to four targets; larger groups must retain
+at least the first target and every failed target. These name checks do not prove
+the semantic accuracy of model prose. The stream is closed on every exit.
+Cancellation propagates. There
 is no speech-generation retry or extra tool execution. Authentication failure after
 a native action preserves its known result rather than reporting that action failed.
 Provider/authentication outages themselves still use local generic error guidance.
 
 This adds one model request and latency for action acknowledgements. The generation
-timeout excludes the existing credential resolution step. No model-native state
+timeout excludes the existing credential resolution and bounded readback steps. No model-native state
 from this isolated reply is retained; the final delivered speech joins normal HA
 history. Outcome category/schema checks are structural, not semantic proof that
 free-form prose is truthful. Live acceptance must check the selected model follows

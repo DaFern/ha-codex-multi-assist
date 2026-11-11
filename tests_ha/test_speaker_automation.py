@@ -85,7 +85,10 @@ async def test_real_automation_choose_speaker_and_return_response(
         if name:
             assert seen[-1][0] == name
             assert seen[-1][1].parent_id == context.id
-            assert seen[-1][1].user_id == context.user_id
+            # HA creates the automation action context as a child without
+            # copying the original caller's user_id; do not impersonate it.
+            assert seen[-1][1].user_id is None
+            assert context.user_id == user_id
     assert len(seen) == 2
     assert len(model_calls) == 1
     # Same identity, unrelated phrase; no per-automation profile IDs.

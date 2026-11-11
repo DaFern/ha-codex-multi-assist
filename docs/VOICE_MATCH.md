@@ -45,7 +45,7 @@ provider. Never store secrets or sensitive facts. Packet v2 also carries the enr
 profile's assigned HA user ID encrypted; Codex accepts account-bound voice context only
 when that ID matches the active HA caller. HA `Context` is never replaced or impersonated.
 An unassigned/neutral profile, legacy v1 packet, inactive/system account, or caller
-mismatch fails closed: no profile name/preferences/history, speaker automation, native
+mismatch fails closed: no profile name/preferences, speaker automation, native
 HA controls, or MCP tools are used. Ordinary model chat may continue without HA tools.
 For a match, the caller retains only their normal HA permissions; MCP remains
 administrator-only and read-only. Voice is not a login or sensitive-action approval.
@@ -61,9 +61,17 @@ exact pipeline task; [handoff design and limitations](CLEAN_SPEAKER_STT_PROTOTYP
 A stock personalised-Wyoming path still displays the encrypted header in chat.
 
 Active model scope is bounded by speaker/revision/name and agent within the supplied
-HA conversation. Speaker/agent changes, preferences/ownership changes, uncertainty,
-idle expiry or restart reset it. Returning speakers do not recover an old branch;
-no history is fetched by recognised identity. Later concurrent turns are excluded.
+HA conversation. Speaker/agent changes, preferences/ownership changes, idle expiry
+or restart reset it. A neutral acoustic match can continue recent ordinary dialogue
+in that same active voice conversation, including an answer to the assistant's last
+question. It receives no previous profile name/preferences/account binding or HA/MCP
+tool authority. Any native tool call/result or private provider tool/search replay
+in the active scope prevents that continuity: the neutral turn starts fresh instead.
+A recognized account mismatch still clears the scope. A positively identified
+different speaker starts fresh; returning speakers do not recover an old branch.
+No history is fetched by recognised identity. Later concurrent turns are excluded.
+Continuity does not establish speaker identity or confidentiality: ordinary spoken
+dialogue in an active shared conversation may be heard/continued by another person.
 HA's normal log retention is not erased or converted into authenticated private logs.
 
 Unpaired ordinary requests retain the ordinary path. Enabling pairing starts a new

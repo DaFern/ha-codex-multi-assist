@@ -31,7 +31,7 @@ from custom_components.codex_assist.voice_match_stt import VoiceMatchSttAdapter
 
 
 @pytest.fixture
-async def prototype(hass, monkeypatch):
+async def prototype(hass, hass_admin_user, monkeypatch):
     class UnusedProcessor:
         def __init__(self, *args, **kwargs):
             raise AssertionError("Audio enhancement is outside this transport contract")
@@ -102,7 +102,8 @@ async def prototype(hass, monkeypatch):
             yield bytes([marker, 0]) * 512
 
         await assist_pipeline.async_pipeline_from_audio_stream(
-            hass, context=context or Context(), event_callback=event_callback,
+            hass, context=context or Context(user_id=hass_admin_user.id),
+            event_callback=event_callback,
             stt_metadata=stt.SpeechMetadata(
                 language="en", format=stt.AudioFormats.WAV, codec=stt.AudioCodecs.PCM,
                 bit_rate=stt.AudioBitRates.BITRATE_16,
@@ -116,8 +117,14 @@ async def prototype(hass, monkeypatch):
         )
         return events
 
-    return SimpleNamespace(key=key, entry=entry, adapter=adapter, source=source,
-                           responses=responses, calls=calls, run=run, pipeline=pipeline)
+    def make_packet(voice="alice", text="hello", instructions="Private style preference",
+                    speaker_name=None):
+        return packet(key, voice, text, instructions, speaker_name,
+                      ha_user_id=hass_admin_user.id if voice else None)
+
+    return SimpleNamespace(key=key, user_id=hass_admin_user.id, packet=make_packet,
+                           entry=entry, adapter=adapter, source=source, responses=responses,
+                           calls=calls, run=run, pipeline=pipeline)
 
 
 @pytest.fixture
@@ -152,9 +159,10 @@ async def managed(prototype, hass, monkeypatch):
 
 
 def packet(key, voice="alice", text="hello", instructions="Private style preference",
-           speaker_name=None):
+           speaker_name=None, *, ha_user_id=None):
     return encode(key, text, voice=voice, revision="a" * 32 if voice else None,
-                  instructions=instructions if voice else "", speaker_name=speaker_name)
+                  instructions=instructions if voice else "", speaker_name=speaker_name,
+                  ha_user_id=ha_user_id)
 
 
 def event_data(events, name):
@@ -169,7 +177,7 @@ async def test_pipeline_frontend_text_is_clean_and_preferences_still_arrive(
 
     caplog.set_level(logging.INFO, logger="custom_components.codex_assist")
     p = prototype
-    p.responses[1] = packet(p.key, instructions=instructions, speaker_name="Alice")
+    p.responses[1] = p.packet(instructions=instructions, speaker_name="Alice")
     events = await p.run(1)
     assert not [event for event in events if event.type == "error"]
     assert event_data(events, "stt-end")["stt_output"]["text"] == "hello"
@@ -189,7 +197,8 @@ async def test_pipeline_frontend_text_is_clean_and_preferences_still_arrive(
     tag = diagnostic_tag(p.responses[1])
     messages = [record.getMessage() for record in caplog.records
                 if record.getMessage().startswith("Voice Match")]
-    assert any(f"receive: request={tag} result=recognised instructions_present={bool(instructions)}"
+    assert any(f"receive: request={tag} result=recognised binding=matched "
+               f"instructions_present={bool(instructions)}"
                in message for message in messages)
     assert any((f"prompt: request={tag} stage=prompt_prepared "
                 f"instructions_applied={bool(instructions)}")
@@ -201,7 +210,7 @@ async def test_pipeline_frontend_text_is_clean_and_preferences_still_arrive(
 async def test_identical_parallel_phrases_select_the_right_native_condition(hass, prototype):
     p = prototype
     for marker, name in enumerate(("alice", "bob"), 1):
-        p.responses[marker] = packet(p.key, name, text="good morning", instructions=name)
+        p.responses[marker] = p.packet(name, text="good morning", instructions=name)
     arrived = asyncio.Event()
     count = 0
 
@@ -237,7 +246,7 @@ async def test_identical_parallel_phrases_select_the_right_native_condition(hass
 
 async def test_missing_invalid_replayed_and_uncertain_metadata_do_not_borrow_person(prototype):
     p = prototype
-    p.responses[1] = packet(p.key)
+    p.responses[1] = p.packet()
     await p.run(1)
     before = len(p.calls)
     # A repeated encrypted packet cannot execute a second model turn.
@@ -250,7 +259,7 @@ async def test_missing_invalid_replayed_and_uncertain_metadata_do_not_borrow_per
         events = await p.run(2)
         assert [event for event in events if event.type == "error"]
         assert len(p.calls) == before
-    p.responses[3] = packet(p.key, None)
+    p.responses[3] = p.packet(None)
     await p.run(3)
     assert "Private style preference" not in p.calls[-1]["instructions"]
     assert not runtime_for_entry(p.entry).handoffs.pending
@@ -258,7 +267,7 @@ async def test_missing_invalid_replayed_and_uncertain_metadata_do_not_borrow_per
 
 async def test_cancel_between_stt_and_conversation_cleans_retained_packet(prototype):
     p = prototype
-    p.responses[1] = packet(p.key)
+    p.responses[1] = p.packet()
     retained = []
 
     def cancel_after_stt(event):
@@ -277,7 +286,7 @@ async def test_cancel_between_stt_and_conversation_cleans_retained_packet(protot
 
 async def test_stt_only_request_owner_cleanup_and_adapter_audio_properties(prototype):
     p = prototype
-    p.responses[1] = packet(p.key)
+    p.responses[1] = p.packet()
     events = await asyncio.create_task(p.run(1, end_at_stt=True))
     await asyncio.sleep(0)
     assert event_data(events, "stt-end")["stt_output"]["text"] == "hello"
@@ -292,7 +301,7 @@ async def test_native_sentence_override_cannot_claim_speaker_and_cleans_unused_h
     hass, prototype,
 ):
     p = prototype
-    p.responses[1] = packet(p.key, text="good morning")
+    p.responses[1] = p.packet(text="good morning")
     assert await async_setup_component(hass, "automation", {"automation": [{
         "id": "native_override", "alias": "Native override",
         "triggers": [{"trigger": "conversation", "command": "good morning"}],
@@ -325,7 +334,7 @@ async def test_adapter_rejects_disabled_or_changed_pairing_before_issuing_handof
     async def source(metadata, stream):
         calls.append(True)
         entry.options = {"voice_match_pairing_key": Fernet.generate_key().decode()}
-        return stt.SpeechResult(packet(p.key), stt.SpeechResultState.SUCCESS)
+        return stt.SpeechResult(p.packet(), stt.SpeechResultState.SUCCESS)
 
     adapter = VoiceMatchSttAdapter(entry, SimpleNamespace(async_process_audio_stream=source))
     result = await adapter.async_process_audio_stream(None, None)
@@ -347,7 +356,7 @@ async def test_clean_entity_is_default_off(prototype, hass):
 
 async def test_managed_native_pipeline_is_clean_and_name_reaches_model(managed):
     p = managed
-    p.responses[1] = packet(p.key, instructions="", speaker_name="Alice")
+    p.responses[1] = p.packet(instructions="", speaker_name="Alice")
     events = await asyncio.create_task(p.run(1))
     await asyncio.sleep(0)
     assert not [event for event in events if event.type == "error"]
@@ -367,7 +376,7 @@ async def test_managed_unload_cancels_request_and_clears_private_state(
     reached = asyncio.Event()
     blocker = asyncio.Event()
     retained = []
-    p.responses[1] = packet(p.key)
+    p.responses[1] = p.packet()
 
     if phase == "recording":
         async def source(metadata, stream):
@@ -408,7 +417,7 @@ async def test_managed_unload_cancels_request_and_clears_private_state(
 @pytest.mark.parametrize("change", ["disable", "key", "source"])
 async def test_managed_midrecord_settings_change_discards_result(managed, hass, change):
     p = managed
-    wire = packet(p.key)
+    wire = p.packet()
 
     async def source(metadata, stream):
         options = dict(p.entry.options)
@@ -445,7 +454,7 @@ async def test_managed_source_failures_never_publish_header_or_retry(managed, mo
         if outcome == "exception":
             raise RuntimeError("private peer failure")
         return stt.SpeechResult(
-            "hello" if outcome == "plain" else packet(p.key),
+            "hello" if outcome == "plain" else p.packet(),
             (stt.SpeechResultState.ERROR if outcome == "private_error"
              else stt.SpeechResultState.SUCCESS),
         )
@@ -465,7 +474,7 @@ async def test_managed_source_failures_never_publish_header_or_retry(managed, mo
 
 async def test_disable_reload_removes_entity_and_keeps_replay_cache(managed, hass):
     p = managed
-    p.responses[1] = packet(p.key)
+    p.responses[1] = p.packet()
     await asyncio.create_task(p.run(1))
     runtime = runtime_for_entry(p.entry)
     seen = dict(runtime.seen)
@@ -509,15 +518,15 @@ async def test_missing_source_only_disables_clean_entity_then_recovers(managed, 
     await hass.async_block_till_done()
     assert adapter.available
     assert hass.states.get(adapter.entity_id).state != "unavailable"
-    p.responses[1] = packet(p.key)
+    p.responses[1] = p.packet()
     events = await asyncio.create_task(p.run(1))
     assert not [event for event in events if event.type == "error"]
 
 
 async def test_managed_simultaneous_identical_words_keep_their_own_names(managed):
     p = managed
-    p.responses[1] = packet(p.key, speaker_name="Alice")
-    p.responses[2] = packet(p.key, voice="bob", speaker_name="Bob")
+    p.responses[1] = p.packet(speaker_name="Alice")
+    p.responses[2] = p.packet(voice="bob", speaker_name="Bob")
     events = await asyncio.gather(p.run(1), p.run(2))
     assert all(event_data(items, "stt-end")["stt_output"]["text"] == "hello" for items in events)
     prompts = [call["instructions"] for call in p.calls]
