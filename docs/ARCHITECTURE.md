@@ -42,10 +42,13 @@ See [MCP.md](MCP.md) for configuration, trust and compatibility limits. The opti
 flow stores independently enabled connections and definition-bound read approvals.
 `mcp_client.py` provides bounded Streamable HTTP sessions without redirects, DNS,
 proxies, retries or subprocesses. `mcp_tools.py` prepares request-local native LLM
-tools only for current HA administrators. The synchronous native LLM provider
+tools only for currently eligible HA administrators. The synchronous native LLM provider
 consumes that exact-context preparation, while every invocation independently
 rechecks identity, current options and remote tool definitions. Remote annotations
-alone are never authority. Voice Match packets are excluded, not mapped to accounts.
+alone are never authority. A recognized Voice Match v2 packet is eligible only when
+its encrypted administrator-assigned profile owner equals the active HA caller;
+ordinary admin policy is still checked and HA context is never impersonated. Legacy,
+neutral/unassigned and mismatched packets are denied tools.
 `mcp_history.py` binds native conversation ownership to the HA account/admin class,
 starting a fresh supported native chat session after changes or lost ownership.
 Native Assist controls and AI Task remain separate. This is issue #8's restricted
@@ -70,15 +73,19 @@ first milestone, not its full identity, per-user policy or write-approval design
 See [VOICE_MATCH.md](VOICE_MATCH.md). An opt-in separate STT endpoint emits a
 Fernet-encrypted context header bound to the utterance. The conversation owner
 verifies expiry, nonce replay and exact current-turn association synchronously,
-strips the header, and retains the original HA caller/permissions. Preferences
-are appended literally after native base-prompt rendering on every model/tool
-round; they are never executed as Jinja or applied to AI Task.
+strips the header, and retains the original HA caller/permissions. For recognized
+v2 requests it also requires the encrypted profile owner to match that active caller.
+An absent, inactive, system, or mismatched account loses profile-only context and all
+voice-triggered native/MCP actions; ordinary chat can continue without HA tools.
+For an account match, preferences are appended literally after native base-prompt
+rendering on every model/tool round; they are never executed as Jinja or applied to AI Task.
 
 The sender's optional encrypted `speaker_name` supplies the matched
 profile label as quoted per-request recognition context, even with empty style
-preferences. It conveys neither an authenticated HA account nor permissions.
-Legacy packets remain unnamed; neutral packets reject a supplied name. Name
-changes also reset scope, and diagnostics still omit names. See the recognised
+preferences. V2 carries the assigned HA user ID encrypted; it is a match check, not
+authentication or caller impersonation. Legacy packets remain unbound; neutral
+packets reject a supplied name. Name changes also reset scope, and diagnostics still
+omit names. See the recognised
 names section in the connector guide for privacy and compatibility limits.
 
 The bounded entry-scoped in-memory speaker runtime retains only current-scope
@@ -86,8 +93,9 @@ boundaries, not a private-history database. Model input is filtered by boundary
 and agent, excluding later concurrent user turns; provider session/cache IDs vary
 with scope. Switching speaker/agent/revision, uncertainty, expiry or loss of state
 starts fresh. Missing or forged metadata never selects another person's prompt.
-Pairing keys are redacted from integration diagnostics. This is response
-personalisation, not authentication, confidentiality or authorisation by voice.
+Pairing keys are redacted from integration diagnostics. Acoustic recognition remains
+fallible and does not establish who spoke; account binding prevents it from borrowing
+another HA caller's existing permissions.
 
 Request diagnostics correlate the sender, receiver and prompt composition by
 a short hash of the random encrypted header. They report fixed outcomes/reasons,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -311,12 +312,16 @@ async def test_paired_preferences_reach_only_this_turn_without_impersonating_use
     entity = conversation_module.CodexAssistConversationEntity(entry)
     entity.hass = type("Hass", (), {
         "http_client": None, "config_entries": FakeConfigEntries(), "data": {},
+        "auth": SimpleNamespace(async_get_user=AsyncMock(return_value=SimpleNamespace(
+            id="actual-ha-caller", is_active=True, system_generated=False,
+        ))),
     })()
     entity.entity_id = "conversation.codex_assist"
     user_input = FakeUserInput()
     user_input.context = SimpleNamespace(user_id="actual-ha-caller")
     user_input.text = encode(key, "hello", voice="alice", revision="a" * 32,
-                             instructions="Be brief. {{ states('private') }}")
+                             instructions="Be brief. {{ states('private') }}",
+                             ha_user_id="actual-ha-caller")
     chat_log = FakeHandleMessageChatLog()
     chat_log.content = [SimpleNamespace(role="system", content="Rendered base personality"),
                         SimpleNamespace(role="user", content="Old unrelated private turn"),
@@ -340,3 +345,61 @@ async def test_paired_preferences_reach_only_this_turn_without_impersonating_use
     assert result[0].context.user_id == "actual-ha-caller"
     assert result[0].text == "hello"
     assert "Be brief" not in chat_log.provided_args[2]
+
+
+@pytest.mark.asyncio
+async def test_voice_account_mismatch_strips_private_context_and_disables_tools(
+    conversation_module, monkeypatch,
+):
+    from cryptography.fernet import Fernet
+
+    from custom_components.codex_assist.speaker_packet import encode
+
+    key = Fernet.generate_key().decode()
+    entry = FakeEntry()
+    entry.options = {"voice_match_pairing_key": key}
+    entity = conversation_module.CodexAssistConversationEntity(entry)
+    entity.hass = type("Hass", (), {
+        "http_client": None, "config_entries": FakeConfigEntries(), "data": {},
+        "auth": SimpleNamespace(async_get_user=AsyncMock(return_value=SimpleNamespace(
+            id="profile-owner", is_active=True, system_generated=False,
+        ))),
+    })()
+    entity.entity_id = "conversation.codex_assist"
+    user_input = FakeUserInput()
+    user_input.context = SimpleNamespace(user_id="different-ha-caller")
+    user_input.text = encode(
+        key, "hello", voice="alice", revision="a" * 32,
+        instructions="Private profile instruction", speaker_name="Private profile name",
+        ha_user_id="profile-owner",
+    )
+    context = user_input.context
+    chat_log = FakeHandleMessageChatLog()
+    chat_log.content = [
+        SimpleNamespace(role="system", content="Rendered base personality"),
+        SimpleNamespace(role="user", content="Old private account turn"),
+        SimpleNamespace(role="user", content=user_input.text),
+    ]
+
+    class Coordinator:
+        async def resolve(self, *args, **kwargs):
+            return CodexTokenSet("access-1", "refresh-1")
+
+    seen = {}
+
+    async def capture(**kwargs):
+        seen.update(kwargs)
+        return False
+
+    monkeypatch.setattr(
+        conversation_module, "runtime_token_coordinator", lambda entry: Coordinator(),
+    )
+    monkeypatch.setattr(conversation_module, "_stream_codex_turn_into_chat_log", capture)
+    result = await entity._async_handle_message(user_input, chat_log)
+
+    assert result[0].context is context
+    assert "Private profile instruction" not in seen["instructions"]
+    assert "Private profile name" not in seen["instructions"]
+    assert "Do not claim to have read or changed any Home Assistant state" in seen["instructions"]
+    assert [item["content"] for item in seen["input_items"]] == ["hello"]
+    assert seen["tools"] == []

@@ -70,7 +70,7 @@ async def test_native_read_only_schema_result_and_remote_errors(hass, setup_brid
     assert bridge.tools_for_context(ctx.context) == []
 
 
-async def test_unknown_nonadmin_inactive_and_voice_never_discover(
+async def test_unknown_nonadmin_unbound_voice_and_inactive_user_never_discover(
     hass, setup_bridge, hass_read_only_user, monkeypatch,
 ):
     entry, _, ctx, _ = setup_bridge
@@ -78,11 +78,24 @@ async def test_unknown_nonadmin_inactive_and_voice_never_discover(
                            (Context(user_id=hass_read_only_user.id), False), (ctx.context, True)]:
         async with bridge.request_tools(hass, entry, context, voice_packet=voice):
             assert bridge.tools_for_context(context) == []
+    readonly_context = Context(user_id=hass_read_only_user.id)
+    async with bridge.request_tools(
+        hass, entry, readonly_context, voice_packet=True, voice_account_matches=True,
+    ):
+        assert bridge.tools_for_context(readonly_context) == []
     bridge.discover.assert_not_awaited()
+    async with bridge.request_tools(
+        hass, entry, ctx.context, voice_packet=True, voice_account_matches=True,
+    ):
+        tools = bridge.tools_for_context(ctx.context)
+        assert len(tools) == 1
+    bridge.discover.assert_awaited_once()
     monkeypatch.setattr(hass.auth, "async_get_user", AsyncMock(return_value=SimpleNamespace(
         is_active=False, is_admin=True, system_generated=False,
     )))
-    async with bridge.request_tools(hass, entry, ctx.context):
+    async with bridge.request_tools(
+        hass, entry, ctx.context, voice_packet=True, voice_account_matches=True,
+    ):
         assert bridge.tools_for_context(ctx.context) == []
 
 

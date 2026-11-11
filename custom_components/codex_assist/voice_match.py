@@ -39,6 +39,7 @@ class PreparedRequest:
     voice: str | None = None
     diagnostic_tag: str | None = None
     speaker_name: str | None = None
+    ha_user_id: str | None = None
 
 
 def replace_text(value, text):
@@ -103,6 +104,7 @@ class SpeakerRuntime:
         verified = False
         voice = None
         speaker_name = None
+        ha_user_id = None
         tag = None
         transport = text if packet_text is None else packet_text
         if transport.startswith(WIRE_PREFIX):
@@ -122,11 +124,12 @@ class SpeakerRuntime:
             verified = True
             voice = packet["voice"]
             speaker_name = packet.get("speaker_name")
+            ha_user_id = packet.get("ha_user_id")
             instructions = packet["instructions"]
             uncertain = packet["voice"] is None
             identity = (
                 hashlib.sha256(key.encode()).hexdigest(), packet["voice"],
-                packet["revision"], agent_id, speaker_name,
+                packet["revision"], agent_id, speaker_name, ha_user_id,
             )
         if not key and not self.managed and not text.startswith(WIRE_PREFIX):
             return PreparedRequest(clean, "", None, None)
@@ -155,7 +158,23 @@ class SpeakerRuntime:
         while len(self.scopes) > 256:
             self.scopes.popitem(last=False)
         return PreparedRequest(clean, instructions, previous["boundary"], previous["scope"],
-                               verified, voice, tag, speaker_name)
+                               verified, voice, tag, speaker_name, ha_user_id)
+
+
+async def async_voice_account_matches(hass, request, context):
+    """Require a matched voice's enrolled account to equal the actual HA caller."""
+    if not request.verified:
+        return True
+    user_id = request.ha_user_id
+    if not user_id or getattr(context, "user_id", None) != user_id:
+        return False
+    try:
+        user = await hass.auth.async_get_user(user_id)
+    except Exception:
+        return False
+    return bool(
+        user and user.is_active and not user.system_generated and user.id == user_id
+    )
 
 
 def runtime_for_entry(entry):

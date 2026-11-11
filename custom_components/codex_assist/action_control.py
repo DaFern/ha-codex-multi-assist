@@ -162,10 +162,12 @@ class NativeRequestResult:
     """Indicate native handling and optionally carry sanitized action context."""
 
     action_context: ActionContext | None = None
+    denied: bool = False
 
 
 async def async_native_request(
     hass: Any, user_input: Any, chat_log: Any,
+    *, allow_execution: bool = True,
 ) -> NativeRequestResult | None:
     """Route native-recognised requests through already-authorised Assist tools.
 
@@ -195,6 +197,8 @@ async def async_native_request(
         return None
     if recognised.unmatched_entities:
         raise ActionControlError("Native request has unmatched targets")
+    if not allow_execution:
+        return NativeRequestResult(denied=True)
     schema = to_openapi(tool.parameters, custom_serializer=chat_log.llm_api.custom_serializer)
     properties = schema.get("properties")
     if not isinstance(properties, dict):

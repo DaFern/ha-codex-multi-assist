@@ -172,6 +172,12 @@ async def test_native_recognition_uses_existing_tool_contract_and_original_input
             received.append(content)
             yield None
 
+    denied_result = await async_native_request(
+        object(), user_input, Chat(), allow_execution=False,
+    )
+    assert denied_result.denied is True
+    assert received == []
+
     native_result = await async_native_request(object(), user_input, Chat())
     assert native_result is not None
     assert native_result.action_context.operation == "turn_off"

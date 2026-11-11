@@ -109,9 +109,11 @@ class MCPReadTool(llm.Tool):
 
 
 @asynccontextmanager
-async def request_tools(hass, entry, context, *, voice_packet=False):
+async def request_tools(
+    hass, entry, context, *, voice_packet=False, voice_account_matches=False,
+):
     tools = []
-    if not voice_packet and await administrator(hass, context):
+    if (not voice_packet or voice_account_matches) and await administrator(hass, context):
         for server in entry.options.get(CONF_MCP_SERVERS, []):
             if not server.get("enabled") or not server.get("approved_tools"):
                 continue

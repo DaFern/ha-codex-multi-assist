@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
 from copy import copy
 from dataclasses import is_dataclass, replace
@@ -53,6 +54,7 @@ from .speaker_packet import WIRE_PREFIX
 from .voice_match import (
     CONF_VOICE_MATCH_KEY,
     PacketError,
+    async_voice_account_matches,
     personal_instructions,
     runtime_for_entry,
     scoped_contents,
@@ -160,6 +162,8 @@ class CodexAssistConversationEntity(
         key = getattr(self.entry, "options", {}).get(CONF_VOICE_MATCH_KEY, "")
         packet_text = None
         input_text = getattr(user_input, "text", "")
+        voice_identity_matches = True
+        voice_recognized = False
         try:
             runtime = runtime_for_entry(self.entry)
             packet_text = runtime.handoffs.consume(key, input_text)
@@ -168,15 +172,43 @@ class CodexAssistConversationEntity(
                 user_input.conversation_id, user_input.agent_id,
                 packet_text=packet_text,
             )
+            voice_recognized = prepared_request.voice is not None
+            voice_identity_matches = await async_voice_account_matches(
+                self.hass, prepared_request, user_input.context,
+            )
+            if prepared_request.verified and not voice_identity_matches:
+                # Do not carry another profile's private prompt/history into this
+                # authenticated HA session. Keep ordinary chat, but strip identity
+                # context and use only the current turn; action tools are disabled.
+                runtime.invalidate(user_input.conversation_id)
+                current_turn = next(
+                    (item for item in reversed(chat_log.content)
+                     if getattr(item, "role", None) == "user"
+                     and getattr(item, "content", None) == prepared_request.text),
+                    None,
+                )
+                if current_turn is None:
+                    raise PacketError()
+                prepared_request = replace(
+                    prepared_request,
+                    instructions="",
+                    boundary=current_turn,
+                    scope=secrets.token_hex(16),
+                    voice=None,
+                    speaker_name=None,
+                    ha_user_id=None,
+                )
             _clean = prepared_request.text
             preferences = prepared_request.instructions
             boundary = prepared_request.boundary
             speaker_scope = prepared_request.scope
             if prepared_request.verified:
                 LOGGER.info(
-                    "Voice Match receive: request=%s result=%s instructions_present=%s",
+                    "Voice Match receive: request=%s result=%s binding=%s "
+                    "instructions_present=%s",
                     prepared_request.diagnostic_tag,
-                    "recognised" if prepared_request.voice is not None else "neutral",
+                    "recognised" if voice_recognized else "neutral",
+                    "matched" if voice_identity_matches else "unavailable_or_mismatched",
                     bool(preferences),
                 )
             if _clean != getattr(user_input, "text", ""):
@@ -204,11 +236,20 @@ class CodexAssistConversationEntity(
             ))
             return conversation.async_get_result_from_chat_log(user_input, chat_log)
 
+        def request_instructions(instructions: str) -> str:
+            if prepared_request.verified and not voice_identity_matches:
+                return instructions + (
+                    "\n\nHome Assistant controls are unavailable for this request because "
+                    "the recognized voice is not bound to the active authenticated HA user. "
+                    "Do not claim to have read or changed any Home Assistant state."
+                )
+            return instructions
+
         from .speaker_automation import DATA_SPEAKER_AUTOMATIONS, DispatchResult
 
         try:
             automation_result = DispatchResult()
-            if (prepared_request.verified
+            if (prepared_request.verified and voice_identity_matches
                     and (bridge := self.hass.data.get(DATA_SPEAKER_AUTOMATIONS)) is not None):
                 automation_result = await bridge.dispatch(prepared_request, user_input)
         except Exception:
@@ -233,6 +274,7 @@ class CodexAssistConversationEntity(
                 async with request_tools(
                     self.hass, self.entry, user_input.context,
                     voice_packet=prepared_request.verified,
+                    voice_account_matches=voice_identity_matches,
                 ):
                     await chat_log.async_provide_llm_data(
                         user_input.as_llm_context(DOMAIN), llm.LLM_API_ASSIST,
@@ -257,11 +299,11 @@ class CodexAssistConversationEntity(
             if client is not None:
                 text = await async_action_reply(
                     outcome, codex=client, model=model,
-                    instructions=personal_instructions(
+                    instructions=request_instructions(personal_instructions(
                         _instructions_for_turn(chat_log, prompt, web_search=False),
                         preferences, request_tag=prepared_request.diagnostic_tag,
                         speaker_name=prepared_request.speaker_name,
-                    ) + f"\nUser language: {user_input.language}",
+                    )) + f"\nUser language: {user_input.language}",
                     reasoning_effort=reasoning_effort, reasoning_summary=reasoning_summary,
                     text_verbosity=text_verbosity,
                 )
@@ -272,7 +314,17 @@ class CodexAssistConversationEntity(
 
         try:
             native_start = len(chat_log.content)
-            native_result = await async_native_request(self.hass, user_input, chat_log)
+            native_result = await async_native_request(
+                self.hass, user_input, chat_log,
+                allow_execution=voice_identity_matches,
+            )
+            if native_result and native_result.denied:
+                chat_log.async_add_assistant_content_without_tools(conversation.AssistantContent(
+                    agent_id=user_input.agent_id,
+                    content=("This voice profile does not match the active Home Assistant "
+                             "account, so I didn't use Home Assistant controls."),
+                ))
+                return conversation.async_get_result_from_chat_log(user_input, chat_log)
             native_handled = native_result is not None
             outcome = action_outcome(chat_log.content[native_start:], readonly)
             if outcome.speech and native_result and native_result.action_context:
@@ -322,7 +374,10 @@ class CodexAssistConversationEntity(
             return await publish_action(outcome, codex)
         try:
             for _iteration in range(MAX_TOOL_ITERATIONS + 1):
-                allow_tools = _iteration < MAX_TOOL_ITERATIONS and not native_handled
+                allow_tools = (
+                    _iteration < MAX_TOOL_ITERATIONS and not native_handled
+                    and voice_identity_matches
+                )
                 round_start = len(chat_log.content)
                 try:
                     tool_call_requested = await _stream_codex_turn_into_chat_log(
@@ -330,10 +385,12 @@ class CodexAssistConversationEntity(
                         codex=codex,
                         entity_id=self.entity_id or "",
                         model=model,
-                        instructions=personal_instructions(_instructions_for_turn(
-                            chat_log, prompt, web_search=web_search
-                        ), preferences, request_tag=prepared_request.diagnostic_tag,
-                           speaker_name=prepared_request.speaker_name),
+                        instructions=request_instructions(personal_instructions(
+                            _instructions_for_turn(
+                                chat_log, prompt, web_search=web_search,
+                            ), preferences, request_tag=prepared_request.diagnostic_tag,
+                            speaker_name=prepared_request.speaker_name,
+                        )),
                         input_items=await _codex_input_from_chat_log(
                             self.hass, chat_log, user_input.agent_id, boundary, request_turn
                         ),
@@ -379,10 +436,12 @@ class CodexAssistConversationEntity(
                             codex=codex,
                             entity_id=self.entity_id or "",
                             model=model,
-                            instructions=personal_instructions(_instructions_for_turn(
-                                chat_log, prompt, web_search=web_search
-                            ), preferences, request_tag=prepared_request.diagnostic_tag,
-                               speaker_name=prepared_request.speaker_name),
+                            instructions=request_instructions(personal_instructions(
+                                _instructions_for_turn(
+                                    chat_log, prompt, web_search=web_search
+                                ), preferences, request_tag=prepared_request.diagnostic_tag,
+                                speaker_name=prepared_request.speaker_name,
+                            )),
                             input_items=await _codex_input_from_chat_log(
                                 self.hass, chat_log, user_input.agent_id, boundary, request_turn
                             ),

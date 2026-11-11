@@ -6,6 +6,7 @@ from cryptography.fernet import Fernet
 from custom_components.codex_assist.speaker_packet import PacketError, decode, encode
 from custom_components.codex_assist.voice_match import (
     SpeakerRuntime,
+    async_voice_account_matches,
     personal_instructions,
     scoped_contents,
 )
@@ -154,6 +155,56 @@ def test_recognised_name_reaches_prompt_without_personal_instructions(caplog):
     assert "say you recognise their voice" in result
     assert "not authentication" in result
     assert name not in caplog.text and "Alice" not in caplog.text
+
+
+def test_account_bound_packet_round_trips_user_id_only_inside_encrypted_payload():
+    key = Fernet.generate_key().decode()
+    wire = encode(key, "hello", voice="alice", revision="a" * 32,
+                  speaker_name="Alice", ha_user_id="ha-user-123", now=1000)
+    assert wire.startswith("[[voice-match:v2:")
+    assert "ha-user-123" not in wire
+    request = SpeakerRuntime().prepare_request(
+        key, wire, [user(wire)], "chat", "agent", now=1000,
+    )
+    assert request.verified and request.ha_user_id == "ha-user-123"
+
+
+@pytest.mark.parametrize("user_id", ["", "x" * 129, "bad\nuser", 42, []])
+def test_account_bound_packet_rejects_invalid_home_assistant_user_ids(user_id):
+    with pytest.raises(PacketError):
+        encode(Fernet.generate_key().decode(), "hello", voice="alice", revision="a" * 32,
+               ha_user_id=user_id)
+
+
+@pytest.mark.asyncio
+async def test_account_binding_requires_same_active_non_system_ha_caller():
+    request = SimpleNamespace(verified=True, ha_user_id="ha-user-123")
+
+    class Auth:
+        user = SimpleNamespace(id="ha-user-123", is_active=True, system_generated=False)
+
+        async def async_get_user(self, user_id):
+            assert user_id == "ha-user-123"
+            return self.user
+
+    hass = SimpleNamespace(auth=Auth())
+    assert await async_voice_account_matches(
+        hass, request, SimpleNamespace(user_id="ha-user-123"),
+    )
+    assert not await async_voice_account_matches(
+        hass, request, SimpleNamespace(user_id="another-user"),
+    )
+    assert not await async_voice_account_matches(hass, request, SimpleNamespace(user_id=None))
+    hass.auth.user = SimpleNamespace(id="ha-user-123", is_active=False,
+                                     system_generated=False)
+    assert not await async_voice_account_matches(
+        hass, request, SimpleNamespace(user_id="ha-user-123"),
+    )
+    hass.auth.user = SimpleNamespace(id="ha-user-123", is_active=True,
+                                     system_generated=True)
+    assert not await async_voice_account_matches(
+        hass, request, SimpleNamespace(user_id="ha-user-123"),
+    )
 
 
 @pytest.mark.parametrize("name", ["", " ", "x" * 81, "Alice\nAdmin", "A\x00B", 42, []])

@@ -54,11 +54,14 @@ are not silently granted. Up to eight independent server IDs are supported.
   non-admin and system accounts receive no MCP tools. User IDs in prompts or tool
   arguments are not identities. This is **administrator-only**, not arbitrary
   per-user HA permission mapping. Non-admin MCP tools remain denied.
-- Existing Voice Match packets are personalisation, not account authentication.
-  All such packet turns (including neutral matches) receive no MCP tools, even if
-  a pipeline otherwise carries an admin context. Other requests need a real HA user
-  context; a satellite without one cannot inherit a prior user's identity. This
-  does not provide voiceprint-to-account binding or strong biometric authentication.
+- Recognized Voice Match packet v2 includes the administrator-assigned profile owner
+  inside Fernet encryption. A voice turn can receive MCP tools only when that owner
+  equals the active authenticated HA caller; the ordinary administrator check still
+  applies, so MCP remains admin-only and read-only. HA's caller context is never
+  changed or impersonated. Legacy v1, neutral/unassigned, inactive/system, missing
+  and mismatched accounts receive no MCP tools. A satellite without a real HA user
+  context cannot inherit a prior user's identity. This binding is not strong biometric
+  authentication and does not grant permission to non-admins.
 - Every native tool invocation checks the current account and saved server policy,
   discovers the remote definition again, validates arguments using HA's native schema,
   and compares its approval fingerprint before dispatch. Revocation is checked again

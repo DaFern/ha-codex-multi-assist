@@ -7,8 +7,9 @@ instructions. **Voice Learning** is a separate entry/assistant and uses a separa
 
 ## Setup
 
-1. Install compatible reviewed components; back up before replacement. Integration
-   Python updates require an approved Core restart; app builds/updates are separate.
+1. Install compatible reviewed components together; packet v2 requires both sides.
+   Back up before replacement. Integration Python updates require an approved Core
+   restart; app builds/updates are separate.
 2. Enrol voices and assign each to its actual HA account. Personal instructions in
    Manage voices are optional; an empty value still permits recognised-name context.
 3. In the app's **Administrator settings → Voice Match connection**, create a
@@ -40,9 +41,14 @@ Its wording and real acoustic accuracy are not guaranteed.
 
 Personal instructions are literal text up to 2000 characters, added after rendering
 the agent's base prompt—not executed as Jinja. Name and preferences go to the selected
-provider. Never store secrets or sensitive facts. They do not replace the personality,
-model, tools, original HA caller, permissions, Piper voice or shared AI Task defaults.
-Neutral/unassigned requests carry no recognised name or inherited speaker context.
+provider. Never store secrets or sensitive facts. Packet v2 also carries the enrolled
+profile's assigned HA user ID encrypted; Codex accepts account-bound voice context only
+when that ID matches the active HA caller. HA `Context` is never replaced or impersonated.
+An unassigned/neutral profile, legacy v1 packet, inactive/system account, or caller
+mismatch fails closed: no profile name/preferences/history, speaker automation, native
+HA controls, or MCP tools are used. Ordinary model chat may continue without HA tools.
+For a match, the caller retains only their normal HA permissions; MCP remains
+administrator-only and read-only. Voice is not a login or sensitive-action approval.
 
 ## Transport and conversation scope
 
@@ -74,7 +80,8 @@ Already issued snapshots remain valid until expiry; immediate receiver revocatio
 requires disabling/removing pairing in Codex too. Accepted actions cannot be retracted.
 
 **Recognition is not authentication or confidentiality.** False matches and replayed
-speech remain possible. Do not authorise locks, alarms, purchases or confidential
+speech remain possible. Account binding prevents cross-account use of voice context;
+it does not prove who spoke. Do not authorise locks, alarms, purchases or confidential
 data access from a match. HA's exposed-entity/Assist API boundary remains decisive.
 The [speaker automation extension](SPEAKER_AUTOMATIONS.md) requires explicit automation
 configuration; saved preferences alone cannot create a trusted speaker condition.
