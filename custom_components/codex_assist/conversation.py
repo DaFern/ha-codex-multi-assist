@@ -16,6 +16,7 @@ from homeassistant.const import MATCH_ALL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent, llm
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.json import json_dumps
@@ -50,12 +51,19 @@ from .codex_client import (
 )
 from .codex_protocol import CodexNativeState, native_state_from_response_items
 from .codex_runtime import runtime_token_coordinator
+from .music_control import (
+    CONF_MUSIC_PLAYER_IDS,
+    MUSIC_API_ID,
+    MusicAuthorization,
+    music_authorization,
+)
 from .schema_compat import to_openapi
 from .speaker_packet import WIRE_PREFIX
 from .voice_match import (
     CONF_VOICE_MATCH_KEY,
     PacketError,
     async_voice_account_matches,
+    async_voice_account_user,
     personal_instructions,
     runtime_for_entry,
     scoped_contents,
@@ -170,6 +178,9 @@ class CodexAssistConversationEntity(
         )
         voice_identity_matches = True
         voice_recognized = False
+        satellite_id = getattr(user_input, "satellite_id", None)
+        music_only_request = satellite_id is not None
+        music_auth = None
         try:
             runtime = runtime_for_entry(self.entry)
             packet_text = runtime.handoffs.consume(key, input_text)
@@ -182,7 +193,48 @@ class CodexAssistConversationEntity(
             voice_identity_matches = await async_voice_account_matches(
                 self.hass, prepared_request, user_input.context,
             )
-            if prepared_request.verified and not voice_identity_matches:
+            if music_only_request:
+                satellite_entry = er.async_get(self.hass).async_get(satellite_id)
+                speaker_user = await async_voice_account_user(self.hass, prepared_request)
+                if (
+                    satellite_entry is None
+                    or satellite_entry.domain != "assist_satellite"
+                    or speaker_user is None
+                ):
+                    chat_log.async_add_assistant_content_without_tools(
+                        conversation.AssistantContent(
+                            agent_id=user_input.agent_id,
+                            content="I need a verified, account-linked voice before I can control music here.",
+                        )
+                    )
+                    return conversation.async_get_result_from_chat_log(user_input, chat_log)
+                player_ids = self.entry.options.get(CONF_MUSIC_PLAYER_IDS, [])
+                if (
+                    not isinstance(player_ids, list)
+                    or not player_ids
+                    or len(player_ids) > 32
+                    or any(not isinstance(entity_id, str) for entity_id in player_ids)
+                ):
+                    chat_log.async_add_assistant_content_without_tools(
+                        conversation.AssistantContent(
+                            agent_id=user_input.agent_id,
+                            content="Music control has not been configured for this assistant.",
+                        )
+                    )
+                    return conversation.async_get_result_from_chat_log(user_input, chat_log)
+                music_auth = MusicAuthorization(
+                    context=user_input.context,
+                    prepared_request=prepared_request,
+                    user_id=speaker_user.id,
+                    player_ids=tuple(player_ids),
+                    satellite_id=satellite_id,
+                    device_id=getattr(user_input, "device_id", None),
+                )
+            if (
+                prepared_request.verified
+                and not voice_identity_matches
+                and not music_only_request
+            ):
                 # Do not carry another profile's private prompt/history into this
                 # authenticated HA session. Strip profile identity; a recognized
                 # account mismatch also discards history. Action tools stay disabled.
@@ -218,7 +270,10 @@ class CodexAssistConversationEntity(
                     "instructions_present=%s",
                     prepared_request.diagnostic_tag,
                     "recognised" if voice_recognized else "neutral",
-                    "matched" if voice_identity_matches else "unavailable_or_mismatched",
+                    (
+                        "matched" if voice_identity_matches or music_only_request
+                        else "unavailable_or_mismatched"
+                    ),
                     bool(preferences),
                 )
             if _clean != getattr(user_input, "text", ""):
@@ -232,6 +287,9 @@ class CodexAssistConversationEntity(
                     item for item in reversed(chat_log.content)
                     if getattr(item, "role", None) == "user"
                 )
+            if music_only_request and request_turn is not None:
+                # Satellite turns never inherit prior native actions or other history.
+                boundary = request_turn
         except PacketError:
             from .speaker_packet import diagnostic_tag
 
@@ -247,6 +305,12 @@ class CodexAssistConversationEntity(
             return conversation.async_get_result_from_chat_log(user_input, chat_log)
 
         def request_instructions(instructions: str) -> str:
+            if music_only_request:
+                return instructions + (
+                    "\n\nThis request has access only to the configured Music Assistant "
+                    "control tool. Use it only for music requests. Never claim access to "
+                    "other Home Assistant entities or tools."
+                )
             if prepared_request.verified and not voice_identity_matches:
                 reason = (
                     "voice identity is uncertain for this turn. " if not voice_recognized else
@@ -266,7 +330,7 @@ class CodexAssistConversationEntity(
 
         try:
             automation_result = DispatchResult()
-            if (prepared_request.verified and voice_identity_matches
+            if (not music_only_request and prepared_request.verified and voice_identity_matches
                     and (bridge := self.hass.data.get(DATA_SPEAKER_AUTOMATIONS)) is not None):
                 automation_result = await bridge.dispatch(prepared_request, user_input)
         except Exception:
@@ -285,7 +349,24 @@ class CodexAssistConversationEntity(
             ))
             return conversation.async_get_result_from_chat_log(user_input, chat_log)
         try:
-            if self.entry.options.get("mcp_servers"):
+            if music_only_request:
+                assert music_auth is not None
+                if not hasattr(llm, "async_get_api"):
+                    chat_log.async_add_assistant_content_without_tools(
+                        conversation.AssistantContent(
+                            agent_id=user_input.agent_id,
+                            content="Music-only satellite control is not supported by this Home Assistant version.",
+                        )
+                    )
+                    return conversation.async_get_result_from_chat_log(user_input, chat_log)
+                with music_authorization(music_auth):
+                    await chat_log.async_provide_llm_data(
+                        user_input.as_llm_context(DOMAIN),
+                        MUSIC_API_ID,
+                        prompt,
+                        user_input.extra_system_prompt,
+                    )
+            elif self.entry.options.get("mcp_servers"):
                 from .mcp_tools import request_tools
 
                 async with request_tools(
@@ -333,28 +414,36 @@ class CodexAssistConversationEntity(
             ))
             return conversation.async_get_result_from_chat_log(user_input, chat_log)
 
-        try:
-            native_start = len(chat_log.content)
-            native_result = await async_native_request(
-                self.hass, user_input, chat_log,
-                allow_execution=voice_identity_matches,
-            )
-            if native_result and native_result.denied:
-                chat_log.async_add_assistant_content_without_tools(conversation.AssistantContent(
-                    agent_id=user_input.agent_id,
-                    content=("This voice profile does not match the active Home Assistant "
-                             "account, so I didn't use Home Assistant controls."),
-                ))
-                return conversation.async_get_result_from_chat_log(user_input, chat_log)
-            native_handled = native_result is not None
-            action_contents = chat_log.content[native_start:]
-            outcome = action_outcome(action_contents, readonly)
-            if outcome.speech and native_result and native_result.action_context:
-                outcome = ActionOutcome(outcome.kind, native_result.action_context)
-        except (HomeAssistantError, RuntimeError, ValueError, TypeError) as err:
-            _log_request_failure(err, stage="native_assist")
-            outcome = ActionOutcome("unconfirmed")
-            action_contents = []
+        native_handled = False
+        action_contents = []
+        outcome = ActionOutcome()
+        if not music_only_request:
+            try:
+                native_start = len(chat_log.content)
+                native_result = await async_native_request(
+                    self.hass, user_input, chat_log,
+                    allow_execution=voice_identity_matches,
+                )
+                if native_result and native_result.denied:
+                    chat_log.async_add_assistant_content_without_tools(
+                        conversation.AssistantContent(
+                            agent_id=user_input.agent_id,
+                            content=(
+                                "This voice profile does not match the active Home Assistant "
+                                "account, so I didn't use Home Assistant controls."
+                            ),
+                        )
+                    )
+                    return conversation.async_get_result_from_chat_log(user_input, chat_log)
+                native_handled = native_result is not None
+                action_contents = chat_log.content[native_start:]
+                outcome = action_outcome(action_contents, readonly)
+                if outcome.speech and native_result and native_result.action_context:
+                    outcome = ActionOutcome(outcome.kind, native_result.action_context)
+            except (HomeAssistantError, RuntimeError, ValueError, TypeError) as err:
+                _log_request_failure(err, stage="native_assist")
+                outcome = ActionOutcome("unconfirmed")
+                action_contents = []
 
         http_client = get_async_client(self.hass)
         auth_client = CodexAuthClient(http_client=http_client)
@@ -399,7 +488,7 @@ class CodexAssistConversationEntity(
             for _iteration in range(MAX_TOOL_ITERATIONS + 1):
                 allow_tools = (
                     _iteration < MAX_TOOL_ITERATIONS and not native_handled
-                    and voice_identity_matches
+                    and (voice_identity_matches or music_only_request)
                 )
                 round_start = len(chat_log.content)
                 try:
@@ -418,7 +507,10 @@ class CodexAssistConversationEntity(
                             self.hass, chat_log, user_input.agent_id, boundary, request_turn
                         ),
                         tools=(
-                            _codex_tools_from_chat_log(chat_log, enable_web_search=web_search)
+                            _codex_tools_from_chat_log(
+                                chat_log,
+                                enable_web_search=web_search and not music_only_request,
+                            )
                             if allow_tools
                             else []
                         ),
@@ -469,7 +561,10 @@ class CodexAssistConversationEntity(
                                 self.hass, chat_log, user_input.agent_id, boundary, request_turn
                             ),
                             tools=(
-                                _codex_tools_from_chat_log(chat_log, enable_web_search=web_search)
+                                _codex_tools_from_chat_log(
+                                    chat_log,
+                                    enable_web_search=web_search and not music_only_request,
+                                )
                                 if allow_tools
                                 else []
                             ),

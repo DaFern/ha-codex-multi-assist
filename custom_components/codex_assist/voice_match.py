@@ -214,6 +214,24 @@ async def async_voice_account_matches(hass, request, context):
     )
 
 
+async def async_voice_account_user(hass, request):
+    """Resolve the active account bound to a verified voice without replacing Context."""
+    if (
+        not request.verified
+        or not request.voice
+        or not isinstance(request.ha_user_id, str)
+        or not request.ha_user_id
+    ):
+        return None
+    try:
+        user = await hass.auth.async_get_user(request.ha_user_id)
+    except Exception:
+        return None
+    if not user or not user.is_active or user.system_generated or user.id != request.ha_user_id:
+        return None
+    return user
+
+
 def runtime_for_entry(entry):
     if entry not in _RUNTIMES:
         _RUNTIMES[entry] = SpeakerRuntime()

@@ -1,5 +1,11 @@
 # Testing
 
+The Music Assistant satellite path has focused tests in
+`tests_ha/test_music_control.py` for fail-closed API exposure, exact request
+context binding, and the single-tool boundary. Run them with the HA-native test
+environment described below. The tests do not exercise physical satellite
+provenance, actual Music Assistant playback, or per-user service acceptance.
+
 ## Dormant ingress-to-command chain (not activated)
 
 Fifty-one new cases in the separate RBAC checkout's `tests/test_assist_ingress.py`

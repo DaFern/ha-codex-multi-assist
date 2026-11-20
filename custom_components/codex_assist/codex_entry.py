@@ -27,6 +27,8 @@ async def async_setup_codex(hass: HomeAssistant, entry: ModuleConfigEntry) -> bo
     """Start only Codex platforms and model refresh, without touching OAuth locks."""
     from . import async_update_listener
 
+    from homeassistant.helpers import llm
+
     platforms = (Platform.CONVERSATION, Platform.AI_TASK)
     if entry.options.get(CONF_CLEAN_TRANSCRIPT):
         from homeassistant.exceptions import ConfigEntryError
@@ -41,6 +43,11 @@ async def async_setup_codex(hass: HomeAssistant, entry: ModuleConfigEntry) -> bo
         platforms += (Platform.STT,)
     entry.runtime_data = ModuleRuntime(EntryModule.CODEX, platforms)
     await hass.config_entries.async_forward_entry_setups(entry, entry.runtime_data.platforms)
+    # Native per-API registration was added after the integration's HA 2026.6 floor.
+    if hasattr(llm, "async_register_api") and hasattr(llm, "API"):
+        from .music_api import async_register_music_api
+
+        entry.async_on_unload(async_register_music_api(hass))
     entry.async_on_unload(entry.add_update_listener(async_update_listener))
 
     async def refresh_models(_now) -> None:

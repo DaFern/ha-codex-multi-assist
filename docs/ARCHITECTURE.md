@@ -90,6 +90,21 @@ starting a fresh supported native chat session after changes or lost ownership.
 Native Assist controls and AI Task remain separate. This is issue #8's restricted
 first milestone, not its full identity, per-user policy or write-approval design.
 
+### Music-only Voice Match satellite path
+
+The Codex source now has a separate `codex_assist_music` native LLM API for
+satellite turns. It is populated only from the current verified, account-linked
+Voice Match request and provides one fixed Music Assistant tool. It does not merge
+the ordinary Assist API, MCP tools, web search, native intent execution, speaker
+automations, or earlier conversation/tool history into that turn. The encrypted
+profile's active HA account is used only for per-player control-permission checks;
+the original Home Assistant `Context` remains unchanged for every service call.
+Targets must be in the entry's explicitly configured Music Assistant allowlist,
+Assist-exposed, available, and controlled by the linked account. Room/speaker
+resolution requires one exact eligible match; uncertain or unmapped rooms prompt
+for clarification. This source path is not deployed or physically acceptance-tested;
+live player selection, room assignments and routing remain separately gated.
+
 - **Config flow** handles Codex-style device-code sign-in. It stores OAuth tokens in the Home Assistant config entry and exposes integration options.
 - **Model discovery** uses only visible model IDs returned for the signed-in account. An entry-scoped, in-memory cache survives temporary failures; a small, explicitly unverified fallback list is used only before a successful result.
 - **Conversation agents** register the retained primary entity and independent

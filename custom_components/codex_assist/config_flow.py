@@ -32,6 +32,7 @@ from .codex_runtime import runtime_token_coordinator
 from .entry_modules import CONF_MODULE, EntryModule, entry_module
 from .learning.config_flow import LearningConfigFlowMixin, LearningOptionsFlow
 from .mcp_config_flow import MCPOptionsMixin
+from .music_control import CONF_MUSIC_PLAYER_IDS, MAX_PLAYERS
 from .model_discovery import async_entry_model_catalog
 from .speaker_packet import valid_key
 from .voice_match import (
@@ -262,7 +263,50 @@ class CodexAssistOptionsFlow(MCPOptionsMixin, config_entries.OptionsFlow):
             return self.async_abort(reason="learning_reconfigure_required")
         return self.async_show_menu(
             step_id="init",
-            menu_options=["settings", "agents", "voice_match", "mcp"],
+            menu_options=["settings", "agents", "voice_match", "music", "mcp"],
+        )
+
+    async def async_step_music(self, user_input=None):
+        """Select the Music Assistant players available to verified Voice Match."""
+        from homeassistant.helpers import entity_registry as er
+
+        errors = {}
+        saved = self.config_entry.options.get(CONF_MUSIC_PLAYER_IDS, [])
+        if user_input is not None:
+            selected = user_input.get(CONF_MUSIC_PLAYER_IDS, [])
+            registry = er.async_get(self.hass)
+            if (
+                not isinstance(selected, list)
+                or len(selected) > MAX_PLAYERS
+                or len(set(selected)) != len(selected)
+                or any(
+                    not isinstance(entity_id, str)
+                    or (entry := registry.async_get(entity_id)) is None
+                    or entry.platform != "music_assistant"
+                    or not entity_id.startswith("media_player.")
+                    for entity_id in selected
+                )
+            ):
+                errors["base"] = "invalid_music_players"
+            else:
+                options = dict(self.config_entry.options)
+                options[CONF_MUSIC_PLAYER_IDS] = selected
+                return self.async_create_entry(title="", data=options)
+        return self.async_show_form(
+            step_id="music",
+            data_schema=vol.Schema({
+                vol.Optional(
+                    CONF_MUSIC_PLAYER_IDS,
+                    default=saved,
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="media_player",
+                        integration="music_assistant",
+                        multiple=True,
+                    )
+                ),
+            }),
+            errors=errors,
         )
 
     async def async_step_voice_match(self, user_input=None):

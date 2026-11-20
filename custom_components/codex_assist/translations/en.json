@@ -201,7 +201,18 @@
           "settings": "Shared AI Task defaults",
           "agents": "Manage conversation assistants",
           "voice_match": "Voice Match",
+          "music": "Voice Match music access",
           "mcp": "MCP servers (read-only preview)"
+        }
+      },
+      "music": {
+        "title": "Voice Match music access",
+        "description": "Choose the Music Assistant speakers that a confidently matched, account-linked voice may control from an Assist satellite. Each request checks the linked Home Assistant account's control permission for the selected player. This adds no access to other entities or general Assist tools. The players must also be exposed to Assist. No speakers are selected by default.",
+        "data": {
+          "music_player_ids": "Allowed Music Assistant speakers"
+        },
+        "errors": {
+          "invalid_music_players": "Select only existing Music Assistant media players."
         }
       },
       "mcp": {
@@ -225,7 +236,7 @@
       },
       "voice_match": {
         "title": "Voice Match",
-        "description": "Connect to the add-on's internal personalised backend (normally port 10352) using its personalisation key, not its learning key. Leave the key blank to keep an existing pairing. Then choose Voice Match in your Codex assistant. No separate Wyoming Voice Match sources are needed. Chat messages stay clean; personal instructions are optional. Saving stops active Voice Match requests. Disabling removes this pairing, not your voices. Recognition is not a login or permission to access private information.",
+        "description": "Connect to the add-on's internal personalised backend (normally port 10352) using its personalisation key, not its learning key. Leave the key blank to keep an existing pairing. Then choose Voice Match in your Codex assistant. No separate Wyoming Voice Match sources are needed. Chat messages stay clean; personal instructions are optional. A verified, account-linked voice may authorize only the separately configured Music Assistant actions, after checking that account's permission for the selected player. It does not grant general Home Assistant access. Saving stops active Voice Match requests. Disabling removes this pairing, not your voices.",
         "data": {
           "enabled": "Enable Voice Match",
           "voice_match_host": "Add-on hostname or IP address",

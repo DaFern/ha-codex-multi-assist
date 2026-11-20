@@ -46,9 +46,35 @@ profile's assigned HA user ID encrypted; Codex accepts account-bound voice conte
 when that ID matches the active HA caller. HA `Context` is never replaced or impersonated.
 An unassigned/neutral profile, legacy v1 packet, inactive/system account, or caller
 mismatch fails closed: no profile name/preferences, speaker automation, native
-HA controls, or MCP tools are used. Ordinary model chat may continue without HA tools.
+HA controls, or MCP tools are used on ordinary requests. A separately scoped
+Music-Assistant-only satellite route is described below.
 For a match, the caller retains only their normal HA permissions; MCP remains
 administrator-only and read-only. Voice is not a login or sensitive-action approval.
+
+### Restricted satellite music control (source-only)
+
+The Codex integration source includes a separate `codex_assist_music` API for
+Assist satellite turns. It requires a verified Voice Match packet assigned to an
+active, non-system HA account, then checks that account's `control` permission for
+each selected player. The actual request `Context` and `user_id` are never replaced.
+The API supplies only one fixed Music Assistant tool; it does not expose general
+Assist, MCP, web-search, native-intent or arbitrary service tools, and satellite
+turns do not inherit earlier conversation/tool history.
+
+Only media-player entities explicitly selected in **Configure → Voice Match music
+access** are eligible; each must also belong to the Music Assistant integration,
+be exposed to Assist, be available, and pass the account permission check. Playback
+search results are bounded and require a candidate selection before playback.
+Transport, volume, queue read and queue clear are fixed operations. Room and speaker
+resolution uses the request satellite/device area, area names/aliases, and exact
+entity names/aliases; zero or multiple matches require clarification. Unmapped
+rooms remain unavailable until separately configured.
+
+This is **source work only**: it is not installed, enabled, or acceptance-tested on
+the live Home Assistant instance. Room/player assignments, allowed-player selection,
+script routing, deployment, restart, and physical playback acceptance need separate
+review and approval. Voice Match remains a probabilistic speaker signal, not a login;
+physical false matches and replay risks still apply.
 
 ## Transport and conversation scope
 
