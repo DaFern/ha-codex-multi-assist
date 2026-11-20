@@ -27,6 +27,7 @@ class _Pending:
     wire: str
     key_digest: bytes
     expires: float
+    created_at: float
     cleanup: object = None
     timer: object = None
 
@@ -61,7 +62,8 @@ class RequestHandoffs:
         identifier = id(text)
         remaining = max(0, issued + TTL + 60 - (time.time() if now is None else now))
         record = _Pending(None, weakref.ref(owner), wire,
-                          hashlib.sha256(key.encode()).digest(), loop.time() + remaining)
+                          hashlib.sha256(key.encode()).digest(), loop.time() + remaining,
+                          time.monotonic())
 
         def cleanup(_event=None):
             if self.pending.get(identifier) is not record:
@@ -79,7 +81,7 @@ class RequestHandoffs:
         owner.add_done_callback(cleanup)
         return text
 
-    def consume(self, key, text, *, now=None):
+    def consume(self, key, text, *, now=None, not_before=None):
         if not isinstance(text, SpeakerTranscript):
             # Plain/serialized text has no identity. Do not guess a matching one.
             return None
@@ -88,6 +90,8 @@ class RequestHandoffs:
                 or record.owner() is not asyncio.current_task()):
             raise PacketError()
         try:
+            if not_before is not None and record.created_at < not_before:
+                raise PacketError()
             if asyncio.current_task().cancelling():
                 raise asyncio.CancelledError()
             if not isinstance(key, str):

@@ -1,5 +1,149 @@
 # Testing
 
+## Experimental protected existing-satellite source stage
+
+The paired `test_satellite_admission.py` now includes the per-instance adapter
+hook → native STT-only controller → private Voice Match handoff → real compiled
+RBAC policy → bounded protected model loop → native service admission → native
+TTS-only controller. It covers guest/child/adult/owner grants, forbidden targets,
+unchanged Context, no native intent-stage entry, incomplete/forged input,
+disconnect cancellation during STT/model handling, reconnect admission, changed
+client/configuration and denial-hook takeover/restoration through reload.
+
+**These are source-level end-to-end tests, not physical Kiosk acceptance.**
+The original tests simulate ESPHome object shapes and authenticated network
+connections. STT/model responses and TTS synthesis are external-provider stand-ins;
+HA's stage controllers, handoff, role compiler and service admission run for real.
+The follow-up below adds native ESPHome-class coverage but does not perform socket
+authentication or physical-device acceptance.
+`tests_ha/test_protected_model.py` separately checks complete-stream buffering,
+query-tool replay, fixed-tool/schema validation and failure speech. None of this
+authorises deployment, a Core restart or live device actions.
+
+Adapter-stage validation passed 237 paired RBAC checks on current HA; minimum HA
+passed 189 with 48 unsupported modern-tool/adapter skips. Full Codex native runs
+passed 714 with one skip on HA 2026.10 and 424 with 203 skips on HA 2026.6.
+After the final projection recheck and enrollment test edits, the focused native
+guest/options/model selection passed 26; the fast suite passed 1,089 plus 32
+subtests. Lint, diff and distribution checks passed. The full native runs preceded
+those final focused edits and are not an exact final-tree full-suite run. Neither
+ESPHome native-class validation nor a physical Kiosk turn was performed. No source
+was committed/pushed, deployed or restarted.
+
+### Approved constructor-guard redesign
+
+`kiosk_lifecycle.py` adds an explicitly approved class-wide runtime constructor
+hook, filtered to administrator-enrolled ESPHome config entries. It synchronously
+installs the per-instance audio guard before construction returns to platform
+setup. A replacement revokes old bindings and cancels active STT/model/tool work.
+Closed owners continue guarding newly constructed instances during Codex reload;
+a replacement owner takes over without restoring unrestricted Assist. Explicit
+de-enrollment restores only the exact constructor/instance hooks still owned by
+the adapter. Unenrolled entries are left untouched.
+
+The previously strict-xfailed replacement regression is now an ordinary passing
+test, parameterized for guest/child/adult/owner permissions and denied targets.
+Further real native-class regressions cover active-model cancellation, stale
+instance/binding denial, changed unique identity, construction while the owner
+is closed, enrollment before platform entity creation, unrelated entries and
+non-clobbering restoration when a peer has installed a newer constructor hook.
+The paired current-HA selection passed **262 tests with no skips or xfails**.
+Minimum HA passed 189 with 73 unsupported modern-tool/native-lifecycle skips.
+The final lifecycle case also verifies that removing one enrolled owner leaves the
+other protected, and that the original constructor returns only after the final
+owner explicitly de-enrolls.
+
+Fresh full Codex native suites passed 715 with one skip on HA 2026.10 and 424
+with 204 unsupported/version-specific skips on HA 2026.6. Fast tests passed 1,089
+plus 32 subtests. Both source lint checks, diff checks and distribution projection
+passed. Skips do not establish support for protected tools on minimum HA.
+
+This is an unsupported class-wide runtime patch, not a supported HA extension
+point. It is neither a Core-file edit nor a global intent/service patch. Tests
+control socket readiness and external providers; they do not prove cryptographic
+authentication or physical Kiosk behaviour. The late-construction test proves
+protection after enrollment is installed, not before Codex setup on a cold boot.
+Whole-system startup ordering and physical acceptance remain deployment gates.
+Publication does not activate this redesign: no live installation or restart was
+performed during these source tests. Deployment requires a separate review.
+
+### Initial native ESPHome-class follow-up (historical blocker)
+
+With separate approval, installed `aioesphomeapi==46.6.0`,
+`esphome-dashboard-api==1.4.0`, `bleak-esphome==4.0.0` and their resolved
+dependencies only in `/data/v2/cache/opencode/codex-speaker-ha-current`.
+USB discovery/serial proxy and optional audio-enhancement imports are test doubles.
+The real native satellite, runtime, API client and connection classes are used,
+including `handle_pipeline_start`, the native audio queue/stop path and runtime
+disconnect/reconnect callbacks. Real library readiness fields are controlled in
+tests; no cryptographic handshake, socket provenance or actual Kiosk is verified.
+
+The native selection passed 11 tests. A strict expected-failure regression,
+`test_replaced_native_entity_cannot_return_to_ordinary_pipeline`, confirmed a
+**release blocker**: replacing the native entity loses the instance-only hook.
+Its test-only ordinary-pipeline sentinel was reached. No unrestricted intent or
+live service executed in that test. The old connection validator refuses the
+replacement, but that does not protect a new entity that never enters the adapter.
+Initial startup ordering remains another unverified gate. Do not deploy this
+prototype as protected Kiosk access or treat the xfail as a passing security check.
+A lifecycle design revision was required at that stage; no class-wide patch had
+yet been approved. The constructor redesign above resolves this regression.
+The full paired selection after that follow-up passed 248 checks with this one
+strict expected failure and no skips. RBAC lint and both checkout diff checks
+passed. Production integration source was unchanged during the dependency/native
+test follow-up; only tests and development documentation changed.
+
+`tests/test_guest_policy.py` covers provider version/shape failures and admin role
+selection, removal and disable semantics without changing RBAC roles. Native
+`test_guest_options.py` exercises the supported HA options editor; the old-HA branch
+proves the unsupported option stays hidden. `test_guest_control.py` exercises real
+native services with simulated admission/policy, including fixed on/off/music,
+request-local search/playback, original Context preservation, replay and revocation.
+
+The paired RBAC checkout adds real compiled-domain tests in `test_guest_voice.py`.
+Its expanded `test_satellite_admission.py` pairs the real role compiler, private
+neutral handoff, admission scope and guest tools, including domain removal,
+caller/key/role changes, source loss, held tools after return, serialized/unbound
+packet refusal and disconnect cancellation. Run it with both checkouts in the
+namespace as described below; ordinary fixture skips are not integrated validation.
+The real connection validator is still simulated, not proof of live Kiosk provenance.
+Ordinary neutral conversation tests assert that neither the old entity-list option
+nor the new role option grants tools without protected admission.
+
+Fresh guest-stage validation passed 1,089 fast tests plus 32 subtests, the full
+HA 2026.10 native suite (707 passed, one version-specific skip), and the full
+HA 2026.6 native suite (424 passed, 202 unsupported/version-specific skips).
+The paired RBAC guest/admission/existing-intent-policy selection passed 202 on
+current HA with no skips, and 189 on minimum HA with 13 modern guest-tool skips.
+Those skips do not establish guest-tool support on minimum HA. Full RBAC was not
+run. Source lint and distribution checks passed; nothing was deployed or published.
+
+## Satellite compatibility and denial regression checks
+
+`tests/test_satellite_compat.py` requires every modern native capability, rejects
+API-registration-only support, and verifies unsupported option saves leave settings
+unchanged. Modern music/neutral-provider tests are explicitly current-HA-only;
+`tests_ha/test_satellite_denials.py` runs on both minimum and current HA instead of
+skipping the older-HA rejection boundary.
+
+The native denial cases cover unsupported APIs, missing/invalid voice packets,
+missing satellites, account mismatch/inactivity, empty neutral permissions and nonce
+replay. They assert no tool discovery, model request or fixed device-service call,
+unchanged original caller identity and unchanged target state. They exercise
+synthetic native conversation requests, not the physical Kiosk transport or live
+end-to-end recognised-user/guest RBAC enforcement. No transport or RBAC exception
+is activated by these tests or the compatibility guards.
+
+The repaired direct-Wyoming positive fixtures use the existing account-bound
+packet helper. Separate unbound/mismatched-account cases retain ordinary dialogue
+only, with no tools, personalisation or device-service calls; the runtime identity
+check was not relaxed. Fresh full runs passed 1,068 fast tests plus 32 subtests,
+687 native tests on HA 2026.10 (one version-specific skip), and 421 on HA 2026.6
+(201 unsupported/version-specific skips). The paired-checkout RBAC
+intent-surface/oracle/satellite-policy selection passed 95 on each version with
+no skips. Full-repository Ruff and distribution projection checks also passed.
+These are development checks, not deployment, physical audio or live Kiosk acceptance.
+
 The Music Assistant satellite path has focused tests in
 `tests_ha/test_music_control.py` for fail-closed API exposure, exact request
 context binding, and the single-tool boundary. Run them with the HA-native test

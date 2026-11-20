@@ -90,20 +90,69 @@ starting a fresh supported native chat session after changes or lost ownership.
 Native Assist controls and AI Task remain separate. This is issue #8's restricted
 first milestone, not its full identity, per-user policy or write-approval design.
 
-### Music-only Voice Match satellite path
+### Voice Match satellite access
 
-The Codex source now has a separate `codex_assist_music` native LLM API for
-satellite turns. It is populated only from the current verified, account-linked
-Voice Match request and provides one fixed Music Assistant tool. It does not merge
-the ordinary Assist API, MCP tools, web search, native intent execution, speaker
-automations, or earlier conversation/tool history into that turn. The encrypted
-profile's active HA account is used only for per-player control-permission checks;
-the original Home Assistant `Context` remains unchanged for every service call.
-Targets must be in the entry's explicitly configured Music Assistant allowlist,
-Assist-exposed, available, and controlled by the linked account. Room/speaker
-resolution requires one exact eligible match; uncertain or unmapped rooms prompt
-for clarification. This source path is not deployed or physically acceptance-tested;
-live player selection, room assignments and routing remain separately gated.
+Modern satellite providers are loaded only after checking HA's typed tool results,
+annotations, native API access and matching Probatio schema support. Shared constants
+are independent of those providers, so ordinary Codex setup/conversation retains the
+HA 2026.6 floor. Unsupported satellite turns return a denial before tool discovery;
+they never fall back to ordinary Assist, guest authority or a service bridge. Provider
+registration and the satellite options use the same capability boundary. None of
+these checks relaxes RBAC's existing conversation/pipeline ingress denial.
+
+Satellite requests split by current packet status. A confidently matched profile is
+accepted only when its active enrolled HA account equals the user on the original
+request `Context`. That turn uses Home Assistant's native Assist API and the separate
+`codex_assist_music` API; Codex MCP and hosted web search are omitted. No account or
+context is substituted. Native Assist exposure and the original context govern its
+standard controls; the Music Assistant tool additionally checks the linked account's
+per-player control permission, the entry allowlist, exposure and player availability.
+
+Guest policy uses the additive `GUEST_POLICY_VERSION=1` RBAC interface and the selected
+`guest_voice_role_id`, never a second entity/domain permission list. The administrator
+selector receives only bounded restricted-role IDs/labels. Domain/entity grants,
+denials, schedules and hidden fields stay in the existing compiled RBAC policy.
+The separate guest action contract supports direct switch/light/fan on/off and fixed
+Music Assistant controls without widening the legacy dual-account or satellite APIs.
+
+`ProtectedSatelliteDispatcher.async_guest_turn` consumes the same one-use transport
+admission and private post-admission STT handoff as exact dispatch. It supplies a
+trusted server handler with a filtered prompt and scoped tools from `guest_control.py`.
+The exact native on/off guard checks the whole batch and again in each native task.
+Guest music reuses the fixed music tool and request-local search candidates with a
+separate role checker, never a synthetic HA user. Scope expiry, source disconnect,
+caller/key/role changes and callback completion revoke tool authority.
+
+`kiosk_adapter.py` adds an opt-in, entry-owned, per-instance hook on existing
+ESPHome satellite entities, without replacing their subscriptions or modifying Core.
+It checks the exact native entity/runtime/client/connection, encrypted session
+readiness, registry and configuration identity, selected Codex agent and paired STT.
+Disconnect cancels STT/model/tool work and revokes leases. Closed hooks deny through
+reload; a replacement may take over the exact hook. Native restoration requires
+explicit de-enrollment and never overwrites a newer peer hook.
+
+`protected_pipeline.py` runs native STT-only and TTS-only stages on the same task.
+The native intent stage, pre-agent sentence triggers, ordinary conversation,
+history, general Assist discovery and prompt templates are not entered.
+`protected_model.py` buffers completed responses, permits only supplied fixed tools,
+bounds rounds/calls/results, preserves original Context and uses the existing token
+coordinator. Recognition selects own-user native/RBAC policy, never a kiosk ceiling;
+neutral evidence selects only the configured guest role. Invalid evidence denies.
+Projection authority is rechecked after model awaits before returning speech.
+
+This remains undeployed source. Native stage-controller tests use simulated
+network authentication, external speech and model providers. A follow-up using real
+ESPHome classes found that the instance-only hook did not follow replacements.
+The explicitly approved redesign in `kiosk_lifecycle.py` intercepts the native
+class constructor, filters by enrolled ESPHome entry, and installs the instance
+guard synchronously before returning the new entity to platform setup. Old bindings
+and work are revoked; closed owners keep replacements guarded during reload.
+The replacement regression now passes rather than xfails. This is a class-wide
+runtime patch, not a supported extension point or a Core-file/global-intent edit.
+Cold-boot ordering before enrollment setup, socket authentication and physical
+Kiosk acceptance remain release gates. Ordinary neutral
+conversation requests still deny; no raw satellite IDs, serialized packets,
+model-selected identities, ingress exceptions or general Assist forwarding grant access.
 
 - **Config flow** handles Codex-style device-code sign-in. It stores OAuth tokens in the Home Assistant config entry and exposes integration options.
 - **Model discovery** uses only visible model IDs returned for the signed-in account. An entry-scoped, in-memory cache survives temporary failures; a small, explicitly unverified fallback list is used only before a successful result.

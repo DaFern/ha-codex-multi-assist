@@ -242,7 +242,7 @@ async def test_direct_native_pipeline_has_one_stt_and_preserves_context(
     direct, peer, hass, instructions,
 ):
     p = direct
-    peer.packets[1] = packet(p.key, instructions=instructions, speaker_name="Alice")
+    peer.packets[1] = p.packet(instructions=instructions, speaker_name="Alice")
     events = await p.run(1)
     assert not [event for event in events if event.type == "error"]
     assert event_data(events, "stt-end")["stt_output"]["text"] == "hello"
@@ -256,14 +256,44 @@ async def test_direct_native_pipeline_has_one_stt_and_preserves_context(
     # The direct connection registers no Wyoming source as a side effect.
     assert not hass.config_entries.async_entries("wyoming")
 
-    peer.packets[2] = packet(p.key, voice="alice", instructions="", speaker_name="Alice")
-    peer.packets[3] = packet(p.key, voice="bob", instructions="", speaker_name="Bob")
+    peer.packets[2] = p.packet(voice="alice", instructions="", speaker_name="Alice")
+    peer.packets[3] = p.packet(voice="bob", instructions="", speaker_name="Bob")
     concurrent = await asyncio.gather(p.run(2), p.run(3))
     assert all(event_data(events, "stt-end")["stt_output"]["text"] == "hello"
                for events in concurrent)
     prompts = [call["instructions"] for call in p.calls[-2:]]
     assert sum('"Alice"' in prompt for prompt in prompts) == 1
     assert sum('"Bob"' in prompt for prompt in prompts) == 1
+
+
+@pytest.mark.parametrize("account", [None, "different-account"])
+async def test_direct_unbound_or_mismatched_voice_has_no_tools_or_personalisation(
+    direct, peer, hass, account,
+):
+    from homeassistant.core import Context
+
+    p = direct
+    peer.packets[1] = packet(
+        p.key, instructions="Private style", speaker_name="Alice", ha_user_id=account,
+    )
+    calls = []
+
+    async def turn_on(call):
+        calls.append(call)
+
+    hass.services.async_register("light", "turn_on", turn_on)
+    context = Context(user_id=p.user_id)
+    events = await p.run(1, context=context)
+    assert not [event for event in events if event.type == "error"]
+    assert event_data(events, "stt-end")["stt_output"]["text"] == "hello"
+    assert len(p.calls) == 1  # Ordinary dialogue may continue without authority.
+    assert p.calls[0]["tools"] == []
+    assert '"Alice"' not in p.calls[0]["instructions"]
+    assert "Private style" not in p.calls[0]["instructions"]
+    assert "Do not claim to have read or changed" in p.calls[0]["instructions"]
+    assert calls == []
+    assert context.user_id == p.user_id
+    assert not runtime_for_entry(p.entry).handoffs.pending
 
 
 @pytest.mark.parametrize("result", ["plain", "wrong_key", "empty"])
@@ -320,7 +350,7 @@ async def test_migration_keeps_existing_entity_and_pipeline_binding(managed, pee
     old = managed.adapter
     options = {**managed.entry.options, **peer.options}
     options.pop(CONF_PERSONAL_STT_SOURCE)
-    peer.packets[1] = packet(managed.key, speaker_name="Alice")
+    peer.packets[1] = managed.packet(speaker_name="Alice")
     hass.config_entries.async_update_entry(managed.entry, options=options)
     await hass.async_block_till_done()
     current = stt.async_get_speech_to_text_entity(hass, old.entity_id)

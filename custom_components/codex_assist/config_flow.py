@@ -30,10 +30,15 @@ from .codex_image import (
 from .codex_models import ModelCatalog, ModelDiscoveryCache, fetch_codex_model_ids
 from .codex_runtime import runtime_token_coordinator
 from .entry_modules import CONF_MODULE, EntryModule, entry_module
+from .guest_policy import CONF_GUEST_ROLE, async_guest_role_choices
 from .learning.config_flow import LearningConfigFlowMixin, LearningOptionsFlow
 from .mcp_config_flow import MCPOptionsMixin
-from .music_control import CONF_MUSIC_PLAYER_IDS, MAX_PLAYERS
 from .model_discovery import async_entry_model_catalog
+from .satellite_constants import (
+    CONF_MUSIC_PLAYER_IDS,
+    MAX_PLAYERS,
+)
+from .satellite_runtime import satellite_tools_supported
 from .speaker_packet import valid_key
 from .voice_match import (
     CONF_CLEAN_TRANSCRIPT,
@@ -261,13 +266,90 @@ class CodexAssistOptionsFlow(MCPOptionsMixin, config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         if entry_module(self.config_entry) is not EntryModule.CODEX:
             return self.async_abort(reason="learning_reconfigure_required")
-        return self.async_show_menu(
-            step_id="init",
-            menu_options=["settings", "agents", "voice_match", "music", "mcp"],
+        menu = ["settings", "agents", "voice_match"]
+        if satellite_tools_supported():
+            menu.extend(["music", "guest"])
+        menu.append("mcp")
+        return self.async_show_menu(step_id="init", menu_options=menu)
+
+    async def async_step_guest(self, user_input=None):
+        """Select an existing restricted role; its domain rules stay in RBAC."""
+        if not satellite_tools_supported():
+            return self.async_abort(reason="satellite_requires_current_ha")
+        roles = await async_guest_role_choices(self.hass)
+        errors = {} if roles is not None else {"base": "guest_policy_unavailable"}
+        saved = self.config_entry.options.get(CONF_GUEST_ROLE, "")
+        saved = saved if isinstance(saved, str) else ""
+        if user_input is not None:
+            selected = user_input.get(CONF_GUEST_ROLE, "")
+            options = dict(self.config_entry.options)
+            enrolled = user_input.get("protected_satellite_ids")
+            if enrolled is not None:
+                from homeassistant.helpers import entity_registry as er
+
+                registry = er.async_get(self.hass)
+                if (
+                    type(enrolled) is not list or len(enrolled) > 32
+                    or any(type(eid) is not str for eid in enrolled)
+                    or len(set(enrolled)) != len(enrolled)
+                    or any(
+                        (entity := registry.async_get(eid)) is None
+                        or entity.domain != "assist_satellite"
+                        or entity.platform != "esphome" or entity.disabled_by is not None
+                        for eid in enrolled
+                    )
+                ):
+                    errors["base"] = "invalid_protected_satellites"
+                elif enrolled:
+                    options["protected_satellite_ids"] = enrolled
+                else:
+                    options.pop("protected_satellite_ids", None)
+            if selected != "" and (
+                type(selected) is not str or roles is None or selected not in roles
+            ):
+                errors["base"] = "invalid_guest_role"
+            elif errors.get("base") != "invalid_protected_satellites":
+                if selected:
+                    options[CONF_GUEST_ROLE] = selected
+                else:
+                    options.pop(CONF_GUEST_ROLE, None)
+                return self.async_create_entry(title="", data=options)
+        choices = [selector.SelectOptionDict(value="", label="Disabled")]
+        choices.extend(
+            selector.SelectOptionDict(value=role_id, label=name)
+            for role_id, name in (roles or {}).items()
         )
+        if saved and saved not in (roles or {}):
+            choices.append(selector.SelectOptionDict(
+                value=saved, label="Saved role (currently unavailable)",
+            ))
+        return self.async_show_form(
+            step_id="guest",
+            data_schema=vol.Schema({
+                vol.Optional(CONF_GUEST_ROLE, default=saved): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=choices, mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional("protected_satellite_ids", description={
+                    "suggested_value": self.config_entry.options.get("protected_satellite_ids", []),
+                }): selector.EntitySelector(selector.EntitySelectorConfig(
+                    domain="assist_satellite", integration="esphome", multiple=True,
+                )),
+            }),
+            errors=errors,
+        )
+
+    async def async_step_neutral_satellite(self, user_input=None):
+        """Do not save the superseded entity-list draft as a guest permission."""
+        if not satellite_tools_supported():
+            return self.async_abort(reason="satellite_requires_current_ha")
+        return self.async_abort(reason="guest_role_required")
 
     async def async_step_music(self, user_input=None):
         """Select the Music Assistant players available to verified Voice Match."""
+        if not satellite_tools_supported():
+            return self.async_abort(reason="satellite_requires_current_ha")
         from homeassistant.helpers import entity_registry as er
 
         errors = {}

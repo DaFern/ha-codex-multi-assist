@@ -16,15 +16,16 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import llm
 
+from .satellite_constants import CONF_MUSIC_PLAYER_IDS as CONF_MUSIC_PLAYER_IDS
+from .satellite_constants import MAX_PLAYERS as MAX_PLAYERS
+from .satellite_constants import MUSIC_API_ID as MUSIC_API_ID
+
 if TYPE_CHECKING:
     from homeassistant.core import Context, HomeAssistant
 
     from .voice_match import PreparedRequest
 
 
-CONF_MUSIC_PLAYER_IDS = "music_player_ids"
-MUSIC_API_ID = "codex_assist_music"
-MAX_PLAYERS = 32
 MAX_SEARCH_ITEMS = 10
 
 _MUSIC_AUTH: ContextVar[MusicAuthorization | None] = ContextVar(
@@ -116,24 +117,16 @@ class MusicControlTool(llm.Tool):
 
     async def async_call(self, hass: HomeAssistant, tool_input, llm_context):
         auth = self._authorization
-        if (
-            llm_context.context is not auth.context
-            or not auth.prepared_request.verified
-            or not auth.prepared_request.voice
-            or auth.prepared_request.ha_user_id != auth.user_id
-        ):
+        if not self._request_identity_valid(llm_context):
             return llm.ToolResult(data={"error": "Music control is not authorized."}, error=True)
         args = self.parameters(tool_input.tool_args)
         target_id, problem = self._resolve_target(hass, auth, args)
         if target_id is None:
-            return llm.ToolResult(data={"status": "clarify", "message": problem})
-        user = await hass.auth.async_get_user(auth.user_id)
-        if not user or not user.is_active or user.system_generated:
-            return llm.ToolResult(data={"error": "Music control is not authorized."}, error=True)
-        if not self._target_is_allowed(hass, user, auth, target_id):
             return llm.ToolResult(
-                data={"status": "clarify", "message": "Choose an available Music Assistant speaker."}
+                data={"response_type": "query_answer", "status": "clarify", "message": problem}
             )
+        if problem := await self._target_problem(hass, auth, target_id):
+            return problem
         action = args["action"]
         try:
             if action == "play":
@@ -141,7 +134,8 @@ class MusicControlTool(llm.Tool):
                     return await self._play_candidate(hass, auth, target_id, candidate_id, args)
                 if not (query := args.get("query")):
                     return llm.ToolResult(
-                        data={"status": "clarify", "message": "What would you like to play?"}
+                        data={"response_type": "query_answer", "status": "clarify",
+                              "message": "What would you like to play?"}
                     )
                 return await self._search(hass, auth, target_id, query, args.get("kind"))
             if action == "queue":
@@ -174,13 +168,35 @@ class MusicControlTool(llm.Tool):
             )
             if action == "volume" and "level" not in args:
                 return llm.ToolResult(
-                    data={"status": "clarify", "message": "What volume level from 0 to 100?"}
+                    data={"response_type": "query_answer", "status": "clarify",
+                          "message": "What volume level from 0 to 100?"}
                 )
             return await self._call_player(hass, auth, target_id, service, data)
         except Exception:
             return llm.ToolResult(
                 data={"error": "Music Assistant could not complete that request."}, error=True
             )
+
+    def _request_identity_valid(self, llm_context):
+        """Recognised-user contract; guest subclasses supply separate authority."""
+        auth = self._authorization
+        return (
+            llm_context.context is auth.context
+            and auth.prepared_request.verified
+            and bool(auth.prepared_request.voice)
+            and auth.prepared_request.ha_user_id == auth.user_id
+        )
+
+    async def _target_problem(self, hass, auth, target_id):
+        user = await hass.auth.async_get_user(auth.user_id)
+        if not user or not user.is_active or user.system_generated:
+            return llm.ToolResult(data={"error": "Music control is not authorized."}, error=True)
+        if not self._target_is_allowed(hass, user, auth, target_id):
+            return llm.ToolResult(
+                data={"response_type": "query_answer", "status": "clarify",
+                      "message": "Choose an available Music Assistant speaker."}
+            )
+        return None
 
     def _resolve_target(self, hass, auth: MusicAuthorization, args: dict[str, Any]):
         """Resolve only exact configured entities, never a similarly named Alexa player."""
@@ -344,8 +360,11 @@ class MusicControlTool(llm.Tool):
                 "type": _bounded_text(row.get("media_type")),
             })
         if not results:
-            return llm.ToolResult(data={"status": "not_found"})
-        return llm.ToolResult(data={"status": "selection_required", "results": results})
+            return llm.ToolResult(data={"response_type": "query_answer", "status": "not_found"})
+        return llm.ToolResult(
+            data={"response_type": "query_answer", "status": "selection_required",
+                  "results": results}
+        )
 
     async def _play_candidate(self, hass, auth, target_id: str, candidate_id: str, args):
         candidate = auth.candidates.get(candidate_id)
@@ -422,13 +441,13 @@ class MusicControlTool(llm.Tool):
 
     def _queue_result(self, response: Any, target_id: str) -> dict[str, Any]:
         if not isinstance(response, dict):
-            return {"status": "unconfirmed"}
+            return {"response_type": "query_answer", "status": "unconfirmed"}
         player_queue = response.get(target_id)
         if not isinstance(player_queue, dict):
-            return {"status": "unconfirmed"}
+            return {"response_type": "query_answer", "status": "unconfirmed"}
         queue = player_queue.get("items", player_queue.get("queue", []))
         if not isinstance(queue, list):
-            return {"status": "unconfirmed"}
+            return {"response_type": "query_answer", "status": "unconfirmed"}
         items = []
         for row in queue[:MAX_SEARCH_ITEMS]:
             if isinstance(row, dict):
@@ -446,4 +465,5 @@ class MusicControlTool(llm.Tool):
             if isinstance(current, dict)
             else None
         )
-        return {"status": "ok", "current": current_item, "items": items}
+        return {"response_type": "query_answer", "status": "ok",
+                "current": current_item, "items": items}

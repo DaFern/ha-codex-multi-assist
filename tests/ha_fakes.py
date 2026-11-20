@@ -27,6 +27,7 @@ def install_homeassistant_fakes(monkeypatch):
     core = types.ModuleType("homeassistant.core")
     exceptions = types.ModuleType("homeassistant.exceptions")
     helpers = types.ModuleType("homeassistant.helpers")
+    config_validation = types.ModuleType("homeassistant.helpers.config_validation")
     entity_platform = types.ModuleType("homeassistant.helpers.entity_platform")
     httpx_client = types.ModuleType("homeassistant.helpers.httpx_client")
     helpers_json = types.ModuleType("homeassistant.helpers.json")
@@ -175,6 +176,16 @@ def install_homeassistant_fakes(monkeypatch):
     class TextSelector:
         config: TextSelectorConfig | None = None
 
+    @dataclass
+    class EntitySelectorConfig:
+        domain: str
+        integration: str
+        multiple: bool = False
+
+    @dataclass
+    class EntitySelector:
+        config: EntitySelectorConfig
+
     class Section:
         def __init__(self, schema, options=None):
             self.schema = schema
@@ -196,9 +207,10 @@ def install_homeassistant_fakes(monkeypatch):
         pass
 
     class Optional:
-        def __init__(self, key, default=None):
+        def __init__(self, key, default=None, description=None):
             self.schema = key
             self.default = default
+            self.description = description
 
         def __hash__(self):
             return hash((self.schema, self.default))
@@ -263,6 +275,8 @@ def install_homeassistant_fakes(monkeypatch):
     selector.SelectSelectorMode = SelectSelectorMode
     selector.TextSelector = TextSelector
     selector.TextSelectorConfig = TextSelectorConfig
+    selector.EntitySelector = EntitySelector
+    selector.EntitySelectorConfig = EntitySelectorConfig
     util_json.json_loads = __import__("json").loads
     # HA-specific values are covered with the real serializer in tests_ha/.
     helpers_json.json_dumps = __import__("json").dumps
@@ -284,6 +298,7 @@ def install_homeassistant_fakes(monkeypatch):
     components.conversation = conversation
     components.ai_task = ai_task
     helpers.entity_platform = entity_platform
+    helpers.config_validation = config_validation
     helpers.httpx_client = httpx_client
     helpers.json = helpers_json
     helpers.intent = intent
@@ -302,6 +317,7 @@ def install_homeassistant_fakes(monkeypatch):
         "homeassistant.core": core,
         "homeassistant.exceptions": exceptions,
         "homeassistant.helpers": helpers,
+        "homeassistant.helpers.config_validation": config_validation,
         "homeassistant.helpers.entity_platform": entity_platform,
         "homeassistant.helpers.httpx_client": httpx_client,
         "homeassistant.helpers.json": helpers_json,

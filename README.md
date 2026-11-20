@@ -35,6 +35,11 @@ plan with Codex access. Optional voice learning requires **HA 2026.10+**, the
 separate [Voice Match add-on](https://github.com/DaFern/wyoming-voice-match-ha),
 ordinary Wyoming Whisper and TTS, but **no ChatGPT account**.
 
+Optional music and entity-limited satellite tools require **HA 2026.10+** with
+the modern native tool/schema APIs. On older or incompatible HA, ordinary Codex
+features remain available, but satellite controls are denied and their setup
+options are unavailable. This never grants guest access or bypasses RBAC denials.
+
 [![Open fork in HACS (development only)](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=DaFern&repository=ha-codex-multi-assist&category=integration)
 [![Add the Codex Assist integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=codex_assist)
 
@@ -158,7 +163,7 @@ pressure and thermostat settings. It checks exposure and caller read permissions
 returns units/missing values honestly, and has no four-agent limit. It is not an
 unrestricted attribute dump. See [supported attributes and safeguards](docs/ENTITY_ATTRIBUTES.md).
 
-### Voice Match and optional response preferences
+### Voice Match and satellite access
 
 The experimental Voice Match connector can add a recognised person's response
 preferences to the selected agent without changing its personality or HA
@@ -166,6 +171,29 @@ permissions. It requires explicit pairing and reviewed add-on/integration update
 personal instructions are optional, not a separate STT mode.
 See [setup, privacy boundaries and rollback](docs/VOICE_MATCH.md). It does not
 authenticate speakers or retrieve private conversations by recognised identity.
+
+On the ordinary satellite path, a recognised fingerprint must match the active
+Home Assistant user to receive the native Assist controls available to that user.
+The **Guest voice role (development preview)** option selects an existing restricted
+RBAC role; administrators choose its domains and entity exceptions in RBAC. Current
+guest capabilities cover direct light/switch/plug/fan on/off and fixed Music Assistant
+controls. Selecting another domain does not create arbitrary service access.
+The default is Disabled; no role is created or changed automatically.
+
+**Guest execution remains source-only:** the experimental adapter can hook selected
+existing ESPHome satellites; the native STT → protected tools → TTS path is tested
+with simulated transport, model and speech providers. It is not deployed or verified
+on a physical Kiosk connection. Enrollment requires an authenticated encrypted
+ESPHome session and this entry's paired Voice Match STT. Ordinary unmatched turns
+outside the adapter still deny control, even with a selected role.
+The earlier neutral entity-list runtime fallback is disabled, not an alternative
+to RBAC. Missing/invalid/replayed voice evidence never becomes guest authority.
+Recognition thresholds and the original request `Context` are unchanged.
+The approved redesign uses an unsupported **class-wide constructor runtime hook**,
+filtered to enrolled entries, to guard replacement instances before audio setup.
+The replacement regression passes. Cold-boot ordering, socket authentication and
+physical Kiosk acceptance are not verified; this remains a source prototype, not
+deployment-ready protected access. See [RBAC Assist](docs/RBAC_ASSIST.md).
 
 Neutral voice matches can continue recent ordinary dialogue in the same active chat,
 without inheriting the earlier speaker's identity or restricted tools. Tool-bearing

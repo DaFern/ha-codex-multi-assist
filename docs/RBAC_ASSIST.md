@@ -2,6 +2,112 @@
 
 ## Status: inactive protected-path development, not working parental controls
 
+### Configurable guest domains (source only)
+
+Codex's **Guest voice role (development preview)** selector stores only an existing
+restricted RBAC role ID, Disabled by default. Administrators edit its Domains and
+entity exceptions in the existing RBAC panel; no role, binding or live permission
+is automatically created. The current capability set covers direct light/switch/
+fan on/off and fixed Music Assistant search, candidate playback, transport, volume
+and queue operations. Further role domains do not enable unsupported services.
+
+The additive `GUEST_POLICY_VERSION=1` provider returns bounded admin role labels,
+filtered state/name projections and fresh per-action decisions. Legacy
+`async_check_access` and `async_check_satellite_access` are not widened. Hidden
+identity/state, explicit denies, schedules, unavailable/replaced/group/template
+targets, music groups and missing/full-access roles deny guest actions.
+
+`SatelliteAdmissionRegistry.async_guest_turn` and the matching dispatcher method
+bind scoped guest tools to the existing single-use connection admission and
+post-admission private STT handoff. The original Context is preserved; the guest
+music subclass never resolves or impersonates an HA account. Source/role/key/caller
+changes, expiry, replay and disconnect revoke current authority. Native on/off
+execution retains the whole-batch and inside-task checks. Recognition thresholds,
+matched-user policy and ordinary free-text intent denials are unchanged.
+
+### Experimental existing-satellite adapter (source only)
+
+`kiosk_adapter.py` now connects the source contract to an administrator-enrolled
+existing native ESPHome satellite's per-instance audio entry point. It is an
+unsupported runtime hook, not a Core change, replacement integration or endpoint.
+The trusted callback validates the actual server-held entity/runtime/client/
+connection, configuration and registry identity, encrypted/authenticated readiness,
+and selected entry-owned Codex agent/Voice Match STT. Plaintext/unsupported or
+changed connections deny. Disconnect revokes leases and cancels pending STT as well
+as active model/tool work. New connections require fresh admission. Closed hooks
+deny during reload; only explicit de-enrollment restores the original method,
+and only when the method is still the exact hook owned by that adapter.
+
+The runner uses native `PipelineRun`/`PipelineInput` for STT-only and TTS-only
+stages on the admitting task, combines their run events, and never enters native
+intent recognition, sentence triggers, conversation history or general discovery.
+The bounded protected model loop buffers complete responses, validates tools and
+uses the existing entry token coordinator. No arbitrary service bridge is added.
+`async_voice_turn` chooses own-user RBAC/native policy for a verified enrolled
+speaker, or the selected guest role for verified neutral evidence; `async_guest_turn`
+retains its neutral-only contract. The original HA Context is never substituted.
+Candidate projection is bounded to 1,024 entities in provider batches of 32; fixed
+action batches remain limited to 32. Additional domains remain unsupported.
+
+**No live Kiosk connection is enrolled or deployed.** Paired tests reach the
+installed source hook, native STT, real role compilation, fixed model/tool dispatch,
+native service admission and native TTS. Network authentication, external STT/model
+responses and TTS synthesis are stand-ins. The original test environment lacked the
+optional ESPHome packages. The approved follow-up installed
+them only in the cached test environment and passed 11 real native-class/audio-entry
+checks with simulated readiness and external providers. It also confirmed a
+replacement gap in the original instance-only design. The owner subsequently
+approved a narrowly filtered **class-wide constructor runtime hook** as an explicit
+exception to the earlier no-global-runtime-patches constraint. `kiosk_lifecycle.py`
+installs each enrolled replacement's instance guard synchronously before returning
+the entity to native platform setup. Old connections and active work are revoked;
+closed owners guard replacements during reload. The guard can enroll from saved
+registry identity before an entity exists and leaves unrelated entries untouched.
+Only exact owned constructor/instance hooks are restored on explicit de-enrollment;
+a newer peer hook is never overwritten.
+
+The formerly xfailed replacement regression now passes for matched/guest grants
+and denials. The current paired selection passes 262 tests without skips/xfails.
+This remains an unsupported runtime patch, not a Core-file edit or global
+intent/service interception. Cold-boot ordering before Codex setup, actual socket
+authentication and physical-device acceptance remain unverified deployment gates.
+Ordinary unmatched conversation turns still deny control, including when a role is
+selected; the old entity-list fallback remains disabled.
+
+### Source-only satellite admission/execution contract
+
+The separate satellite path now connects RBAC's `satellite_admission.py` to
+Codex's `rbac_satellite.ProtectedSatelliteDispatcher` and the existing exact native
+execution guard. It uses the satellite-policy interface: a positively unmatched
+paired result selects the explicitly configured guest role; a matched result
+selects its enrolled user's own RBAC/native permissions, without a kiosk ceiling.
+The owner retains full supported access. Missing/unbound matched users do not
+fall back to guests. The existing kiosk path is unchanged.
+
+An authenticated transport integration must explicitly register an enrolled
+satellite's actual connection and a synchronous connection-liveness validator.
+The registry checks device registry identity, connection liveness, original Context,
+owning task, expiry and single-use admission. Only one pending/active audio turn
+per task is accepted. The paired private STT handoff must be issued after that
+admission on the same task; raw/serialized packets and supplied user/device IDs
+are not admission evidence.
+
+Dispatch accepts only bounded exact light/fan on/off proposals. It rebuilds readable
+RBAC context, rejects mixed forbidden batches, and rechecks policy and source
+liveness inside every native service task. Disconnect/unload revokes before
+cancelling; asynchronous teardown waits for the native child work. Cancellation
+propagates, uncertain device errors are not retried, and already admitted actions
+cannot be rolled back. Results expose fixed status/count only.
+
+**No live transport registers this path.** The tests simulate authenticated sessions;
+they do not authenticate network/audio hardware. An actual transport adapter must
+enter the protected path *instead of* the ordinary pipeline's pre-agent sentence
+triggers/local intents. There is no global patch, event-based identity inference,
+baseline Assist exception, model tool, free-speech resolver or enabled ESPHome
+interception. Existing live satellite routing is not secured by this source work.
+The paired protocol currently encodes explicit neutral results as v1; recognized
+v1 profiles lacking an enrolled account remain denied.
+
 ## Handoff checkpoint
 
 This batch is a source-only development checkpoint for issue #4. The companion

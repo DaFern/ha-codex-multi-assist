@@ -32,7 +32,7 @@ class ExactCommand:
     entity_ids: tuple[str, ...] = field(repr=False)
     _context: object = field(repr=False)
     _request: PreparedRequest = field(repr=False)
-    _caller: str = field(repr=False)
+    _caller: str | None = field(repr=False)
     _identities: tuple = field(repr=False)
     _expires: float = field(repr=False)
 
@@ -93,6 +93,10 @@ class SharedExecutionGuard:
                 and isinstance(prepared, PreparedRequest) and prepared.verified is True
                 and bool(prepared.voice) and bool(prepared.ha_user_id))
 
+    def _valid_entity_id(self, entity_id):
+        """Keep the legacy kiosk capability limited to light/fan on/off."""
+        return bool(ENTITY_ID.fullmatch(entity_id))
+
     def prepare(self, context, prepared_request, entity_ids, *, operation):
         """Seal one immutable, bounded proposal per exact prepared voice turn.
 
@@ -104,7 +108,7 @@ class SharedExecutionGuard:
         if (not self._eligible(context, prepared_request)
                 or operation not in ("turn_on", "turn_off")
                 or not isinstance(entity_ids, tuple) or not 0 < len(entity_ids) <= 32
-                or any(not isinstance(eid, str) or not ENTITY_ID.fullmatch(eid)
+                or any(not isinstance(eid, str) or not self._valid_entity_id(eid)
                        for eid in entity_ids)
                 or len(set(entity_ids)) != len(entity_ids)
                 or id(prepared_request) in self._turns

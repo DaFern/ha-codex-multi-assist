@@ -81,8 +81,13 @@ async def test_invalid_personal_sources_are_rejected(hass, discovered, invalid, 
 
 
 async def clean_options(hass, entry):
+    from custom_components.codex_assist.satellite_runtime import satellite_tools_supported
+
     result = await hass.config_entries.options.async_init(entry.entry_id)
-    assert set(result["menu_options"]) == {"settings", "agents", "voice_match", "mcp"}
+    expected = {"settings", "agents", "voice_match", "mcp"}
+    if satellite_tools_supported():
+        expected |= {"music", "guest"}
+    assert set(result["menu_options"]) == expected
     return await hass.config_entries.options.async_configure(
         result["flow_id"], user_input={"next_step_id": "voice_match"},
     )

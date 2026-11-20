@@ -16,6 +16,7 @@ from homeassistant.helpers import intent, llm
 
 from . import DOMAIN
 from .entity_attributes import ATTRIBUTE_NAMES, MAX_ATTRIBUTES, project_attributes
+from .satellite_runtime import satellite_assist_active
 
 schema = getattr(cv, "probatio", vol)
 TOOL_NAME = "codex_assist__GetEntityAttributes"
@@ -117,6 +118,8 @@ class EntityAttributesTool(llm.Tool):
 def async_get_tools(hass: HomeAssistant, llm_context: llm.LLMContext, api_id: str):
     """Contribute once per API request, independently of agent count or names."""
     if api_id != llm.LLM_API_ASSIST or not _context_allowed(llm_context):
+        return None
+    if satellite_assist_active():
         return None
     tools = [EntityAttributesTool()]
     # Import only on current HA: older native providers keep their existing path.

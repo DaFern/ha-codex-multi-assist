@@ -45,36 +45,64 @@ provider. Never store secrets or sensitive facts. Packet v2 also carries the enr
 profile's assigned HA user ID encrypted; Codex accepts account-bound voice context only
 when that ID matches the active HA caller. HA `Context` is never replaced or impersonated.
 An unassigned/neutral profile, legacy v1 packet, inactive/system account, or caller
-mismatch fails closed: no profile name/preferences, speaker automation, native
-HA controls, or MCP tools are used on ordinary requests. A separately scoped
-Music-Assistant-only satellite route is described below.
-For a match, the caller retains only their normal HA permissions; MCP remains
-administrator-only and read-only. Voice is not a login or sensitive-action approval.
+mismatch supplies no profile name/preferences or speaker automation. Ordinary
+non-satellite turns receive no Home Assistant control tools when the account does
+not match. Satellite access follows the separate matched and neutral rules below.
+MCP remains administrator-only and read-only. Voice is not a login or sensitive-action
+approval.
 
-### Restricted satellite music control (source-only)
+### Satellite entity access
 
-The Codex integration source includes a separate `codex_assist_music` API for
-Assist satellite turns. It requires a verified Voice Match packet assigned to an
-active, non-system HA account, then checks that account's `control` permission for
-each selected player. The actual request `Context` and `user_id` are never replaced.
-The API supplies only one fixed Music Assistant tool; it does not expose general
-Assist, MCP, web-search, native-intent or arbitrary service tools, and satellite
-turns do not inherit earlier conversation/tool history.
+Satellite turns have two isolated routes. A confidently matched voice is accepted
+only when its enrolled HA user is the active user on the original satellite request.
+It receives Home Assistant's native Assist tools under that unchanged request
+`Context`, plus the separate Music Assistant tool. The request is never impersonated;
+Home Assistant exposure and user permissions remain in force. Codex MCP and web
+search are not added to satellite turns.
 
-Only media-player entities explicitly selected in **Configure → Voice Match music
-access** are eligible; each must also belong to the Music Assistant integration,
-be exposed to Assist, be available, and pass the account permission check. Playback
-search results are bounded and require a candidate selection before playback.
-Transport, volume, queue read and queue clear are fixed operations. Room and speaker
-resolution uses the request satellite/device area, area names/aliases, and exact
-entity names/aliases; zero or multiple matches require clarification. Unmapped
-rooms remain unavailable until separately configured.
+The source-only **Configure → Guest voice role** preview selects an existing
+restricted RBAC role, Disabled by default. In RBAC's existing role editor, select
+the allowed **Domains** and any entity exceptions. For basic guest controls select
+`switch` (including plugs), `light`, `fan`, and `media_player`; no household role or
+grant is installed automatically. Removing a domain revokes it on the next check.
+The tool vocabulary is deliberately narrower than arbitrary domain services:
+on/off for direct lights/switches/fans, plus search, selection, transport, volume
+and queue controls for Music Assistant players. Group/template indirection, player
+groups, scripts, automation triggers and arbitrary services stay denied.
 
-This is **source work only**: it is not installed, enabled, or acceptance-tested on
-the live Home Assistant instance. Room/player assignments, allowed-player selection,
-script routing, deployment, restart, and physical playback acceptance need separate
-review and approval. Voice Match remains a probabilistic speaker signal, not a login;
-physical false matches and replay risks still apply.
+The guarded guest handler requires a real, currently admitted satellite connection,
+a fresh private same-task neutral STT handoff, current role policy and exposed
+available targets. It preserves the original HA `Context`, does not look up or
+impersonate a guest user, and never borrows the earlier recognised speaker.
+The existing packet protocol encodes explicit neutral results as v1; an unbound
+recognised v1 profile is not a guest. Missing, malformed, expired or replayed
+evidence stays denied. Recognition thresholds are unchanged.
+
+**This is not enabled in the live Kiosk path.** The experimental source adapter
+hooks only explicitly enrolled existing ESPHome satellites, requires an authenticated
+encrypted connection and this entry's paired STT, and runs native STT → protected
+tools → native TTS without sentence triggers. Recognised speakers use their own
+native/RBAC permissions, not the guest role or the original caller's role ceiling.
+The original HA Context is unchanged. Unsupported or plaintext connections deny.
+Connection/admission tests simulate transport authentication, not actual Kiosk
+network/audio provenance.
+Ordinary unmatched conversation turns still deny control; the old entity-list
+runtime fallback and its API registration are disabled in source. A configured
+role alone is not authority. The **Experimental protected ESPHome satellites**
+selector is empty by default; no household enrollment or guest role is installed
+automatically. While enrolled, closed hooks deny during reload rather than returning
+to ordinary Assist. Explicit de-enrollment restores the original hook only if no
+other integration has replaced it. This preview needs actual ESPHome-package and
+physical-device validation before deployment as working guest access.
+Native-class tests found a replacement gap in the first instance-only design.
+The subsequently approved redesign uses a **class-wide constructor runtime hook**
+filtered to enrolled ESPHome entries, installing each new instance's audio guard
+before platform subscription setup. The replacement regression now passes; old
+connections/work are revoked and replacements stay denied during owner reload.
+This unsupported runtime patch is an explicit exception to the original constraint,
+not a Core-file change, global intent patch or replacement Kiosk integration.
+Cold-boot ordering before Codex setup, real socket authentication and physical
+acceptance remain unverified before deployment.
 
 ## Transport and conversation scope
 

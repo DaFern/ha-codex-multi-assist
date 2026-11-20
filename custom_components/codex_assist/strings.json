@@ -154,6 +154,8 @@
   },
   "options": {
     "abort": {
+      "satellite_requires_current_ha": "Satellite controls require Home Assistant 2026.10 or later with native tool support.",
+      "guest_role_required": "Use Guest voice role and edit its domain permissions in RBAC. The old entity-list preview cannot grant guest access.",
       "mcp_requires_current_ha": "MCP tools require Home Assistant 2026.10 or later.",
       "learning_requires_current_ha": "Voice Match learning requires Home Assistant 2026.10 or later. Codex assistants remain available on this version.",
       "learning_reconfigure_required": "Use the Voice Match learning entry's own configuration."
@@ -201,7 +203,37 @@
           "settings": "Shared AI Task defaults",
           "agents": "Manage conversation assistants",
           "voice_match": "Voice Match",
+          "music": "Voice Match music access",
+          "guest": "Guest voice role (development preview)",
           "mcp": "MCP servers (read-only preview)"
+        }
+      },
+      "guest": {
+        "title": "Guest voice role",
+        "description": "Choose guest domains and entity exceptions in RBAC. Supported controls cover lights, switches/plugs, fans and Music Assistant players. Experimental protected routing changes only selected ESPHome satellites, requires an authenticated encrypted connection and this entry's Voice Match STT, and bypasses ordinary sentence triggers. Recognised speakers use their own permissions. Guest role and satellite enrollment are disabled by default. Source preview: deployment and physical Kiosk testing remain unverified.",
+        "data": {
+          "guest_voice_role_id": "RBAC guest role",
+          "protected_satellite_ids": "Experimental protected ESPHome satellites"
+        }
+      },
+      "neutral_satellite": {
+        "title": "Unmatched voice satellite access",
+        "description": "Choose entities a fresh, verified Voice Match turn with no confident fingerprint match may control from any satellite using this Codex entry. The list is shared across satellites and empty by default. Entities must also be exposed to Assist and available. Standard Home Assistant entity intents are used; scripts, automations, scenes, buttons, MCP, and arbitrary services are not available. Anyone near an enabled satellite whose voice is not confidently matched may use this list. Select locks, alarms, covers, or other sensitive entities only if you intend that access.",
+        "data": {
+          "neutral_satellite_entity_ids": "Entities allowed for unmatched voices"
+        },
+        "errors": {
+          "invalid_neutral_satellite_entities": "Select only existing Home Assistant entities (up to 100)."
+        }
+      },
+      "music": {
+        "title": "Voice Match music access",
+        "description": "Choose the Music Assistant speakers that a confidently matched, account-linked voice may control from an Assist satellite. Each request checks the linked Home Assistant account's control permission for the selected player. This adds no access to other entities or general Assist tools. The players must also be exposed to Assist. No speakers are selected by default.",
+        "data": {
+          "music_player_ids": "Allowed Music Assistant speakers"
+        },
+        "errors": {
+          "invalid_music_players": "Select only existing Music Assistant media players."
         }
       },
       "mcp": {
@@ -225,7 +257,7 @@
       },
       "voice_match": {
         "title": "Voice Match",
-        "description": "Connect to the add-on's internal personalised backend (normally port 10352) using its personalisation key, not its learning key. Leave the key blank to keep an existing pairing. Then choose Voice Match in your Codex assistant. No separate Wyoming Voice Match sources are needed. Chat messages stay clean; personal instructions are optional. Saving stops active Voice Match requests. Disabling removes this pairing, not your voices. Recognition is not a login or permission to access private information.",
+        "description": "Connect to the add-on's internal personalised backend (normally port 10352) using its personalisation key, not its learning key. Leave the key blank to keep an existing pairing. Then choose Voice Match in your Codex assistant. No separate Wyoming Voice Match sources are needed. Chat messages stay clean; personal instructions are optional. A verified, account-linked voice may authorize only the separately configured Music Assistant actions, after checking that account's permission for the selected player. It does not grant general Home Assistant access. Saving stops active Voice Match requests. Disabling removes this pairing, not your voices.",
         "data": {
           "enabled": "Enable Voice Match",
           "voice_match_host": "Add-on hostname or IP address",
@@ -348,6 +380,9 @@
       "duplicate_agent_name": "Each assistant must have a different name.",
       "last_agent": "Keep at least one conversation assistant.",
       "invalid_voice_match_pairing_key": "Paste a valid pairing key from the Voice Match administrator page.",
+      "guest_policy_unavailable": "A compatible RBAC guest-policy provider is unavailable. Guest access remains disabled.",
+      "invalid_guest_role": "Select an existing restricted RBAC role, or Disabled. No guest permissions were changed.",
+      "invalid_protected_satellites": "Select up to 32 enabled ESPHome Assist satellites. No enrollment was changed.",
       "clean_voice_requires_current_ha": "Clean voice messages require Home Assistant 2026.10 or later.",
       "clean_voice_needs_pairing": "Set up Voice Match pairing first.",
       "voice_match_backend_unavailable": "Cannot connect to the personalised Voice Match backend. Check its hostname and port; ordinary Whisper and the plain Voice Match endpoint cannot be used here.",
