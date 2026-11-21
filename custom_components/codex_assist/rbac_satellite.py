@@ -7,6 +7,7 @@ resolve free speech, call a model, or authenticate a self-declared satellite ID.
 
 import asyncio
 import hashlib
+import json
 from types import SimpleNamespace
 
 from homeassistant.components.homeassistant.exposed_entities import async_should_expose
@@ -14,7 +15,7 @@ from homeassistant.core import Context
 
 from .rbac_execution import ExecutionResult, SharedExecutionGuard
 from .rbac_policy import import_module
-from .speaker_packet import PacketError
+from .speaker_packet import PacketError, decode
 from .voice_match import PreparedRequest
 
 
@@ -232,6 +233,14 @@ class ProtectedSatelliteDispatcher:
             )
             if payload is None or not payload["tools"] or not authorization.valid():
                 return denied
+            # Stable continuity subject from this newly consumed, verified packet,
+            # not a remembered account or a client/model conversation identifier.
+            _clean, packet, _issued = decode(key, wire)
+            payload["continuation_identity"] = hashlib.sha256(json.dumps([
+                hashlib.sha256(key.encode()).hexdigest(), prepared.voice,
+                prepared.ha_user_id, packet["revision"], prepared.speaker_name,
+                prepared.instructions, role_id, admission.context.user_id,
+            ]).encode()).hexdigest()
             result = await handler(payload, admission.context)
             return result if authorization.valid() and await payload["validate"]() else denied
         except PacketError:

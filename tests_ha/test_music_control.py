@@ -4,6 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 from homeassistant.core import Context, SupportsResponse
+from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.llm import LLMContext
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -132,6 +134,107 @@ def music_request(hass, hass_admin_user, monkeypatch):
         )
 
     return authorization, tool, invoke
+
+
+@pytest.fixture
+def inherited_music_room(hass, music_request):
+    """Real native registries: player and satellite inherit their devices' room."""
+    auth, tool, invoke = music_request
+    area = ar.async_get(hass).async_create("Test listening room")
+    registry = er.async_get(hass)
+    player = registry.async_get(auth.player_ids[0])
+    device_registry = dr.async_get(hass)
+    player_device = device_registry.async_get_or_create(
+        config_entry_id=player.config_entry_id,
+        identifiers={("music_assistant", "synthetic-player")},
+    )
+    player_device = device_registry.async_update_device(player_device.id, area_id=area.id)
+    registry.async_update_entity(player.entity_id, device_id=player_device.id)
+    satellite_entry = MockConfigEntry(domain="esphome")
+    satellite_entry.add_to_hass(hass)
+    satellite_device = device_registry.async_get_or_create(
+        config_entry_id=satellite_entry.entry_id,
+        identifiers={("esphome", "synthetic-satellite")},
+    )
+    satellite_device = device_registry.async_update_device(satellite_device.id, area_id=area.id)
+    satellite = registry.async_get_or_create(
+        "assist_satellite", "esphome", "synthetic-satellite",
+        config_entry=satellite_entry, device_id=satellite_device.id,
+    )
+    assert registry.async_get(player.entity_id).area_id is None
+    assert satellite.area_id is None
+    return SimpleNamespace(
+        auth=auth, tool=tool, invoke=invoke, area=area,
+        satellite=satellite, satellite_device=satellite_device,
+        player_device=player_device,
+    )
+
+
+@pytest.mark.parametrize("source", ["explicit_room", "satellite_device", "request_device"])
+async def test_room_resolution_uses_inherited_device_area(hass, inherited_music_room, source):
+    r = inherited_music_room
+    if source == "explicit_room":
+        args = {"room": r.area.name}
+    elif source == "satellite_device":
+        r.auth.satellite_id = r.satellite.entity_id
+        args = {}
+    else:
+        r.auth.device_id = r.satellite_device.id
+        args = {}
+    target, error = r.tool._resolve_target(hass, r.auth, args)
+    assert target == r.auth.player_ids[0]
+    assert error == ""
+
+
+async def test_inherited_room_refuses_ambiguous_players(hass, inherited_music_room):
+    r = inherited_music_room
+    registry = er.async_get(hass)
+    entry = hass.config_entries.async_get_entry(
+        registry.async_get(r.auth.player_ids[0]).config_entry_id,
+    )
+    second = registry.async_get_or_create(
+        "media_player", "music_assistant", "second-synthetic-player",
+        config_entry=entry, device_id=r.player_device.id,
+    )
+    hass.states.async_set(second.entity_id, "idle")
+    r.auth.player_ids = (*r.auth.player_ids, second.entity_id)
+    target, error = r.tool._resolve_target(hass, r.auth, {"room": r.area.name})
+    assert target is None
+    assert "multiple" in error
+
+
+async def test_inherited_room_does_not_revive_unavailable_player(hass, inherited_music_room):
+    r = inherited_music_room
+    hass.states.async_set(r.auth.player_ids[0], "unavailable")
+    target, error = r.tool._resolve_target(hass, r.auth, {"room": r.area.name})
+    assert target is None
+    assert error
+
+
+@pytest.mark.parametrize("allowed", [True, False])
+async def test_inherited_room_keeps_execution_permissions_and_original_context(
+    hass, inherited_music_room, monkeypatch, allowed,
+):
+    r = inherited_music_room
+    calls = []
+
+    async def play(call):
+        calls.append(call)
+
+    hass.services.async_register("media_player", "media_play", play)
+    if not allowed:
+        monkeypatch.setattr(r.tool, "_target_is_allowed", lambda *args: False)
+    result = await r.tool.async_call(
+        hass,
+        SimpleNamespace(tool_args={"action": "resume", "room": r.area.name}),
+        _context(r.auth.context),
+    )
+    assert result.data["status"] == ("accepted" if allowed else "clarify")
+    assert len(calls) == int(allowed)
+    if allowed:
+        assert calls[0].data["entity_id"] == r.auth.player_ids[0]
+        assert calls[0].context is r.auth.context
+    assert r.auth.context.user_id == "original-caller"
 
 
 @pytest.mark.parametrize("args", [

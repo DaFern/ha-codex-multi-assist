@@ -26,7 +26,7 @@ FAILURE_SPEECH = "I couldn't confirm that request."
 async def async_run_protected_pipeline(
     hass, *, pipeline, context, audio_stream, event_callback, binding, ingress,
     handler, device_id, satellite_id, tts_audio_output=None, wake_word_phrase=None,
-    silence_seconds=0.7,
+    silence_seconds=0.7, on_result=None, should_continue=None, on_speech=None,
 ):
     """Run on the admitting task; handler is trusted code, never client input."""
     admission = binding.admit(context)
@@ -39,11 +39,19 @@ async def async_run_protected_pipeline(
     text = None
     failed = False
     started = False
+    intent_finished = False
+    handled = None
+    handled_reply = None
 
     def events(event):
         nonlocal text, failed, started
         if event.type is PipelineEventType.STT_END:
             text = (event.data or {}).get("stt_output", {}).get("text")
+        if (
+            on_speech is not None
+            and event.type in {PipelineEventType.STT_VAD_START, PipelineEventType.STT_END}
+        ):
+            on_speech()
         if event.type is PipelineEventType.ERROR:
             failed = True
         # Two native runs are one satellite turn. Never send the STT run-end or
@@ -83,13 +91,10 @@ async def async_run_protected_pipeline(
                 speech = DENIAL_SPEECH
 
                 async def handle(payload, original):
-                    nonlocal speech
+                    nonlocal handled, handled_reply
                     result, reply = await handler(payload, original, text, pipeline.language)
-                    if (type(result) is dict and result.get("status") == "completed"
-                            and type(reply) is str and 0 < len(reply) <= 4096):
-                        speech = reply
-                    elif type(result) is dict and result.get("status") != "denied":
-                        speech = FAILURE_SPEECH
+                    if type(result) is dict and type(reply) is str and 0 < len(reply) <= 4096:
+                        handled, handled_reply = dict(result), reply
                     return result
 
                 event_callback(PipelineEvent(PipelineEventType.INTENT_START, {
@@ -97,16 +102,25 @@ async def async_run_protected_pipeline(
                     "intent_input": text,
                 }))
                 result = await ingress.async_voice_turn(admission, transcript=text, handler=handle)
-                if result.get("status") not in {"completed", "denied"}:
+                if result == handled and handled_reply:
+                    speech = handled_reply
+                elif result.get("status") != "denied":
                     speech = FAILURE_SPEECH
+                if on_result is not None:
+                    await on_result(result)
+                continuing = bool(
+                    result.get("status") == "completed" and should_continue is not None
+                    and should_continue()
+                )
                 event_callback(PipelineEvent(PipelineEventType.INTENT_END, {
                     "intent_output": {
                         "response": {"speech": {"plain": {"speech": speech, "extra_data": None}},
                                      "language": pipeline.language},
                         "conversation_id": session.conversation_id,
-                        "continue_conversation": False,
+                        "continue_conversation": continuing,
                     },
                 }))
+                intent_finished = True
                 if not failed:
                     tts_run = PipelineRun(
                         **common, start_stage=PipelineStage.TTS, end_stage=PipelineStage.TTS,
@@ -115,6 +129,7 @@ async def async_run_protected_pipeline(
                         run=tts_run, session=session, tts_input=speech,
                         device_id=device_id, satellite_id=satellite_id,
                     ).execute(validate=True)
+                return result if not failed else None
     except asyncio.CancelledError:
         raise
     except Exception:
@@ -124,4 +139,11 @@ async def async_run_protected_pipeline(
     finally:
         # Remove an unconsumed STT lease too; revoking a turn never reopens ingress.
         ingress.discard_pending(admission)
+        if not intent_finished or failed:
+            event_callback(PipelineEvent(PipelineEventType.INTENT_END, {
+                "intent_output": {
+                    "response": {"speech": {"plain": {"speech": ""}}},
+                    "conversation_id": "", "continue_conversation": False,
+                },
+            }))
         event_callback(PipelineEvent(PipelineEventType.RUN_END))

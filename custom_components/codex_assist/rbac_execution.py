@@ -184,6 +184,9 @@ class SharedExecutionGuard:
                     claimed = True  # Consume this native admission before policy awaits, too.
                     if not await self._check(command, context, prepared_request):
                         raise _Denied()
+                    claim = getattr(self, "claim_effect", None)
+                    if claim is not None and not claim(domain, service, service_data):
+                        raise _Denied()
                     admitted = True
                     await self.hass.services.async_call(
                         domain, service, {"entity_id": _eid}, context=context, blocking=True,

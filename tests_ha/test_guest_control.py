@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.core import Context, SupportsResponse
+from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import llm
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -67,6 +68,9 @@ def guest(hass, monkeypatch):
         ("light", "turn_on"), ("light", "turn_off"), ("switch", "turn_on"),
         ("fan", "turn_on"), ("media_player", "media_play"), ("media_player", "volume_set"),
         ("music_assistant", "play_media"),
+        ("media_player", "media_stop"), ("media_player", "volume_mute"),
+        ("media_player", "media_seek"), ("media_player", "shuffle_set"),
+        ("media_player", "repeat_set"),
     ):
         hass.services.async_register(domain, service, record)
     return SimpleNamespace(auth=auth, context=context, prepared=prepared, state=state)
@@ -209,3 +213,57 @@ async def test_factory_projects_only_policy_rows_and_no_arbitrary_tools(hass, gu
     }
     guest.state.current = False
     assert await async_guest_tools(hass, guest.auth, ("switch.guest",)) is None
+
+
+async def test_music_speaker_and_room_aliases_still_use_exact_fresh_permission_checks(hass, guest):
+    area = ar.async_get(hass).async_create("Library")
+    er.async_get(hass).async_update_entity("media_player.guest", area_id=area.id)
+    tool = GuestMusicControlTool(guest.auth, ("media_player.guest",))
+    tool.reference_catalogue = [{
+        "entity_id": "media_player.guest", "name": "Guest device", "aliases": ["Bookshelf"],
+        "area": "Library", "area_aliases": ["Reading room"],
+    }]
+    result = await invoke(hass, guest, tool, {
+        "action": "resume", "speaker": "Bookshelf", "room": "Reading room",
+    })
+    assert not result.error
+    assert guest.state.calls[-1].data["entity_id"] == "media_player.guest"
+    guest.state.allowed.remove("media_player.guest")
+    assert (await invoke(hass, guest, tool, {
+        "action": "resume", "speaker": "Bookshelf",
+    })).error
+    assert len(guest.state.calls) == 1
+
+
+async def test_group_alias_expansion_never_bypasses_a_forbidden_member(hass, guest):
+    tool = GuestOnOffTool(hass, guest.auth)
+    tool.reference_catalogue = [{
+        "entity_id": "light.room_group", "name": "Room devices",
+        "members": ["light.guest", "switch.guest"],
+    }]
+    guest.state.allowed.remove("switch.guest")
+    result = await invoke(hass, guest, tool, {
+        "operation": "turn_off", "entity_ids": ["Room devices"],
+    })
+    assert result.error and not guest.state.calls
+
+
+@pytest.mark.parametrize(("action", "args", "service", "data"), [
+    ("stop", {}, "media_stop", {}),
+    ("mute", {}, "volume_mute", {"is_volume_muted": True}),
+    ("unmute", {}, "volume_mute", {"is_volume_muted": False}),
+    ("seek", {"position": 40}, "media_seek", {"seek_position": 40}),
+    ("shuffle", {"enabled": True}, "shuffle_set", {"shuffle": True}),
+    ("repeat", {"repeat_mode": "all"}, "repeat_set", {"repeat": "all"}),
+])
+async def test_extended_music_controls_remain_exact_and_context_bound(
+    hass, guest, action, args, service, data,
+):
+    result = await invoke(hass, guest, GuestMusicControlTool(guest.auth, ("media_player.guest",)), {
+        "action": action, "speaker": "media_player.guest", **args,
+    })
+    assert not result.error and len(guest.state.calls) == 1
+    call = guest.state.calls[0]
+    assert call.service == service
+    assert dict(call.data) == {"entity_id": "media_player.guest", **data}
+    assert call.context is guest.context

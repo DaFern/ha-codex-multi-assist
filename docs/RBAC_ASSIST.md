@@ -1,5 +1,145 @@
 # RBAC-protected Assist development
 
+## Consolidated ordinary-control overhaul — deployed, physical acceptance pending
+
+The owner approved one capability-and-feedback overhaul after the audit found
+prototype restrictions. New source adds music stop/mute/seek/shuffle/repeat,
+typed light brightness/RGB/colour temperature, fan speed, thermostat target/
+HVAC/presets, ordinary blinds and feature-checked generic media/TV controls.
+The additive `VOICE_CAPABILITY_VERSION=1` API and `ProtectedDeviceTool` map each
+typed action to one fixed service and validated arguments, never a model-selected
+domain/service. Device options/ranges/features, native/RBAC permissions, exposure
+and exact registry identity are checked on each target before service admission.
+Whole-target-set preflight remains mandatory. Covers require an explicit ordinary
+blind/shade/curtain/shutter/awning class; doors/garages/gates/unknown covers remain
+denied even to owners. Locks, alarms, scripts and arbitrary service forwarding
+remain unavailable. No roles or live permission settings are changed.
+
+Curated read state includes permitted brightness, volume, temperature, options
+and supported actions, not raw attributes. Compound tool batches complete all
+requested calls or report exact partial counts. Shared per-request effect claims
+prevent automatic retries of uncertain effects across different tools/aliases.
+Invalid arguments get bounded model repair; safe tool errors and specific
+action/target acknowledgements are spoken. A post-handler permission denial
+cannot reuse an earlier successful reply. Plain personality text may style
+responses, but HA/Jinja prompts are never rendered or treated as authority.
+
+Unique active-speaker selection applies within the requested room. The durable
+rolling window increases to 32 turns/64 messages/64,000 serialized characters.
+The 30-second admission lifetime, bounded execution and complete-input history
+privacy checks are **not disabled**. Separating response latency from fresh action
+authority and safely scoped long-term summaries need a separately proven design.
+Speech capture, recognition thresholds and the eight-second microphone window
+are unchanged. Validation passed: 776 current-native tests (one skip), 466 minimum-
+native tests (204 skips), 366 paired current checks, 245 paired minimum checks
+(121 skips), 1,089 fast tests plus 32 subtests, lint and distribution checks.
+Unsupported-feature skips are not protected-path support on old HA. No overhaul
+source was activated before approval. After separate deployment/restart approval,
+12 integration modules were installed with verified hashes and rollback copies at
+`/homeassistant/codex-ordinary-overhaul-rollback-20261121T073639Z`.
+HA configuration validation passed. After the approved restart and a 65-second
+wait, both Codex entries and RBAC reported loaded, Supervisor was healthy and the
+satellite reported idle. Physical voice/control acceptance remains pending.
+
+## General non-security interpretation follow-up
+
+After physical reports of incorrect lighting interpretation and incomplete
+transcriptions, the owner approved a general solution across the existing supported
+non-security capabilities, rather than device-specific patches. This follow-up
+was deployed as five hash-verified modules across Codex and RBAC, with rollback
+copies. HA configuration validation passed; after the approved restart and the
+required wait, both Codex entries and RBAC reported loaded, Supervisor was healthy,
+and the satellite reported idle. Physical interpretation acceptance is pending.
+
+The shared model policy now prioritises current corrections, natural/near-match
+phrasing, conversation references and permitted room/category/alias resolution.
+Current state is evidence about the device, never proof of the requested direction.
+Ambiguous missing action words still require a short clarification.
+
+RBAC's additive `VOICE_REFERENCE_VERSION=1` API provides bounded reference data
+under current read permissions, Assist exposure and hidden-field masks. It does
+not widen any old policy API or create grants. Only fully readable static groups
+with direct supported members are references; nested/template/partial hidden
+groups remain excluded. On/off tools expand a supplied group ID/name only into
+those exact members and then retain whole-batch and native per-member control
+checks. Music uses the same catalogue for speaker/room aliases.
+
+Reference metadata and the permitted satellite-room marker enter the saved
+visibility dependency set; stale aliases, changed membership, exposure or hidden
+fields invalidate their reuse. Before any effect, explicit opposite-direction
+proposals are rejected as a whole batch and sent back for bounded model repair,
+not silently rewritten into services. Invalid evidence and unsupported/security
+tools still deny. The integration remains a finite capability set: no climate,
+lock, alarm, arbitrary script/service or unrestricted native-intent forwarding is
+introduced. Neither raw speech capture nor STT/VAD/recognition thresholds changes.
+
+Focused current-HA native checks passed 60 tests and the expanded five-file paired
+selection passed 333. These use controlled model proposals; they prove context
+packaging, alias/member resolution, conflict vetoes and policy boundaries, **not
+the real model's understanding of every spoken phrase or microphone capture**.
+Full regression suites passed: 767 current-native tests (one skip), 466 minimum-
+native tests (204 unsupported/version skips), 1,089 fast tests plus 32 subtests,
+333 paired current checks and 230 paired minimum checks (103 skips). Lint, diff
+and distribution checks passed. Supervised physical interpretation/capture
+acceptance remains pending; skips do not establish old-HA protected-path support.
+
+## 2026-11-21 supervised deployment and conversation follow-up
+
+The initial protected adapter was published and deployed with explicit approval
+on one existing satellite. A physical read-only turn reached the protected runner.
+That is not acceptance of physical controls, music playback, cold-boot ordering
+or general release readiness. The source-only checkpoints below describe earlier
+stages and must not be mistaken for the current installation state.
+
+The approved conversation follow-up passed source validation and was deployed
+with verified hashes and rollback copies. HA configuration validation passed;
+the approved restart recovered, both Codex entries and RBAC loaded, and the
+satellite returned idle. Physical conversation/retained-memory acceptance is pending:
+after each successful spoken reply, continue listening for eight seconds after
+native playback completion. A device requesting its next pipeline before the
+playback callback supplies the fallback listening boundary. Speech beginning
+within that window may finish; silence and explicit “that's all”, “stop listening”
+or “goodbye” end listening. Stopping music is not a conversation stop.
+
+The owner revised the memory requirement: one **shared conversation per satellite**,
+retained across speaker changes, silence, disconnects and Home Assistant restarts.
+The microphone still closes after eight seconds or a stop phrase. Conversation
+memory does not time out; it is a bounded rolling window, not an unlimited archive:
+at most 12 complete turns, 24 plain user/assistant messages (32,000 serialized
+characters) and ten bounded music candidates. “Forget this conversation” removes
+only the current participant's currently permitted context.
+
+`protected_history.py` uses HA's supported private, atomic `Store` API. Only
+validated data is loaded/saved, with save read-back before publishing changes.
+Each turn records a fingerprint of **every** filtered input entity/field/name and
+its registry identity. A new speaker receives a prior turn only if their fresh
+projection contains that entire input visibility. This deliberately withholds
+possibly harmless dialogue when it cannot safely prove a free-form reply contains
+no restricted details. Restricted turns remain stored for eligible participants;
+they are not exposed to, or erased by, a less privileged participant.
+
+Channel/registry identity separates different pipelines and replaced registry
+records. Ephemeral playback hooks, timers and transport bindings do not survive a
+restart. No old tool calls, private STT handoffs, Contexts, authorisations or tools
+are retained. Every turn obtains a new single-use connection admission, same-task
+private STT handoff, verified evidence, fresh policy projection and fresh tools.
+Saved participant labels are attribution only; unidentified guests cannot be
+distinguished from one another by those labels. Shared history never transfers
+another participant's identity or action permissions.
+
+Saved music choices are restored only under the same visibility check, consumed
+durably **before** playback, and rechecked by the new request's fixed music tool
+before service admission. A failed/unverified storage write prevents playback;
+an uncertain or failed action is not automatically retried. Consuming before an
+effect may lose a selection on interruption, but avoids resurrecting it on restart.
+Private storage is not encryption: HA administrators and backups may access it.
+
+Native-class tests simulate external STT/model/TTS and audio activity; they do
+not establish physical microphone timing or socket authentication. The cached
+native environment uses HA 2026.10.0/aioesphomeapi 46.6.0, not the installation's
+HA 2026.11.1/aioesphomeapi 46.25.0. Physical hands-free continuation, silence/stop
+behaviour and music playback remain supervised acceptance checks.
+
 ## Status: inactive protected-path development, not working parental controls
 
 ### Configurable guest domains (source only)

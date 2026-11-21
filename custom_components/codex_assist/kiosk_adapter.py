@@ -6,6 +6,7 @@ denies the turn. This module never replaces an ESPHome entity or subscription.
 """
 
 import asyncio
+import time
 from importlib import import_module
 
 from homeassistant.components import conversation
@@ -19,7 +20,14 @@ from homeassistant.components.assist_satellite.const import DATA_COMPONENT
 from homeassistant.core import Context
 from homeassistant.helpers import entity_registry as er
 
-from .guest_policy import GUEST_DOMAINS
+from .guest_policy import ORDINARY_DOMAINS
+from .protected_conversation import (
+    LISTEN_SECONDS,
+    ProtectedConversation,
+    SpeechActivity,
+    is_forget_phrase,
+    is_stop_phrase,
+)
 from .protected_model import async_entry_voice_handler
 from .protected_pipeline import async_run_protected_pipeline
 from .rbac_satellite import ProtectedSatelliteDispatcher
@@ -27,6 +35,7 @@ from .rbac_satellite import ProtectedSatelliteDispatcher
 CONF_PROTECTED_SATELLITES = "protected_satellite_ids"
 DATA_ADAPTERS = "codex_assist_protected_satellites"
 DATA_GUARDS = "codex_assist_protected_guards"
+DATA_HISTORY = "codex_assist_protected_history"
 HOOK = "async_accept_pipeline_from_satellite"
 
 
@@ -45,6 +54,7 @@ class KioskSatelliteAdapter:
 
     def __init__(self, hass, entry, approved_satellite_ids):
         from .conversation import CodexAssistConversationEntity
+        from .protected_history import SharedSatelliteHistory
 
         self.hass, self.entry = hass, entry
         self._agent_type = CodexAssistConversationEntity
@@ -55,9 +65,16 @@ class KioskSatelliteAdapter:
         self._tasks = {}
         self._bindings = {}
         self._removers = {}
+        self._conversations = {}
+        self._completion_hooks = {}
         self._enrollments = {}
         self._constructor = None
         self._guards = hass.data.setdefault(DATA_GUARDS, {})
+        histories = hass.data.setdefault(DATA_HISTORY, {})
+        if entry.entry_id not in histories:
+            histories[entry.entry_id] = SharedSatelliteHistory(hass, entry.entry_id, self._approved)
+        self._history = histories[entry.entry_id]
+        self._history.set_approved(self._approved)
         provider = import_module("custom_components.ha_rbac.satellite_admission")
         if type(provider.SATELLITE_ADMISSION_VERSION) is not int:
             raise ValueError("Unsupported admission provider")
@@ -73,7 +90,7 @@ class KioskSatelliteAdapter:
     def _candidates(self):
         return tuple(sorted(
             state.entity_id for state in self.hass.states.async_all()
-            if state.domain in GUEST_DOMAINS
+            if state.domain in ORDINARY_DOMAINS
         ))
 
     def _entity(self, eid):
@@ -134,6 +151,8 @@ class KioskSatelliteAdapter:
         if HOOK in satellite.__dict__ and not takeover:
             raise ValueError("Satellite already has a foreign instance hook")
         previous = previous_guard[3] if takeover else satellite.__dict__.get(HOOK)
+        self._drop_conversation(eid)
+        self._restore_completion_hook(eid)
 
         # Revoke before publishing the new hook. Closing the old binding also
         # cancels active admission work; STT/TTS-only tasks are cancelled here too.
@@ -173,6 +192,86 @@ class KioskSatelliteAdapter:
         self._hooks[eid] = satellite, accept, previous
         setattr(satellite, HOOK, accept)
         self._guards[eid] = self, satellite, accept, previous
+        finished = getattr(satellite, "tts_response_finished", None)
+        if callable(finished):
+            previous_finished = satellite.__dict__.get("tts_response_finished")
+            if takeover:
+                old = previous_guard[0]._completion_hooks.get(eid)
+                if old is not None and previous_finished is old[1]:
+                    previous_finished, finished = old[2], old[3]
+
+            def playback_finished():
+                finished()
+                self._arm_window(satellite)
+
+            self._completion_hooks[eid] = (
+                satellite, playback_finished, previous_finished, finished,
+            )
+            satellite.tts_response_finished = playback_finished
+
+    def _restore_completion_hook(self, eid):
+        old = self._completion_hooks.pop(eid, None)
+        if old is not None:
+            satellite, hook, previous, _original = old
+            if satellite.__dict__.get("tts_response_finished") is hook:
+                if previous is None:
+                    delattr(satellite, "tts_response_finished")
+                else:
+                    satellite.tts_response_finished = previous
+
+    def _drop_conversation(self, eid, connection=None):
+        record = self._conversations.get(eid)
+        if record is not None and (connection is None or record[0] is connection):
+            self._conversations.pop(eid)
+            record[1].clear()
+
+    def _conversation(self, eid, connection):
+        record = self._conversations.get(eid)
+        if record is None or record[0] is not connection:
+            self._drop_conversation(eid)
+            record = self._conversations[eid] = connection, ProtectedConversation()
+        return record[1]
+
+    def _arm_window(self, satellite):
+        """Native playback completion starts the microphone's short follow-up window."""
+        eid = satellite.entity_id
+        record = self._conversations.get(eid)
+        if (
+            self._closed or record is None
+            or self._hooks.get(eid, (None,))[0] is not satellite
+        ):
+            return
+        connection, state = record
+        if state.open_window():
+            state.timer = asyncio.get_running_loop().call_later(
+                LISTEN_SECONDS, self._expire_window, satellite, connection, state,
+            )
+
+    def _expire_window(self, satellite, connection, state):
+        eid = satellite.entity_id
+        record = self._conversations.get(eid)
+        if record is None or record[0] is not connection or record[1] is not state:
+            return
+        if state.speech_started:
+            return
+        self._drop_conversation(eid, connection)
+        tasks = [task for task, entity in tuple(self._tasks.items()) if entity is satellite]
+        for task in tasks:
+            task.cancel()
+        if not self._closed and self._hooks.get(eid, (None,))[0] is satellite:
+            try:
+                # Clear the device's continuation flag before ending silent capture,
+                # so silence cannot recursively start another listening turn.
+                satellite._internal_on_pipeline_event(PipelineEvent(PipelineEventType.INTENT_END, {
+                    "intent_output": {
+                        "response": {"speech": {"plain": {"speech": ""}}},
+                        "conversation_id": "", "continue_conversation": False,
+                    },
+                }))
+                if not tasks:
+                    satellite._internal_on_pipeline_event(PipelineEvent(PipelineEventType.RUN_END))
+            except Exception:
+                pass  # A disconnected microphone cannot retain an active listening window.
 
     def _binding(self, satellite):
         """Bind the actual authenticated server-side connection, never its label."""
@@ -222,6 +321,7 @@ class KioskSatelliteAdapter:
             if old_connection is connection:
                 return old_binding
             old_binding.close()
+            self._drop_conversation(satellite.entity_id, old_connection)
             self._removers.pop(satellite.entity_id)()
         binding = self.ingress.register_transport(
             satellite.entity_id, connection, connection_is_current=current,
@@ -232,6 +332,7 @@ class KioskSatelliteAdapter:
             # HA clears its disconnect callbacks on disconnect. Retain the hook,
             # so a future authenticated connection can get a fresh binding.
             binding.close()
+            self._drop_conversation(satellite.entity_id, connection)
             for task in tuple(self._tasks):
                 if self._tasks[task] is satellite:
                     task.cancel()
@@ -258,6 +359,14 @@ class KioskSatelliteAdapter:
             ):
                 raise ValueError("Unsupported protected pipeline invocation")
             binding = self._binding(satellite)
+            connection = self._bindings[satellite.entity_id][0]
+            state = self._conversation(satellite.entity_id, connection)
+            await self._history.async_load()
+            # Some devices request the new pipeline before delivering the playback
+            # finished callback. Their transition into a follow-up pipeline is the
+            # fallback listening boundary; it never carries speaker authority.
+            if state.pending_speech:
+                self._arm_window(satellite)
             pipeline = async_get_pipeline(self.hass, satellite._resolve_pipeline())
             agent = conversation.async_get_agent(self.hass, pipeline.conversation_engine)
             if not isinstance(agent, self._agent_type) or agent.entry is not self.entry:
@@ -276,24 +385,102 @@ class KioskSatelliteAdapter:
             satellite._extra_system_prompt = None
             satellite._conversation_id = None
             satellite._run_has_tts = False
+            pending = None
+            from .protected_history import channel_digest, is_digest
+
+            binding_id = channel_digest(
+                self.entry.entry_id, satellite.entity_id,
+                self._registry_identity(satellite.registry_entry),
+            )
+            channel = channel_digest(pipeline.id, pipeline.conversation_engine, pipeline.language)
 
             async def handler(payload, ctx, text, language):
-                return await async_entry_voice_handler(
+                nonlocal pending
+                if state.deadline is not None and time.monotonic() > state.deadline:
+                    state.clear()
+                    return {"status": "denied", "completed": 0}, "This listening window ended."
+                if is_stop_phrase(text):
+                    state.clear()
+                    return {"status": "completed", "completed": 0}, "Okay."
+                subject = payload.get("continuation_identity")
+                view = payload.get("continuation_view")
+                if not is_digest(subject):
+                    return {"status": "denied", "completed": 0}, "This request is not authorised."
+                if is_forget_phrase(text):
+                    pending = ("forget", view)
+                    return (
+                        {"status": "completed", "completed": 0},
+                        "Okay, I've cleared the conversation context available to you.",
+                    )
+                history, candidates = self._history.previous(
+                    satellite.entity_id, binding_id, channel, view,
+                )
+                payload["history"] = history
+                payload["participant"] = f"Participant {subject[:12]}"
+                from .guest_control import GuestMusicControlTool
+
+                music = next((tool for tool in payload["tools"]
+                              if isinstance(tool, GuestMusicControlTool)), None)
+                if music is not None:
+                    music.restore_continuation_candidates(candidates)
+                    music.consume_saved_choices = lambda: self._history.async_consume_choices(
+                        satellite.entity_id, binding_id,
+                    )
+                result, reply = await async_entry_voice_handler(
                     self.hass, self.entry, agent.profile, payload, ctx, text, language,
                 )
+                dialogue = payload.get("turn_dialogue", [
+                    {"role": "user", "content": str(text)},
+                    {"role": "assistant", "content": reply},
+                ])
+                pending = (
+                    "append", subject, view, dialogue,
+                    music.continuation_candidates() if music is not None else {},
+                )
+                return result, reply
 
-            await async_run_protected_pipeline(
-                self.hass, pipeline=pipeline, context=original, audio_stream=audio,
+            async def accepted(result):
+                if result.get("status") == "completed" and pending is not None:
+                    if pending[0] == "forget":
+                        await self._history.async_forget(
+                            satellite.entity_id, binding_id, channel, pending[1],
+                        )
+                        state.clear()
+                    elif await self._history.async_append(
+                        satellite.entity_id, binding_id, channel, *pending[1:],
+                    ):
+                        state.reply_ready()
+                    else:
+                        state.clear()
+                else:
+                    state.clear()
+
+            async def observed_audio():
+                activity = SpeechActivity() if state.deadline is not None else None
+                async for chunk in audio:
+                    if activity is not None and state.deadline is not None:
+                        if activity.process(chunk):
+                            state.note_speech()
+                    yield chunk
+
+            result = await async_run_protected_pipeline(
+                self.hass, pipeline=pipeline, context=original, audio_stream=observed_audio(),
                 event_callback=satellite._internal_on_pipeline_event,
                 binding=binding, ingress=self.ingress, handler=handler,
                 device_id=satellite.registry_entry.device_id,
                 satellite_id=satellite.entity_id, tts_audio_output=satellite.tts_options,
                 wake_word_phrase=wake_word,
                 silence_seconds=satellite._resolve_vad_sensitivity(),
+                on_result=accepted, should_continue=lambda: state.pending_speech,
+                on_speech=state.note_speech,
             )
+            if not isinstance(result, dict) or result.get("status") != "completed":
+                state.clear()
         except asyncio.CancelledError:
+            self._drop_conversation(satellite.entity_id)
             raise
         except Exception:
+            self._drop_conversation(satellite.entity_id)
             satellite._internal_on_pipeline_event(PipelineEvent(PipelineEventType.ERROR, {
                 "code": "protected-satellite-denied",
                 "message": "Protected voice routing is unavailable.",
@@ -305,6 +492,8 @@ class KioskSatelliteAdapter:
     def close(self):
         """Revoke first. Restore only our exact hook, never a newer peer's hook."""
         self._closed = True
+        for eid in tuple(self._conversations):
+            self._drop_conversation(eid)
         tasks = set(self._tasks)
         tasks.update(self.ingress.close())
         for task in tasks:
@@ -328,6 +517,9 @@ class KioskSatelliteAdapter:
                     setattr(satellite, HOOK, previous)
                 if self._guards.get(eid, (None,))[0] is self:
                     self._guards.pop(eid)
+        for eid in tuple(self._completion_hooks):
+            if eid not in retained:
+                self._restore_completion_hook(eid)
         return tasks
 
     async def async_close(self):

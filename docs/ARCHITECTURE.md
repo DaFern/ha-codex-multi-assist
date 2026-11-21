@@ -140,7 +140,62 @@ coordinator. Recognition selects own-user native/RBAC policy, never a kiosk ceil
 neutral evidence selects only the configured guest role. Invalid evidence denies.
 Projection authority is rechecked after model awaits before returning speech.
 
-This remains undeployed source. Native stage-controller tests use simulated
+The supervised conversation follow-up separates the connection-scoped microphone
+window (`protected_conversation.py`) from entry-owned persistent shared dialogue
+(`protected_history.py`), not native conversation history.
+Only canonical user/assistant text and bounded music candidates cross turns/restarts.
+The original STT transcript subclass is converted to plain text before retention;
+its private task-bound handoff never becomes memory. The model emits canonical
+dialogue, and the adapter commits it through HA's private atomic Store only after the
+post-handler policy recheck. Saved records retain hashed complete input-visibility
+dependencies, channel/registry identity and participant attribution, never grants.
+Each new participant sees only turns whose entire protected input visibility is
+contained in their freshly permitted projection. Hidden turns remain available to
+eligible participants; shared conversations do not inherit another person's authority.
+Store writes are read back because Store may log a write error without raising.
+Saved music candidates are consumed durably before an effect and independently
+authorised by each new tool. Each next turn receives fresh tools and authority.
+An owned native playback-finished
+hook starts an eight-second idle timer; observed speech activity only cancels that
+idle timer, never supplies identity. Silence disables device continuation and
+cancels pending capture without starting a spoken reply loop.
+Lifecycle teardown cancels the timer, not the saved dialogue. Silence and stop
+phrases end listening without erasing context; explicit forget removes only
+currently permitted records. The rolling dialogue has finite turn/message/byte
+limits but no idle-age expiry.
+
+`protected_interpretation.py` supplies a shared language-understanding policy for
+all fixed non-security tools. The model receives bounded permitted room/alias
+references from RBAC's additive `VOICE_REFERENCE_VERSION=1` projection, with
+friendly-name/alias/location masks, exposure and read permissions enforced there.
+Only static groups with all direct members currently readable are descriptive
+references. Tools resolve unique exact aliases and expand those groups to exact
+direct members; native per-target execution still authorises the entire batch and
+each service admission. No group service handler or arbitrary room/service bridge
+is enabled. Music speaker/room aliases use the same filtered catalogue.
+
+References and the permitted current-room marker are included in history's
+visibility dependencies and rechecked before tool handling and after model awaits.
+An explicit opposite-direction proposal is rejected for the entire batch before
+effects, with bounded model feedback requesting a corrected proposal or clarification.
+This veto is not an intent parser or a permission grant. Natural/fuzzy inference
+remains with the model; ambiguous/mixed/negated wording is not silently rewritten
+by a keyword parser. Speech capture, VAD and recognition thresholds are unchanged.
+
+The consolidated overhaul adds `protected_devices.py` backed by RBAC's finite
+`voice_capabilities.py` contract. Neither tool arguments nor the model choose a
+service/domain: fixed action mappings validate current features, numeric bounds,
+device options, hidden fields and native/RBAC control before each exact effect.
+Ordinary blind classes are explicit; door/garage/gate/unknown covers, locks,
+alarms and arbitrary scripts/services remain excluded. Curated `readable_fields`
+dependencies distinguish a permission change from a temporarily absent state
+value, so ending playback alone need not erase permitted conversation continuity.
+Compound calls share a request-local effect ledger and retain partial counts;
+safe errors and typed acknowledgements replace silent schema failures and
+first-success short-circuiting. Plain personality text is never Jinja-rendered.
+The admission lifetime and complete-input privacy boundary remain enforced.
+
+The supervised deployment is not general release acceptance. Native stage-controller tests use simulated
 network authentication, external speech and model providers. A follow-up using real
 ESPHome classes found that the instance-only hook did not follow replacements.
 The explicitly approved redesign in `kiosk_lifecycle.py` intercepts the native

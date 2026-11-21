@@ -165,6 +165,32 @@ unrestricted attribute dump. See [supported attributes and safeguards](docs/ENTI
 
 ### Voice Match and satellite access
 
+The consolidated ordinary-control overhaul is deployed for supervised testing:
+typed brightness/colour, fan speed, thermostat,
+ordinary-blind and generic media/TV controls; music stop/mute/seek/shuffle/repeat;
+compound requests and useful failure/target feedback. Every action retains fresh
+speaker, native/RBAC, exposure, device-feature and parameter checks. Doors, garage
+doors, locks, alarms, scripts and arbitrary services remain excluded. See the
+[current capability checkpoint](docs/RBAC_ASSIST.md#consolidated-ordinary-control-overhaul--deployed-physical-acceptance-pending).
+
+The experimental protected satellite source now includes an approved, in-testing
+conversation follow-up: an eight-second listening window after each successful
+spoken reply, a bounded shared conversation saved across restarts, and fresh speaker
+evidence and permission checks every turn. Silence or “that's all” ends listening,
+not memory. Previous turns are shown only when the current speaker can access their
+entire protected input context; “forget this conversation” clears permitted context.
+This is not
+physical-device acceptance or general release readiness; see the current
+[RBAC Assist checkpoint](docs/RBAC_ASSIST.md#2026-11-21-supervised-deployment-and-conversation-follow-up).
+
+The supervised protected-satellite update applies one interpretation policy to all supplied
+non-security controls: natural phrasing, near-miss transcriptions, corrections,
+permitted room/device aliases and static group references. Group references expand
+to exact individually authorised members, never group service calls. Explicit
+opposite-direction proposals are rejected before effects and returned to the model
+for bounded correction. Ambiguity still requires a short question; no new device
+capabilities, role grants, security actions or speech-recognition thresholds are enabled.
+
 The experimental Voice Match connector can add a recognised person's response
 preferences to the selected agent without changing its personality or HA
 permissions. It requires explicit pairing and reviewed add-on/integration updates;

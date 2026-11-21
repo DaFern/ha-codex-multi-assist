@@ -87,6 +87,7 @@ class MusicControlTool(llm.Tool):
             (
                 "play",
                 "pause",
+                "stop",
                 "resume",
                 "next",
                 "previous",
@@ -95,6 +96,11 @@ class MusicControlTool(llm.Tool):
                 "volume_down",
                 "queue",
                 "clear_queue",
+                "mute",
+                "unmute",
+                "seek",
+                "shuffle",
+                "repeat",
             )
         ),
         probatio.Optional("room"): probatio.All(str, probatio.Length(min=1, max=128)),
@@ -110,6 +116,11 @@ class MusicControlTool(llm.Tool):
         probatio.Optional("level"): probatio.All(
             int, probatio.Range(min=0, max=100)
         ),
+        probatio.Optional("position"): probatio.All(
+            probatio.Coerce(float), probatio.Range(min=0, max=86400),
+        ),
+        probatio.Optional("enabled"): bool,
+        probatio.Optional("repeat_mode"): probatio.In(("off", "one", "all")),
     })
 
     def __init__(self, authorization: MusicAuthorization) -> None:
@@ -154,12 +165,18 @@ class MusicControlTool(llm.Tool):
                 return await self._call_player(hass, auth, target_id, "clear_playlist", {})
             service = {
                 "pause": "media_pause",
+                "stop": "media_stop",
                 "resume": "media_play",
                 "next": "media_next_track",
                 "previous": "media_previous_track",
                 "volume_up": "volume_up",
                 "volume_down": "volume_down",
                 "volume": "volume_set",
+                "mute": "volume_mute",
+                "unmute": "volume_mute",
+                "seek": "media_seek",
+                "shuffle": "shuffle_set",
+                "repeat": "repeat_set",
             }[action]
             data = (
                 {"volume_level": args["level"] / 100}
@@ -171,6 +188,29 @@ class MusicControlTool(llm.Tool):
                     data={"response_type": "query_answer", "status": "clarify",
                           "message": "What volume level from 0 to 100?"}
                 )
+            if action in {"mute", "unmute"}:
+                data = {"is_volume_muted": action == "mute"}
+            elif action == "seek":
+                if "position" not in args:
+                    return llm.ToolResult(data={
+                        "response_type": "query_answer", "status": "clarify",
+                        "message": "Which playback position in seconds?",
+                    })
+                data = {"seek_position": args["position"]}
+            elif action == "shuffle":
+                if "enabled" not in args:
+                    return llm.ToolResult(data={
+                        "response_type": "query_answer", "status": "clarify",
+                        "message": "Should shuffle be on or off?",
+                    })
+                data = {"shuffle": args["enabled"]}
+            elif action == "repeat":
+                if "repeat_mode" not in args:
+                    return llm.ToolResult(data={
+                        "response_type": "query_answer", "status": "clarify",
+                        "message": "Repeat this track, all tracks, or off?",
+                    })
+                data = {"repeat": args["repeat_mode"]}
             return await self._call_player(hass, auth, target_id, service, data)
         except Exception:
             return llm.ToolResult(
@@ -283,11 +323,14 @@ class MusicControlTool(llm.Tool):
                 matches.append(entity_id)
                 continue
             if entry and entry.device_id:
-                device = dr.async_get(hass).async_get_device(entry.device_id)
+                device = dr.async_get(hass).async_get(entry.device_id)
                 if device and dr.async_get_effective_area_id(hass, device) == area_id:
                     matches.append(entity_id)
         if len(matches) == 1:
             return matches[0], ""
+        active = [eid for eid in matches if hass.states.get(eid).state == "playing"]
+        if len(active) == 1:
+            return active[0], ""
         if not matches:
             return None, "I don't have a configured Music Assistant speaker in that room."
         return None, "There are multiple configured speakers in that room. Which one?"
@@ -300,11 +343,11 @@ class MusicControlTool(llm.Tool):
                 if entry.area_id:
                     return entry.area_id
                 if entry.device_id:
-                    device = dr.async_get(hass).async_get_device(entry.device_id)
+                    device = dr.async_get(hass).async_get(entry.device_id)
                     if device:
                         return dr.async_get_effective_area_id(hass, device)
         if auth.device_id:
-            device = dr.async_get(hass).async_get_device(auth.device_id)
+            device = dr.async_get(hass).async_get(auth.device_id)
             if device:
                 return dr.async_get_effective_area_id(hass, device)
         return None
@@ -389,6 +432,8 @@ class MusicControlTool(llm.Tool):
         return llm.ToolResult(
             data={
                 "status": "accepted",
+                "operation": "play_media",
+                "entity_ids": [target_id],
                 "title": _bounded_text(item.get("name")),
                 "artist": _bounded_text(item.get("artist")),
             }
@@ -398,7 +443,9 @@ class MusicControlTool(llm.Tool):
         await self._call_service(
             hass, auth, "media_player", service, data, target_id=target_id
         )
-        return llm.ToolResult(data={"status": "accepted"})
+        return llm.ToolResult(data={
+            "status": "accepted", "operation": service, "entity_ids": [target_id],
+        })
 
     async def _call_service(
         self, hass, auth, domain: str, service: str, data: dict[str, Any], *, target_id: str

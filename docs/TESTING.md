@@ -1,5 +1,106 @@
 # Testing
 
+## Consolidated ordinary capabilities and feedback (in progress)
+
+New paired tests exercise exact context-bound light settings, fan speed,
+thermostat temperature/HVAC/presets, ordinary blinds and generic TV/media
+stop/mute/seek/shuffle/repeat/source controls. Invalid ranges/options/features,
+security operations, doors/garages even for owners, hidden device classes,
+read-only roles and unexposed entities remain denied. Curated state tests check
+field masks and omission of arbitrary private attributes.
+
+Music tests cover extended fixed playback actions. Model tests cover completing
+multiple accepted calls, partial counts after a later failure and bounded argument
+repair without effects. Native STT/tool/TTS tests stop a generic player plus dim
+a light, including revocation before the second action and spoken partial feedback.
+Fresh current native tests passed 776 (one skip), minimum native 466 (204 skips),
+paired current 366, paired minimum 245 (121 skips), and fast tests 1,089 plus 32
+subtests. The minimum paired run found a fan-feature import relocation; using the
+public fan import fixed it and the compatibility rerun passed. Both source lint
+checks and distribution projection passed. Unsupported-feature skips do not
+establish protected-path support on old HA. Final curated-field/context rechecks
+passed on current and minimum HA. With separate approval, 12 integration modules
+were deployed with verified source/live hashes and rollback copies; HA config
+validation passed. After the approved restart and the 65-second wait, both Codex
+entries and RBAC reported loaded, Supervisor was healthy and the satellite was
+idle. The bounded startup log still showed the pre-existing provider-import
+blocking warning and unrelated template/integration warnings; no clean-log claim
+is made.
+Test doubles supply external recognition/model/TTS and device services, not
+physical acceptance.
+
+## General protected non-security interpretation
+
+The new source adds shared natural-language/correction guidance, RBAC-filtered
+room/device aliases and static group references, exact alias resolution and bounded
+opposite-direction replanning before effects. It does not add new control domains,
+raw service forwarding, recognition thresholds or STT/VAD changes.
+
+`test_protected_interpretation.py` checks explicit on/off, pause/resume, relative
+volume and next/previous contradictions plus unique exact/domain-scoped alias
+resolution. Mixed/negated wording and near misses are deliberately not rewritten
+by the veto. `test_protected_model.py` supplies a wrong then corrected model
+proposal and verifies no wrong-direction effect. Guest-tool tests cover music
+speaker/room aliases and all-or-nothing denial of a forbidden group member.
+
+The paired reference tests use real HA area/entity registries and compiled RBAC
+for room/area aliases, hidden labels/locations, group read access, hidden members,
+nested/template groups and group-service denial. Native STT/model/tool/TTS tests
+add wrong-direction replanning and exact-member execution from group IDs/names;
+membership/exposure/alias changes before execution cause denial with no effects.
+These are controlled external-provider proposals, not live model quality tests.
+
+Focused current-native tests passed **60**. Full native reruns passed **767 with
+one skip** on current HA and **466 with 204 skips** on minimum HA. Fast tests
+passed **1,089 plus 32 subtests**. The five-file paired selection passed **333**
+on current HA and **230 with 103 skips** on minimum HA. Both lint checks, diff
+checks and distribution projection passed. Skips are not protected-path support.
+Five modules were deployed with verified hashes and rollback copies; HA config
+validation passed. After the approved restart and a 65-second wait, both Codex
+entries and RBAC reported loaded, Supervisor was healthy and the satellite was
+idle. Startup logs still contained the pre-existing blocking provider-import
+warning and unrelated integration/template warnings, plus a satellite connection
+warning just before its latest idle update; no clean-log claim is made. Physical
+recognition quality and actual interpretation remain supervised acceptance checks.
+
+## Persistent shared protected-satellite conversation (2026-11-21)
+
+The owner approved eight seconds of hands-free listening after each reply, then
+clarified that silence must not erase the conversation, history must survive
+restarts, and different speakers should share only currently permitted context.
+Seven integration modules were deployed with verified source/live hashes and
+rollback copies after the owner-approved source work. HA configuration validation
+passed; after the approved restart and a 65-second wait, both Codex entries and
+RBAC reported loaded, the satellite returned idle and Supervisor was healthy.
+The journal still reported the existing blocking provider-import warning; unrelated
+template/integration warnings were also present. This is not a clean-log claim.
+
+`tests_ha/test_protected_history.py` covers validated private atomic Store data,
+restoration into a fresh journal, full-input visibility dependency filtering,
+non-destructive omission of private turns, scoped explicit forgetting, finite
+turn/message/character limits, data-only canonicalisation, durable pre-effect
+music-choice consumption and both raised and silently logged storage failures.
+`test_protected_conversation.py` checks the separate volatile microphone timer,
+playback-completion boundary, late speech and stop phrases.
+
+The paired real-native `tests/test_satellite_admission.py` now includes repeated
+continuation flags and their actual ESPHome string serialization, playback timing
+and fallback boundaries, silence cancellation without a spoken loop, explicit
+stop versus forget, permitted cross-speaker history, owner-to-child privacy,
+fresh journal/connection restoration with forged-evidence denial, two-turn music
+selection with new tools, consumption/replay refusal, storage failure before
+playback and owned callback restoration on replacement/de-enrollment.
+External audio activity, STT/model/TTS and socket readiness remain simulated.
+
+The five-file paired policy/admission selection passed **318 tests**, and the
+fast suite passed **1,089 tests plus 32 subtests**. Fresh full native reruns passed
+**744 with one skip** on current HA and **446 with 204 skips** on minimum HA.
+Unsupported-feature skips do not establish protected-path support on minimum HA.
+The native environments are HA 2026.10.0 and HA 2026.6, not the installation's
+exact HA/aioesphomeapi pair. Source tests and storage restoration do not establish
+physical microphone behaviour, music playback, cold-boot protection before Codex
+setup, or end-to-end dialogue restoration across another restart on the actual satellite.
+
 ## Experimental protected existing-satellite source stage
 
 The paired `test_satellite_admission.py` now includes the per-instance adapter
