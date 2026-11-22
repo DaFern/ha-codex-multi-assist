@@ -56,11 +56,16 @@ approval.
 #### Room music defaults
 
 The development options editor adds **Configure → Room music defaults → Room →
-Default Music Assistant player** on the Codex entry. Choose one room at a time;
-reopen to edit another. **Remove default** clears its mapping. Up to 64 room defaults
+Default Music Assistant player** on the Codex entry. After Submit, choose **Add or
+edit another room** to continue without leaving the dialog. **Finish and save**
+applies all drafted changes together and reloads the entry once. Closing the dialog
+before finishing discards the draft. **Remove default** stages removal of its mapping.
+Up to 64 room defaults
 are supported, and saving preserves other rooms and unrelated settings. Changes
-to the same room during editing are refused; reopen the flow rather than overwrite
-them. Removed rooms remain selectable only to clear their saved mapping.
+to an edited room during the draft are refused on submit or final save; reopen
+the flow rather than overwrite them. Final save revalidates every changed room and
+player and preserves unrelated settings changed elsewhere. Removed rooms remain
+selectable only to clear their saved mapping.
 
 The entry-owned `room_music_defaults` map stores area IDs and Music Assistant
 entity IDs, not permissions. An explicit player name/ID wins over a room argument;

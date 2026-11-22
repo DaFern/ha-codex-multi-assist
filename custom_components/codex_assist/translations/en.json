@@ -213,13 +213,25 @@
       },
       "room_music_defaults": {
         "title": "Room music defaults",
-        "description": "Choose a room to set or remove its default Music Assistant player. Defaults apply to this Codex entry and do not grant access.",
+        "description": "Choose a room to set or remove its default Music Assistant player. You can edit several rooms before choosing Finish and save. Closing this dialog before finishing discards your changes. Defaults apply to this Codex entry and do not grant access.",
         "data": {"area_id": "Room"}
       },
       "room_music_default": {
         "title": "Default music player",
-        "description": "Choose the default player for **{room}**. Naming a particular speaker overrides this default. The player must still be permitted, exposed and available. Select Remove default to restore automatic selection. Saving reloads this Codex entry.",
+        "description": "Choose the default player for **{room}**. Naming a particular speaker overrides this default. The player must still be permitted, exposed and available. Select Remove default to restore automatic selection. Submit adds this change to your draft; Finish and save applies all changes and reloads this Codex entry once.",
         "data": {"player_id": "Default Music Assistant player", "remove_default": "Remove default"}
+      },
+      "room_music_continue": {
+        "title": "Room change added to draft",
+        "description": "Continue editing rooms, or save all changes together. Closing this dialog without finishing discards the draft.",
+        "menu_options": {
+          "room_music_defaults": "Add or edit another room",
+          "room_music_save": "Finish and save"
+        }
+      },
+      "room_music_save": {
+        "title": "Room defaults could not be saved",
+        "description": "No draft changes were saved. If a room or player is no longer valid, restore it and retry, or close this dialog and start again. If settings changed elsewhere, close and reopen to review the latest defaults."
       },
       "guest": {
         "title": "Guest voice role",

@@ -208,6 +208,9 @@ The default is Disabled; no role is created or changed automatically.
 
 **Room music defaults:** on the Codex entry, open **Configure → Room music defaults**,
 choose a Home Assistant area, then select its default Music Assistant `media_player`.
+After Submit, choose **Add or edit another room** to keep going in the same dialog.
+Choose **Finish and save** when done to apply all edits together; closing the dialog
+before finishing discards the draft.
 Room-only music requests use that player, including “here” from a satellite in that
 area. An explicitly named player overrides the default. Defaults are shared by this
 entry's personalities and supported matched/guest music tools, but never grant

@@ -1,5 +1,22 @@
 # Testing
 
+## Multi-room defaults editor follow-up
+
+Room submissions now stage changes and offer **Add or edit another room** or
+**Finish and save**, rather than closing the options flow after every room.
+Native flow tests cover multiple additions/revisions/removals in one flow,
+suggested draft values, cancellation without saving, final-save conflicts,
+registry revalidation, preserving concurrent unrelated edits and the 64-room
+limit (including freeing capacity by removing a default).
+
+The full fast suite passed 1,103 tests plus 32 subtests. The focused native
+options/music/guest/satellite selection passed 112 on current HA and 12 on
+minimum HA (21 unsupported-feature skips). Full-repository Ruff, diff whitespace
+checks and the 83-file distribution projection passed. Full native suites and
+browser/physical acceptance were not rerun for this follow-up. These isolated
+checks changed no live files, room defaults or permissions. Installation is
+separate from activation; a full HA restart requires explicit owner approval.
+
 ## Room music defaults — development only
 
 Publication/deployment checkpoint: feature commit `2041ca0` was pushed to `main`.
