@@ -219,6 +219,7 @@ class _GuestMusicRequest:
     player_ids: tuple[str, ...]
     device_id: str | None = None
     candidates: dict = field(default_factory=dict)
+    room_defaults: dict | None = field(default_factory=dict)
 
     @property
     def context(self):
@@ -238,8 +239,10 @@ class GuestMusicControlTool(MusicControlTool):
 
     name = "codex_assist__guest_music"
 
-    def __init__(self, authorization, player_ids, *, device_id=None):
-        super().__init__(_GuestMusicRequest(authorization, player_ids, device_id))
+    def __init__(self, authorization, player_ids, *, device_id=None, room_defaults=None):
+        super().__init__(_GuestMusicRequest(
+            authorization, player_ids, device_id, room_defaults=room_defaults,
+        ))
         self.consume_saved_choices = None
         self.validate_references = None
         self.reference_catalogue = []
@@ -360,7 +363,7 @@ class GuestMusicControlTool(MusicControlTool):
         )
 
 
-async def async_guest_tools(hass, authorization, entity_ids, *, player_ids=()):
+async def async_guest_tools(hass, authorization, entity_ids, *, player_ids=(), room_defaults=None):
     """Build a bounded protected prompt/tool set for a trusted embedding only.
 
     Not called by ordinary conversation or registered as an unrestricted LLM API.
@@ -481,7 +484,7 @@ async def async_guest_tools(hass, authorization, entity_ids, *, player_ids=()):
             and entry.platform == "music_assistant"
         )
         if players:
-            tools.append(GuestMusicControlTool(auth, players))
+            tools.append(GuestMusicControlTool(auth, players, room_defaults=room_defaults))
     admitted_effects = set()
 
     def claim_effect(domain, service, data):

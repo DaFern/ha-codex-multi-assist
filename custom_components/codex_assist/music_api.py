@@ -37,8 +37,9 @@ class MusicControlAPI(llm.API):
             api_prompt=(
                 "This request has access to one music-only Home Assistant tool. "
                 "Use it only for Music Assistant playback, transport, volume, and queue "
-                "requests. Resolve a named room or speaker exactly. If the room has no "
-                "unique configured Music Assistant speaker, ask which speaker to use. "
+                "requests. Pass a named room as room; the tool applies its saved default. "
+                "Only pass speaker when the user explicitly names a particular player. "
+                "If the tool cannot select a player, ask rather than choosing another. "
                 "For a search with several plausible matches, ask the user before playing. "
                 "Never use or claim access to other Home Assistant entities."
             ),

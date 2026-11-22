@@ -1,5 +1,30 @@
 # Testing
 
+## Room music defaults — development only
+
+Native options tests exercise area/player selection, save/remove, stale-room removal,
+registry/platform/disabled-player validation, preserving unrelated/current options,
+same-room concurrent-edit refusal and the entry-owned satellite settings provider.
+Music API tests verify defaults beat an already-playing alternative, named-player
+overrides, room aliases, inherited satellite/device areas, explicit entity area
+overrides, no-default compatibility, immutable per-request routing snapshots and
+search/candidate playback on the selected player. Missing/unavailable/unexposed/
+disabled/unauthorised defaults never silently redirect. Guest factory/control tests
+verify the same routing and no widening of filtered context or role rights.
+
+Validation passed 1,101 fast tests plus 32 subtests; full-repository Ruff and the
+83-file distribution projection passed. The focused options/music/guest/satellite
+native selection passed 103 on current HA and 12 on minimum HA (12 skips, including
+unsupported modern music features). Skips do not establish music support on old HA.
+The existing paired RBAC guest/satellite-admission/policy selection also passed
+282 cases on current HA; no RBAC source or household policy was changed.
+Full current and minimum native suite attempts each reached the 120-second limit
+without a completion result; no full-native-suite green claim is made. No physical
+speaker, model interpretation, browser-rendered form or live permission was tested.
+These are isolated development results, not live activation or physical acceptance.
+The tests changed no saved household defaults or roles. Deployment/activation must
+be verified separately; a successful file copy is not a running-code check.
+
 ## Consolidated ordinary capabilities and feedback (in progress)
 
 New paired tests exercise exact context-bound light settings, fan speed,

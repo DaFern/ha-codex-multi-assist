@@ -53,6 +53,40 @@ approval.
 
 ### Satellite entity access
 
+#### Room music defaults
+
+The development options editor adds **Configure → Room music defaults → Room →
+Default Music Assistant player** on the Codex entry. Choose one room at a time;
+reopen to edit another. **Remove default** clears its mapping. Up to 64 room defaults
+are supported, and saving preserves other rooms and unrelated settings. Changes
+to the same room during editing are refused; reopen the flow rather than overwrite
+them. Removed rooms remain selectable only to clear their saved mapping.
+
+The entry-owned `room_music_defaults` map stores area IDs and Music Assistant
+entity IDs, not permissions. An explicit player name/ID wins over a room argument;
+otherwise a named room or the requesting satellite/device's area selects its
+configured default. Area aliases work. An explicitly configured default can point
+to a player whose entity/device belongs to a different area (for example a central
+amplifier): the mapping is an intentional routing choice, not an area reassignment.
+
+Only current permitted, exposed, enabled, available Music Assistant players qualify.
+Missing/unavailable/unexposed/disallowed defaults produce clarification/denial,
+never silent playback on the other room speaker. A failed explicit player lookup
+also never falls back to the default. Both recognised-account native checks and
+guest/current RBAC checks remain in force before every command. The default does
+not add a player to an allowlist or grant the guest role access.
+
+When no default is saved, the existing single-player/uniquely-playing-player
+selection and ambiguity clarification remain. Entity area overrides take precedence
+over inherited device areas. Routing data is snapshotted for a request; permissions
+are still checked again at execution. Search choices remain bound to their resolved
+player, so changing targets cannot replay a candidate onto a different speaker.
+
+No room mappings are created automatically. Installing integration code needs
+approval and a Home Assistant restart to activate.
+Once installed, saving options reloads that Codex entry automatically. These
+defaults affect Codex music tools, not arbitrary native Assist/media-player calls.
+
 Satellite turns have two isolated routes. A confidently matched voice is accepted
 only when its enrolled HA user is the active user on the original satellite request.
 It receives Home Assistant's native Assist tools under that unchanged request

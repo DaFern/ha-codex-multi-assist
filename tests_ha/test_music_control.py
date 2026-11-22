@@ -203,6 +203,159 @@ async def test_inherited_room_refuses_ambiguous_players(hass, inherited_music_ro
     assert "multiple" in error
 
 
+@pytest.fixture
+def default_music_room(hass, inherited_music_room):
+    r = inherited_music_room
+    registry = er.async_get(hass)
+    player = registry.async_get(r.auth.player_ids[0])
+    second = registry.async_get_or_create(
+        "media_player", "music_assistant", "second-default-player",
+        config_entry=hass.config_entries.async_get_entry(player.config_entry_id),
+        device_id=r.player_device.id,
+    )
+    hass.states.async_set(second.entity_id, "playing", {"friendly_name": "Other speaker"})
+    r.auth.player_ids = (*r.auth.player_ids, second.entity_id)
+    r.auth.room_defaults = {r.area.id: player.entity_id}
+    r.tool = MusicControlTool(r.auth)
+    r.second = second
+    return r
+
+
+@pytest.mark.parametrize("mode", ["room", "satellite", "request_device", "alias"])
+async def test_saved_room_default_overrides_other_playing_player(hass, default_music_room, mode):
+    r = default_music_room
+    if mode == "satellite":
+        r.auth.satellite_id = r.satellite.entity_id
+        args = {}
+    elif mode == "request_device":
+        r.auth.device_id = r.satellite_device.id
+        args = {}
+    elif mode == "alias":
+        ar.async_get(hass).async_update(r.area.id, aliases={"Listening space"})
+        args = {"room": "Listening space"}
+    else:
+        args = {"room": r.area.name}
+    assert r.tool._resolve_target(hass, r.auth, args) == (r.auth.player_ids[0], "")
+
+
+async def test_explicit_player_overrides_default_even_with_room_argument(hass, default_music_room):
+    r = default_music_room
+    assert r.tool._resolve_target(hass, r.auth, {
+        "room": r.area.name, "speaker": r.second.entity_id,
+    }) == (r.second.entity_id, "")
+    target, _error = r.tool._resolve_target(hass, r.auth, {
+        "room": r.area.name, "speaker": "No matching speaker",
+    })
+    assert target is None  # A failed explicit name never falls back to the room default.
+
+
+@pytest.mark.parametrize(
+    "problem", ["unavailable", "unexposed", "not_allowed", "deleted", "disabled"],
+)
+async def test_invalid_default_never_falls_back_to_other_player(
+    hass, default_music_room, monkeypatch, problem,
+):
+    from custom_components.codex_assist import music_control
+
+    r = default_music_room
+    preferred = r.auth.player_ids[0]
+    if problem == "unavailable":
+        hass.states.async_set(preferred, "unavailable")
+    elif problem == "unexposed":
+        monkeypatch.setattr(music_control, "async_should_expose", lambda h, a, e: e != preferred)
+    elif problem == "not_allowed":
+        r.auth.player_ids = (r.second.entity_id,)
+    elif problem == "deleted":
+        er.async_get(hass).async_remove(preferred)
+    else:
+        er.async_get(hass).async_update_entity(preferred, disabled_by=er.RegistryEntryDisabler.USER)
+    target, error = r.tool._resolve_target(hass, r.auth, {"room": r.area.name})
+    assert target is None
+    assert "unavailable or not permitted" in error
+
+
+async def test_default_still_requires_native_control_permission(
+    hass, default_music_room, monkeypatch,
+):
+    from unittest.mock import AsyncMock
+
+    r = default_music_room
+    monkeypatch.setattr(hass.auth, "async_get_user", AsyncMock(return_value=SimpleNamespace(
+        is_active=True, system_generated=False,
+        permissions=SimpleNamespace(check_entity=lambda *args: False),
+    )))
+    call = AsyncMock()
+    hass.services.async_register("media_player", "media_play", call)
+    result = await r.tool.async_call(
+        hass, SimpleNamespace(tool_args={"action": "resume", "room": r.area.name}),
+        _context(r.auth.context),
+    )
+    assert result.data["status"] == "clarify"
+    call.assert_not_awaited()
+
+
+async def test_no_default_retains_playing_player_selection_and_entity_area_override(
+    hass, default_music_room,
+):
+    r = default_music_room
+    r.auth.room_defaults = {}
+    r.tool = MusicControlTool(r.auth)
+    assert r.tool._resolve_target(hass, r.auth, {"room": r.area.name}) == (r.second.entity_id, "")
+    other = ar.async_get(hass).async_create("Different room")
+    er.async_get(hass).async_update_entity(
+        r.second.entity_id, name="Other speaker", area_id=other.id,
+    )
+    assert r.tool._resolve_target(hass, r.auth, {"room": r.area.name}) == (r.auth.player_ids[0], "")
+
+
+async def test_room_defaults_are_snapshotted_and_malformed_map_does_not_choose_another(
+    hass, default_music_room,
+):
+    r = default_music_room
+    r.auth.room_defaults[r.area.id] = r.second.entity_id
+    assert r.tool._resolve_target(hass, r.auth, {"room": r.area.name}) == (r.auth.player_ids[0], "")
+    r.auth.room_defaults = {r.area.id: ["not-an-entity"]}
+    r.tool = MusicControlTool(r.auth)
+    assert r.tool._resolve_target(hass, r.auth, {"room": r.area.name})[0] is None
+
+
+async def test_music_api_carries_default_through_search_and_candidate_playback(
+    hass, default_music_room,
+):
+    r = default_music_room
+    api = MusicControlAPI(hass=hass, id="codex_assist_music", name="Music")
+    with music_authorization(r.auth):
+        instance = await api.async_get_api_instance(_context(r.auth.context))
+    tool = instance.tools[0]
+    calls = []
+
+    async def search(call):
+        return {"tracks": [{"uri": "library://track/test", "name": "Test track"}]}
+
+    async def play(call):
+        calls.append(call)
+
+    hass.services.async_register(
+        "music_assistant", "search", search, supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register("music_assistant", "play_media", play)
+    result = await tool.async_call(
+        hass, SimpleNamespace(tool_args={
+            "action": "play", "room": r.area.name, "query": "Test track",
+        }), _context(r.auth.context),
+    )
+    assert result.data["status"] == "selection_required"
+    result = await tool.async_call(
+        hass, SimpleNamespace(tool_args={
+            "action": "play", "room": r.area.name,
+            "candidate_id": result.data["results"][0]["candidate_id"],
+        }), _context(r.auth.context),
+    )
+    assert not result.error
+    assert len(calls) == 1 and calls[0].data["entity_id"] == r.auth.player_ids[0]
+    assert calls[0].context is r.auth.context
+
+
 async def test_inherited_room_does_not_revive_unavailable_player(hass, inherited_music_room):
     r = inherited_music_room
     hass.states.async_set(r.auth.player_ids[0], "unavailable")

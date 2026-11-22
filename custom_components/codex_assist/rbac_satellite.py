@@ -86,6 +86,7 @@ class ProtectedSatelliteDispatcher:
     def for_entry(cls, hass, entry, *, candidate_entity_ids):
         """Read administrator-owned settings dynamically, without registering ingress."""
         from .guest_policy import CONF_GUEST_ROLE
+        from .room_music import CONF_ROOM_MUSIC_DEFAULTS
         from .voice_match import CONF_VOICE_MATCH_KEY, runtime_for_entry
 
         return cls(
@@ -93,16 +94,19 @@ class ProtectedSatelliteDispatcher:
             key_provider=lambda: entry.options.get(CONF_VOICE_MATCH_KEY, ""),
             guest_role_provider=lambda: entry.options.get(CONF_GUEST_ROLE),
             candidate_entity_ids=candidate_entity_ids,
+            room_defaults_provider=lambda: entry.options.get(CONF_ROOM_MUSIC_DEFAULTS, {}),
         )
 
     def __init__(
         self, hass, runtime, *, key_provider, guest_role_provider, candidate_entity_ids,
+        room_defaults_provider=None,
     ):
         self.hass = hass
         self._runtime = runtime
         self._key_provider = key_provider
         self._guest_role_provider = guest_role_provider
         self._candidates = candidate_entity_ids
+        self._room_defaults_provider = room_defaults_provider or (lambda: {})
         self._validator = None
         self._closed = False
         self._scopes = {}
@@ -229,7 +233,8 @@ class ProtectedSatelliteDispatcher:
             payload = await async_guest_tools(
                 self.hass, authorization, candidates,
                 player_ids=tuple(eid for eid in candidates
-                                 if eid.startswith("media_player.")),
+                                  if eid.startswith("media_player.")),
+                room_defaults=self._room_defaults_provider(),
             )
             if payload is None or not payload["tools"] or not authorization.valid():
                 return denied

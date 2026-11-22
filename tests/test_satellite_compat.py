@@ -39,7 +39,9 @@ def test_api_registration_alone_never_enables_satellite_tools(monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("step", ["music", "neutral_satellite", "guest"])
+@pytest.mark.parametrize("step", [
+    "music", "neutral_satellite", "guest", "room_music_defaults", "room_music_default",
+])
 async def test_unsupported_options_cannot_be_saved(monkeypatch, step):
     import importlib
 

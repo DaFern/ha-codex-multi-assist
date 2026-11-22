@@ -114,6 +114,39 @@ async def test_guest_mixed_batch_executes_nothing(hass, guest):
     assert guest.state.calls == []
 
 
+@pytest.mark.parametrize("permitted", [True, False])
+async def test_guest_room_default_respects_role_and_explicit_player_override(
+    hass, guest, permitted,
+):
+    registry = er.async_get(hass)
+    player = registry.async_get("media_player.guest")
+    area = ar.async_get(hass).async_create("Test guest room")
+    registry.async_update_entity(player.entity_id, area_id=area.id)
+    other = registry.async_get_or_create(
+        "media_player", "music_assistant", "other-default-player",
+        config_entry=hass.config_entries.async_get_entry(player.config_entry_id),
+    )
+    registry.async_update_entity(other.entity_id, area_id=area.id)
+    hass.states.async_set(other.entity_id, "playing")
+    guest.state.allowed.add(other.entity_id)
+    if not permitted:
+        guest.state.allowed.remove(player.entity_id)
+    tool = GuestMusicControlTool(
+        guest.auth, (player.entity_id, other.entity_id),
+        room_defaults={area.id: player.entity_id},
+    )
+    result = await invoke(hass, guest, tool, {"action": "resume", "room": area.name})
+    assert result.error is not permitted
+    assert len(guest.state.calls) == (1 if permitted else 0)
+    if permitted:
+        assert guest.state.calls[0].data["entity_id"] == player.entity_id
+    result = await invoke(hass, guest, tool, {
+        "action": "resume", "room": area.name, "speaker": other.entity_id,
+    })
+    assert not result.error
+    assert guest.state.calls[-1].data["entity_id"] == other.entity_id
+
+
 @pytest.mark.parametrize("change", [
     "matched", "unverified", "supplied_account", "role", "source", "caller", "expired",
 ])
@@ -213,6 +246,26 @@ async def test_factory_projects_only_policy_rows_and_no_arbitrary_tools(hass, gu
     }
     guest.state.current = False
     assert await async_guest_tools(hass, guest.auth, ("switch.guest",)) is None
+
+
+@pytest.mark.parametrize("default_readable", [True, False])
+async def test_protected_music_factory_carries_defaults_without_widening_projection(
+    hass, guest, default_readable,
+):
+    area = ar.async_get(hass).async_create("Test music room")
+    er.async_get(hass).async_update_entity("media_player.guest", area_id=area.id)
+    defaults = {area.id: "media_player.guest" if default_readable else "media_player.private"}
+    payload = await async_guest_tools(
+        hass, guest.auth, ("media_player.guest",), player_ids=("media_player.guest",),
+        room_defaults=defaults,
+    )
+    tool = next(tool for tool in payload["tools"] if tool.name == GuestMusicControlTool.name)
+    result = await invoke(hass, guest, tool, {"action": "resume", "room": area.name})
+    if default_readable:
+        assert not result.error and len(guest.state.calls) == 1
+    else:
+        assert result.data["status"] == "clarify" and guest.state.calls == []
+    assert "media_player.private" not in payload["prompt"]
 
 
 async def test_music_speaker_and_room_aliases_still_use_exact_fresh_permission_checks(hass, guest):

@@ -154,6 +154,8 @@
   },
   "options": {
     "abort": {
+      "invalid_room_music_defaults": "Room music defaults are invalid. Restore a valid mapping before editing.",
+      "no_music_rooms": "Create a Home Assistant area before choosing a room music default.",
       "satellite_requires_current_ha": "Satellite controls require Home Assistant 2026.10 or later with native tool support.",
       "guest_role_required": "Use Guest voice role and edit its domain permissions in RBAC. The old entity-list preview cannot grant guest access.",
       "mcp_requires_current_ha": "MCP tools require Home Assistant 2026.10 or later.",
@@ -204,9 +206,20 @@
           "agents": "Manage conversation assistants",
           "voice_match": "Voice Match",
           "music": "Voice Match music access",
+          "room_music_defaults": "Room music defaults",
           "guest": "Guest voice role (development preview)",
           "mcp": "MCP servers (read-only preview)"
         }
+      },
+      "room_music_defaults": {
+        "title": "Room music defaults",
+        "description": "Choose a room to set or remove its default Music Assistant player. Defaults apply to this Codex entry and do not grant access.",
+        "data": {"area_id": "Room"}
+      },
+      "room_music_default": {
+        "title": "Default music player",
+        "description": "Choose the default player for **{room}**. Naming a particular speaker overrides this default. The player must still be permitted, exposed and available. Select Remove default to restore automatic selection. Saving reloads this Codex entry.",
+        "data": {"player_id": "Default Music Assistant player", "remove_default": "Remove default"}
       },
       "guest": {
         "title": "Guest voice role",
@@ -365,6 +378,8 @@
     },
     "error": {
       "invalid_target": "Choose an enabled Codex entry from the displayed list.",
+      "invalid_room_music_player": "Select an enabled Music Assistant player and an existing room. Up to 64 room defaults are supported.",
+      "room_music_default_changed": "This room's default changed while you were editing. Close and reopen the settings before saving.",
       "invalid_server": "Use a unique server ID starting with a lowercase letter (24 characters maximum). Up to eight servers are supported.",
       "invalid_endpoint": "Use an HTTP(S) URL with a literal IP, no embedded login or fragment. Local addresses require local access approval; public addresses require HTTPS. Hostnames, loopback and metadata addresses are unsupported.",
       "connection_failed": "MCP connection failed. Check the endpoint, authentication and network access.",

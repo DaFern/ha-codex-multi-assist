@@ -92,6 +92,16 @@ first milestone, not its full identity, per-user policy or write-approval design
 
 ### Voice Match satellite access
 
+`room_music.py`/`room_music_options.py` provide bounded per-entry area-to-Music
+Assistant routing preferences through the native options editor. The matched
+conversation authorization and protected satellite dispatcher pass these preferences
+to the shared music resolver (including the guest subclass). Explicit player
+requests win; otherwise the room default is chosen before the old single/playing
+player heuristic. A saved default outside current eligible candidates denies rather
+than falling back. Routing configuration is never added to authority, allowlists
+or unfiltered model context. Current native/RBAC and exact-player execution checks
+remain unchanged. This feature is development-only until separately installed.
+
 Modern satellite providers are loaded only after checking HA's typed tool results,
 annotations, native API access and matching Probatio schema support. Shared constants
 are independent of those providers, so ordinary Codex setup/conversation retains the

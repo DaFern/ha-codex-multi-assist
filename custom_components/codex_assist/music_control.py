@@ -16,6 +16,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import llm
 
+from .room_music import player_area_id, room_music_defaults
 from .satellite_constants import CONF_MUSIC_PLAYER_IDS as CONF_MUSIC_PLAYER_IDS
 from .satellite_constants import MAX_PLAYERS as MAX_PLAYERS
 from .satellite_constants import MUSIC_API_ID as MUSIC_API_ID
@@ -44,6 +45,7 @@ class MusicAuthorization:
     satellite_id: str | None
     device_id: str | None
     candidates: dict[str, tuple[str, dict[str, Any]]] = field(default_factory=dict)
+    room_defaults: dict | None = field(default_factory=dict)
 
 
 @contextmanager
@@ -77,7 +79,9 @@ class MusicControlTool(llm.Tool):
     integration = "codex_assist"
     description = (
         "Search and play music, control playback and volume, or read and clear the queue "
-        "on an authorized Music Assistant speaker. Name a room or speaker when needed."
+        "on an authorized Music Assistant speaker. Use room for room requests; the tool "
+        "applies the room's configured default. Set speaker only when the user explicitly "
+        "names a particular player; that overrides the room default."
     )
     annotations = llm.ToolAnnotations(
         read_only=False, destructive=True, idempotent=False, open_world=False
@@ -125,6 +129,7 @@ class MusicControlTool(llm.Tool):
 
     def __init__(self, authorization: MusicAuthorization) -> None:
         self._authorization = authorization
+        self._room_defaults = room_music_defaults(getattr(authorization, "room_defaults", {}))
 
     async def async_call(self, hass: HomeAssistant, tool_input, llm_context):
         auth = self._authorization
@@ -250,14 +255,7 @@ class MusicControlTool(llm.Tool):
             matches = self._match_speaker(hass, candidates, requested_speaker)
             if len(matches) != 1:
                 return None, "Which Music Assistant speaker did you mean?"
-            speaker_id = matches[0]
-            if requested_room:
-                room_target, error = self._match_room(hass, candidates, requested_room)
-                if room_target is None:
-                    return None, error
-                if room_target != speaker_id:
-                    return None, "The named speaker and room do not identify the same player."
-            return speaker_id, ""
+            return matches[0], ""
 
         room = requested_room
         if not room:
@@ -280,6 +278,7 @@ class MusicControlTool(llm.Tool):
             if isinstance(entity_id, str)
             and (entry := entity_registry.async_get(entity_id)) is not None
             and entry.platform == "music_assistant"
+            and entry.disabled_by is None
             and entity_id.startswith("media_player.")
             and async_should_expose(hass, "conversation", entity_id)
             and (state := hass.states.get(entity_id)) is not None
@@ -315,17 +314,17 @@ class MusicControlTool(llm.Tool):
         if len(matching_area_ids) != 1:
             return None, "Which room did you mean?"
         area_id = matching_area_ids[0]
+        if self._room_defaults is None:
+            return None, "Room music defaults are invalid. Check the Codex settings."
+        if default := self._room_defaults.get(area_id):
+            if default not in candidates:
+                return None, "The default speaker for that room is unavailable or not permitted."
+            return default, ""
         entity_registry = er.async_get(hass)
-        matches = []
-        for entity_id in candidates:
-            entry = entity_registry.async_get(entity_id)
-            if entry and entry.area_id == area_id:
-                matches.append(entity_id)
-                continue
-            if entry and entry.device_id:
-                device = dr.async_get(hass).async_get(entry.device_id)
-                if device and dr.async_get_effective_area_id(hass, device) == area_id:
-                    matches.append(entity_id)
+        matches = [
+            entity_id for entity_id in candidates
+            if player_area_id(hass, entity_registry.async_get(entity_id)) == area_id
+        ]
         if len(matches) == 1:
             return matches[0], ""
         active = [eid for eid in matches if hass.states.get(eid).state == "playing"]

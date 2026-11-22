@@ -255,6 +255,7 @@ class CodexAssistConversationEntity(
                     ):
                         player_ids = []
                     from .music_control import MusicAuthorization, music_authorization
+                    from .room_music import CONF_ROOM_MUSIC_DEFAULTS
 
                     music_auth = MusicAuthorization(
                         context=user_input.context,
@@ -263,6 +264,7 @@ class CodexAssistConversationEntity(
                         player_ids=tuple(player_ids),
                         satellite_id=satellite_id,
                         device_id=getattr(user_input, "device_id", None),
+                        room_defaults=self.entry.options.get(CONF_ROOM_MUSIC_DEFAULTS, {}),
                     )
                     satellite_mode = "matched"
                 else:

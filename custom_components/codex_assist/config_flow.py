@@ -34,6 +34,7 @@ from .guest_policy import CONF_GUEST_ROLE, async_guest_role_choices
 from .learning.config_flow import LearningConfigFlowMixin, LearningOptionsFlow
 from .mcp_config_flow import MCPOptionsMixin
 from .model_discovery import async_entry_model_catalog
+from .room_music_options import RoomMusicOptionsMixin
 from .satellite_constants import (
     CONF_MUSIC_PLAYER_IDS,
     MAX_PLAYERS,
@@ -256,7 +257,7 @@ def _clear_model_cache(entry) -> None:
     runtime_token_coordinator(entry).model_cache.clear()
 
 
-class CodexAssistOptionsFlow(MCPOptionsMixin, config_entries.OptionsFlow):
+class CodexAssistOptionsFlow(RoomMusicOptionsMixin, MCPOptionsMixin, config_entries.OptionsFlow):
     def __init__(self) -> None:
         self._catalog: ModelCatalog | None = None
         self._agents: list[dict[str, Any]] | None = None
@@ -268,7 +269,7 @@ class CodexAssistOptionsFlow(MCPOptionsMixin, config_entries.OptionsFlow):
             return self.async_abort(reason="learning_reconfigure_required")
         menu = ["settings", "agents", "voice_match"]
         if satellite_tools_supported():
-            menu.extend(["music", "guest"])
+            menu.extend(["music", "room_music_defaults", "guest"])
         menu.append("mcp")
         return self.async_show_menu(step_id="init", menu_options=menu)
 

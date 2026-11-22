@@ -206,6 +206,17 @@ guest capabilities cover direct light/switch/plug/fan on/off and fixed Music Ass
 controls. Selecting another domain does not create arbitrary service access.
 The default is Disabled; no role is created or changed automatically.
 
+**Room music defaults:** on the Codex entry, open **Configure → Room music defaults**,
+choose a Home Assistant area, then select its default Music Assistant `media_player`.
+Room-only music requests use that player, including “here” from a satellite in that
+area. An explicitly named player overrides the default. Defaults are shared by this
+entry's personalities and supported matched/guest music tools, but never grant
+permissions or expose a player. An unavailable or forbidden default is not replaced
+silently by another speaker. Without a saved default, existing room selection and
+clarification remain. Use **Remove default** to clear a room's choice.
+Availability requires installing this code and restarting Home Assistant; it does
+not change native area settings or unrelated media-player automations.
+
 **Guest execution remains source-only:** the experimental adapter can hook selected
 existing ESPHome satellites; the native STT → protected tools → TTS path is tested
 with simulated transport, model and speech providers. It is not deployed or verified
