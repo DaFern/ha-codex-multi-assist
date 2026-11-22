@@ -5,8 +5,11 @@
 Publication/deployment checkpoint: feature commit `2041ca0` was pushed to `main`.
 With owner approval, 10 scoped integration files were backed up, installed and
 hash-verified against that commit; Home Assistant configuration validation passed.
-Activation still requires a separately approved full HA restart. No household room
-defaults or permissions were changed, and live UI/music acceptance remains pending.
+After the separately approved restart and 65-second grace period, Core reported
+RUNNING, both Codex entries reported loaded, Supervisor was healthy and the satellite
+was idle. No household room defaults or permissions were changed. Live UI/music
+acceptance remains pending; the bounded startup log retained the known adapter
+provider-import blocking warning and unrelated integration/template warnings.
 
 Native options tests exercise area/player selection, save/remove, stale-room removal,
 registry/platform/disabled-player validation, preserving unrelated/current options,
