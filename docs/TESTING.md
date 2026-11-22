@@ -2,6 +2,12 @@
 
 ## Room music defaults — development only
 
+Publication/deployment checkpoint: feature commit `2041ca0` was pushed to `main`.
+With owner approval, 10 scoped integration files were backed up, installed and
+hash-verified against that commit; Home Assistant configuration validation passed.
+Activation still requires a separately approved full HA restart. No household room
+defaults or permissions were changed, and live UI/music acceptance remains pending.
+
 Native options tests exercise area/player selection, save/remove, stale-room removal,
 registry/platform/disabled-player validation, preserving unrelated/current options,
 same-room concurrent-edit refusal and the entry-owned satellite settings provider.
