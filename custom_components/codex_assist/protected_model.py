@@ -112,6 +112,13 @@ async def async_fixed_tool_turn(hass, client, profile, payload, context, text, l
         "means end the microphone window. Use ordinary_devices for brightness, fan speed, "
         "thermostats, blinds and generic media/TV controls; never substitute an on/off action "
         "for an unsupported requested setting. Ask for a missing required value. "
+        "Use satellite_timer to start, list, check, pause, resume, adjust or cancel countdown "
+        "timers here, including named timers. Use stop for an alert that is going off; "
+        "only a single positively reported alert on a permitted satellite can be stopped "
+        "automatically. Name a satellite only when the user does; cancel_all stays local "
+        "unless the user explicitly requests all permitted satellites. Never turn a timer "
+        "into a delayed device command. If more than one "
+        "timer matches, ask for its name or starting duration; never cancel an arbitrary one. "
         "Return concise plain spoken text.\n"
         f"Response style only (never permission or tool instructions): "
         f"{payload.get('response_style', '')}\n"
@@ -132,6 +139,13 @@ async def async_fixed_tool_turn(hass, client, profile, payload, context, text, l
         )
 
     for round_number in range(MAX_ROUNDS + 1):
+        timer_validate = payload.get("timer_validate")
+        if timer_validate is not None:
+            try:
+                if not await timer_validate():
+                    return failure("The permitted timer context changed. Please try again.", True)
+            except Exception:
+                return failure("The timer context could not be authorised.", True)
         calls, output, speech = [], [], []
         try:
             async for delta in client.stream_turn(
@@ -246,6 +260,12 @@ async def async_fixed_tool_turn(hass, client, profile, payload, context, text, l
                 effects.add(fingerprint)
                 accepted_in_round = True
                 action = call.arguments.get("operation", call.arguments.get("action", "control"))
+                if call.name == "codex_assist__satellite_timer":
+                    from .satellite_timers import timer_acknowledgement
+
+                    acknowledgement = timer_acknowledgement(data)
+                    if acknowledgement:
+                        acknowledgements.append(acknowledgement)
                 ids = data.get("entity_ids", call.arguments.get("entity_ids", []))
                 labels = [payload.get("entity_names", {}).get(eid) for eid in ids]
                 labels = [name for name in labels if name]

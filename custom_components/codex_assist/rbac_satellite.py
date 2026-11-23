@@ -95,11 +95,13 @@ class ProtectedSatelliteDispatcher:
             guest_role_provider=lambda: entry.options.get(CONF_GUEST_ROLE),
             candidate_entity_ids=candidate_entity_ids,
             room_defaults_provider=lambda: entry.options.get(CONF_ROOM_MUSIC_DEFAULTS, {}),
+            timer_satellites_provider=lambda: entry.options.get("protected_satellite_ids", []),
         )
 
     def __init__(
         self, hass, runtime, *, key_provider, guest_role_provider, candidate_entity_ids,
         room_defaults_provider=None,
+        timer_satellites_provider=None,
     ):
         self.hass = hass
         self._runtime = runtime
@@ -107,6 +109,7 @@ class ProtectedSatelliteDispatcher:
         self._guest_role_provider = guest_role_provider
         self._candidates = candidate_entity_ids
         self._room_defaults_provider = room_defaults_provider or (lambda: {})
+        self._timer_satellites_provider = timer_satellites_provider
         self._validator = None
         self._closed = False
         self._scopes = {}
@@ -235,6 +238,11 @@ class ProtectedSatelliteDispatcher:
                 player_ids=tuple(eid for eid in candidates
                                   if eid.startswith("media_player.")),
                 room_defaults=self._room_defaults_provider(),
+                timer_satellite_ids=(
+                    tuple(self._timer_satellites_provider())
+                    if self._timer_satellites_provider else None
+                ),
+                timer_satellites_current=self._timer_satellites_provider,
             )
             if payload is None or not payload["tools"] or not authorization.valid():
                 return denied

@@ -92,6 +92,40 @@ first milestone, not its full identity, per-user policy or write-approval design
 
 ### Voice Match satellite access
 
+`satellite_timers.py` adds fixed countdown controls only within a live protected
+admission on a registered timer-capable ESPHome satellite. The tool resolves and
+pins registry/device/native-handler identity itself; it does not give the whole
+model loop a new device-context grant or discover general Assist tools. Core's
+native intent timer engine and existing event handler own the countdown. Selection
+is device-local before name/duration matching, never Core's global timer fallback.
+Delayed commands and cross-device targeting are excluded. A bounded volatile
+journal retains ended timer objects for native cancellation/dismissal events;
+no native handlers are wrapped or replaced. Dismissal is a request, not proof of
+physical silence. Remaining-time/list, pause/resume, bounded adjustments and local
+cancel-all use the same exact native objects. Starting-duration selectors remain
+separate from adjustment amounts. The complete non-empty native/RBAC household projection is
+revalidated before every timer effect. See [timer boundaries](SATELLITE_TIMERS.md).
+This addition remains development-only until separately installed and accepted.
+
+`satellite_timer_targets.py` optionally binds the exact native ESPHome
+`vs_list_timers` and `vs_cancel_timer` definitions on currently enrolled Kiosk
+satellites. The separate versioned `timer_policy.py` client requires current
+native/RBAC read/exposure for metadata and control for remote cancellation.
+The model receives only permitted target references, not arbitrary service names.
+The whole catalogue participates in continuation visibility and post-await
+validation. A final batched read decision and synchronous metadata rebind avoid
+per-target await races. Timer-bearing model rounds revalidate the complete frame
+before sending it to the provider, including after token/model awaits.
+A positive device-reported outstanding alert, unique among permitted
+reporting targets, permits automatic stop; unknown/failed reporters and ambiguity
+do not trigger fallback. Finished-alert cancellation uses an exact non-empty ID
+and a checked read-back; active countdowns use Core's exact ID to avoid native
+name/global matching. Remote pause/start/adjust are not exposed. Wider cancel-all
+requires both explicit same-turn broad wording and the finite scope flag.
+Explicit remote destinations/selectors must be present in this utterance;
+an ambiguous result locks mutations until a fresh admitted user reply.
+The native action boundary is version-sensitive and hardware acceptance remains open.
+
 `room_music.py`/`room_music_options.py` provide bounded per-entry area-to-Music
 Assistant routing preferences through the native options editor. The matched
 conversation authorization and protected satellite dispatcher pass these preferences

@@ -165,6 +165,14 @@ unrestricted attribute dump. See [supported attributes and safeguards](docs/ENTI
 
 ### Voice Match and satellite access
 
+**Timers (development only):** protected ESPHome satellites can start, list, check,
+pause/resume, adjust and cancel countdowns, including named timers. Cancel-all is
+local by default. Kiosk Satellite can stop one positively reported alert on another
+permitted enrolled satellite, or ask which one when ambiguous; remote permissions
+require the paired RBAC timer API. No global native timer matching, permission
+changes or automatic deployment are added. This source is not installed and physical
+ringing/dismissal is not verified. See [scope and acceptance checks](docs/SATELLITE_TIMERS.md).
+
 The consolidated ordinary-control overhaul is deployed for supervised testing:
 typed brightness/colour, fan speed, thermostat,
 ordinary-blind and generic media/TV controls; music stop/mute/seek/shuffle/repeat;

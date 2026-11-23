@@ -1,5 +1,63 @@
 # Testing
 
+## Remaining timer controls and cross-satellite alerts — development only
+
+The follow-up adds remaining-time/list, pause/resume, separate duration-selector
+and adjustment fields, bounded time changes and local cancel-all. The optional
+Kiosk adapter reads actual `vs_list_timers` alert state and uses only the exact
+native `vs_cancel_timer` action for ended alerts, with read-back. Zero remaining
+time is not alert evidence; unknown reporters, multiple matches and query failures
+prevent automatic guessing. Explicit destinations are tied to this utterance;
+ambiguity requires a fresh reply. Wider cancel-all additionally has a same-turn
+broad-scope veto rather than trusting a model flag.
+
+The paired RBAC source adds a separate `TIMER_POLICY_VERSION=1` oracle for exact
+exposed targets, native/RBAC read/control, hidden fields, schedules and the
+`timer.cancel` open-tier check. No old Assist ingress/service denial is relaxed.
+The complete remote catalogue participates in shared-history visibility and
+post-await validation. No saved household permissions were changed.
+
+Final checks passed **1,103 fast tests plus 32 subtests**, **183 focused native**
+tests on HA 2026.10.0 and **246 paired** current-native admission/policy cases.
+Minimum-HA selections passed **28 with five module/feature skips**, and the paired
+selection passed **113 with 122 skips**. Unsupported-feature skips do not establish
+protected timer support on HA 2026.6. Both repositories passed full Ruff and
+whitespace checks; the Codex distribution projection passed with 86 runtime files.
+The broader native suites were not rerun for this follow-up; their earlier full
+attempts hit the 120-second limit, so no full-native-suite pass is claimed.
+
+These checks use real Core timers/registries/policy and simulated external
+speech/model/native-ESPHome-action boundaries. They are not the installation's
+exact HA 2026.11.1 environment, physical Kiosk or two-satellite acceptance.
+No integration was installed, committed, pushed or restarted; no saved household
+permission/exposure setting changed. Installation, restart and live countdown/
+ringing/cross-device tests remain separate owner approvals.
+
+## Earlier satellite countdown start/cancel checkpoint
+
+Added `tests_ha/test_satellite_timers.py` (46 cases) for real Core timer objects,
+device-local selection, ambiguity, finished-timer dismissal events, parameter
+bounds, expired/replaced authority, full-projection revalidation, replay and
+specific spoken results. The optional paired
+`test_satellite_timer_admission.py` adds eight real RBAC admission/policy/private
+handoff cases with simulated external speech/transport provenance.
+
+Final isolated checks passed 1,103 fast tests plus 32 subtests, 104 focused native
+tests on HA 2026.10.0, and 198 paired current-native cases (eight new timer
+admission cases plus 190 existing admission regressions). The minimum-HA selection
+passed 10 with five unsupported-feature/module skips; those skips do not establish
+timer support on HA 2026.6. Full current/minimum native attempts each reached the
+120-second limit without completing, so no full-native-suite pass is claimed.
+The fast suite was rerun with native HA plugin autoload disabled to avoid that
+environment's unrelated plugin warning in mutation-test subprocesses; it passed.
+Full-repository Ruff, whitespace checks and the 84-file distribution projection
+passed. No live household files, settings, permissions, timers or playback changed.
+
+This is uninstalled development source, not physical acceptance or publication.
+See [timer scope and remaining device checks](SATELLITE_TIMERS.md). Running
+countdown display, expiry/ringing and firmware handling of a post-finish
+cancellation event require separately approved deployment and supervised tests.
+
 ## Multi-room defaults editor follow-up
 
 Room submissions now stage changes and offer **Add or edit another room** or
