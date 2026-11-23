@@ -5,7 +5,7 @@ import time
 LISTEN_SECONDS = 8
 STOP_PHRASES = frozenset({
     "that's all", "thats all", "that is all", "stop listening",
-    "end conversation", "goodbye",
+    "end conversation", "goodbye", "thanks", "thank you",
 })
 
 

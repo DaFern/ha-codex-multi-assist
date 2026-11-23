@@ -51,6 +51,9 @@ async def async_setup_codex(hass: HomeAssistant, entry: ModuleConfigEntry) -> bo
             from .kiosk_adapter import setup_entry_adapter
 
             setup_entry_adapter(hass, entry)
+            from .timer_http import register_timer_api
+
+            entry.async_on_unload(register_timer_api(hass, entry))
     entry.async_on_unload(entry.add_update_listener(async_update_listener))
 
     async def refresh_models(_now) -> None:

@@ -1,5 +1,47 @@
 # Testing
 
+## Exact-ID kiosk touch controls — local development
+
+The [paired protocol](EXACT_TIMER_CONTROLS.md) adds real-HA HTTP/nonce/ownership
+tests, a real RBAC catalog/decider/evaluator case and operation-specific RBAC
+control tests. Identical named and unnamed timers are tested independently for
+pause/resume/cancel/add/remove. Denied nonce replay, account binding, stale unload
+callbacks, lifecycle races, zero-clamped adjustments and failed callbacks are
+covered without household device I/O.
+
+Final focused paired selections passed **290 with one skip** on current native
+HA and **143 with four skips** on minimum HA. The selections include HTTP,
+satellite timers/targets, policy client, polite closing, protected conversation
+and RBAC timer/satellite policy tests. Modern HTTP controls are skipped on the
+minimum environment; that is not evidence of feature support there.
+The full fast suite passed **1,110 tests plus 32 subtests**.
+Both repositories passed full Ruff; all three development checkouts passed
+whitespace checks. Distribution projection passed with **89 runtime files**.
+
+Adding the broader smoke file exposed one acknowledgement-wording assertion
+(`test_web_search_enabled_handoff_delivers_final_speech_without_source_card`):
+it expected “Home Assistant accepted that request.” but received “Okay.”
+The same failure reproduced in an isolated unchanged-HEAD export. It was not
+changed here. Those broader attempts passed 316/172 cases respectively with one
+failure each before the final three HTTP cases were added; no whole-native-suite
+green result is claimed.
+
+The byte-identical isolated Dart client/test snapshots passed **32 tests**,
+analysis and formatting. The checkout's new Dart files also passed formatting;
+the unresolved Flutter-lints include warning remained because full Flutter
+dependencies/SDK were unavailable. No full-app compilation/widget or physical
+acceptance result is claimed. Those checks remain mandatory before deployment.
+
+At this validation checkpoint, changes including standalone-thanks behavior were
+uncommitted, unpushed and undeployed. Modified live integration files were hash-compared
+against their committed baselines and still matched; the new HTTP API file was
+absent from the live installation. No restart was performed during those tests.
+The public kiosk fork contains only unmodified upstream code; modified kiosk
+distribution remains blocked pending licence permission. Subsequent owner approval
+covered committing/pushing the integration changes, storing the kiosk adaptation
+in a separate private repository, and backing up/deploying/restarting HA. That
+approval is not evidence of completed activation or a kiosk app build.
+
 ## Receipt-first device acknowledgements — development only
 
 Routine accepted device controls now produce a short personality receipt rather

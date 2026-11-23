@@ -92,6 +92,14 @@ first milestone, not its full identity, per-user policy or write-approval design
 
 ### Voice Match satellite access
 
+`timer_http.py` is a separate finite, authenticated exact-ID touch-control route
+for compatible kiosk clients. It uses the HA bearer account and a separate
+versioned RBAC control oracle, not voice admission or a guest override. A
+single-use nonce precedes fresh authorization; loaded enrollment, options,
+registry, handler, manager and timer identity are rechecked synchronously before
+the effect. There is no general service bridge or intent fallback. See
+[the local protocol and release limits](EXACT_TIMER_CONTROLS.md).
+
 `satellite_timers.py` adds fixed countdown controls only within a live protected
 admission on a registered timer-capable ESPHome satellite. The tool resolves and
 pins registry/device/native-handler identity itself; it does not give the whole

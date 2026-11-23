@@ -173,6 +173,25 @@ HA local intents that run before this integration still use HA's own responses.
 This feature does not silently change pipeline settings, affect unrelated agents,
 alter the installation's temperature-response override or change AI Task/learning.
 
+### Standalone polite closings
+
+On the protected Codex satellite path, standalone “thanks” and “thank you” now use
+the existing end-conversation handling, like “that's all”. Case, trailing sentence
+punctuation and repeated whitespace are normalised. The current listening window
+ends without another model call or device action, and normal wake-word standby
+can resume. Conversation history is retained; this does not mute the microphone
+globally or forget the conversation. The existing short “Okay.” closing is unchanged.
+
+Only a complete matching utterance closes listening. “Thanks, turn off the light”,
+quoted phrases, song titles and longer requests still use normal authorised
+handling. Deployment and restart need separate owner approval.
+Native tests use simulated audio/model boundaries, not a physical kiosk.
+The paired current-native selection passed 271 tests; the minimum-HA selection
+passed 134 with 126 feature skips. Unsupported-feature skips do not establish
+protected-pipeline support on minimum HA. Polite-closing tests assert no new
+model/control calls, cancelled listening timers, unchanged history and a false
+native continuation flag; a compound thanks-plus-command still executes normally.
+
 Model response rounds are buffered to completion before any tool batch is
 dispatched. Pre-tool speech is dropped when a tool handoff exists. No-tool answers
 and clarification questions are retained. This can delay first speech for ordinary

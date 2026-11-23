@@ -40,6 +40,11 @@ the modern native tool/schema APIs. On older or incompatible HA, ordinary Codex
 features remain available, but satellite controls are denied and their setup
 options are unavailable. This never grants guest access or bypasses RBAC denials.
 
+**Local exact-ID kiosk preview:** paired development source adds authenticated
+touch controls for otherwise identical timers. It is not a released kiosk build;
+modified kiosk distribution is licence-restricted. See the
+[protocol, permissions and acceptance limits](docs/EXACT_TIMER_CONTROLS.md).
+
 [![Open fork in HACS (development only)](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=DaFern&repository=ha-codex-multi-assist&category=integration)
 [![Add the Codex Assist integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=codex_assist)
 

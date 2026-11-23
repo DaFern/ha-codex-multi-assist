@@ -48,7 +48,10 @@ def test_clear_discards_only_microphone_state_and_timer():
     assert not hasattr(state, "history") and not hasattr(state, "candidates")
 
 
-@pytest.mark.parametrize("phrase", ["That's all.", "that’s all", "STOP LISTENING", "goodbye!"])
+@pytest.mark.parametrize("phrase", [
+    "That's all.", "that’s all", "STOP LISTENING", "goodbye!",
+    "thanks", "Thanks.", " THANKS! ", "thank you", "Thank you!", "thank   you",
+])
 def test_explicit_stop_phrases(phrase):
     assert is_stop_phrase(phrase)
 
@@ -56,6 +59,15 @@ def test_explicit_stop_phrases(phrase):
 def test_music_stop_or_a_quoted_phrase_is_not_a_conversation_stop():
     assert not is_stop_phrase("stop the music")
     assert not is_stop_phrase("play the song That's All")
+
+
+@pytest.mark.parametrize("phrase", [
+    "Thanks, turn off the light", "Thank you, set a pasta timer",
+    "No thanks", "Thanks for turning on the light", "play the song Thank You",
+    'say "thanks"', "what does thank you mean?",
+])
+def test_politeness_inside_a_larger_request_is_not_a_conversation_stop(phrase):
+    assert not is_stop_phrase(phrase)
 
 
 def test_microvad_observer_handles_partial_native_frames_without_authorising_anything():
