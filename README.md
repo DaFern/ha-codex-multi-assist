@@ -141,19 +141,18 @@ If something fails, start with [Troubleshooting](https://github.com/itsreverence
 
 Device commands recognised by native Assist are routed through existing authorised
 intent tools before asking the model. Shared result handling covers all tool/device
-types: replies acknowledge accepted, failed or partial requests without inventing
-physical completion. The prepared device-readback update retains exact native-result
-targets and checks their reported state for up to two seconds total. It distinguishes
-accepted commands, matching reported states/settings and unconfirmed results; optimistic
-state is not confirmation. It never treats a script/scene acknowledgement as completed
-work. This update requires separate deployment/restart approval.
-A tools-disabled reply step uses the selected agent's saved
-instructions to write the entire acknowledgement in its personality, without a
-mandatory stock sentence or fixed prefix/suffix.
-This supports user-created agents as well as starter personalities. If generation
-fails, omits the required target names or its result is invalid, the device-specific
-factual acknowledgement remains the fallback;
-actions are never repeated just to improve wording. This adds a model call/latency.
+types without inventing physical completion. **Prepared, not deployed:** routine
+device controls now receive a brief “I heard you” acknowledgement in the selected
+personality, not a “command sent” or device-state report. They do not wait for an
+extra device-state check. Generic receipts are cached by personality/model/language;
+first-use generation has a two-second limit and a neutral “Okay.” fallback.
+Known failures and necessary clarification still receive useful explanations.
+Eligible satellites check feedback separately and speak again only for a problem
+or uncertain response, without interrupting a newer turn. No device actions are
+retried. Phone/text conversations have no second spoken-response channel.
+Permissions and original authorised command dispatch remain synchronous; this
+does not eliminate speech recognition, model planning or integration I/O latency.
+This change requires separate deployment/restart approval.
 Unrecognised wording still uses the model path, so this is not a
 universal language or truth verifier. See [scope and limitations](docs/ACTION_CONTROL.md).
 

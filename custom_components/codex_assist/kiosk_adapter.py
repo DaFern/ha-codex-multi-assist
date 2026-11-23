@@ -63,7 +63,9 @@ class KioskSatelliteAdapter:
         self._closed = False
         self._hooks = {}
         self._tasks = {}
+        self._followups = {}
         self._bindings = {}
+        self._connection_checks = {}
         self._removers = {}
         self._conversations = {}
         self._completion_hooks = {}
@@ -327,12 +329,16 @@ class KioskSatelliteAdapter:
             satellite.entity_id, connection, connection_is_current=current,
         )
         self._bindings[satellite.entity_id] = connection, binding
+        self._connection_checks[satellite.entity_id] = current
 
         def disconnected():
             # HA clears its disconnect callbacks on disconnect. Retain the hook,
             # so a future authenticated connection can get a fresh binding.
             binding.close()
             self._drop_conversation(satellite.entity_id, connection)
+            followup = self._followups.pop(satellite.entity_id, None)
+            if followup is not None:
+                followup.cancel()
             for task in tuple(self._tasks):
                 if self._tasks[task] is satellite:
                     task.cancel()
@@ -386,6 +392,7 @@ class KioskSatelliteAdapter:
             satellite._conversation_id = None
             satellite._run_has_tts = False
             pending = None
+            followup = None
             from .protected_history import channel_digest, is_digest
 
             binding_id = channel_digest(
@@ -395,7 +402,12 @@ class KioskSatelliteAdapter:
             channel = channel_digest(pipeline.id, pipeline.conversation_engine, pipeline.language)
 
             async def handler(payload, ctx, text, language):
-                nonlocal pending
+                nonlocal pending, followup
+                # Automatic silent follow-up capture is not a new user request.
+                # Actual admitted STT, including stop/forget, invalidates old speech.
+                old_followup = self._followups.pop(satellite.entity_id, None)
+                if old_followup is not None:
+                    old_followup.cancel()
                 if state.deadline is not None and time.monotonic() > state.deadline:
                     state.clear()
                     return {"status": "denied", "completed": 0}, "This listening window ended."
@@ -429,6 +441,7 @@ class KioskSatelliteAdapter:
                 result, reply = await async_entry_voice_handler(
                     self.hass, self.entry, agent.profile, payload, ctx, text, language,
                 )
+                followup = payload
                 dialogue = payload.get("turn_dialogue", [
                     {"role": "user", "content": str(text)},
                     {"role": "assistant", "content": reply},
@@ -476,6 +489,8 @@ class KioskSatelliteAdapter:
             )
             if not isinstance(result, dict) or result.get("status") != "completed":
                 state.clear()
+            elif followup is not None:
+                self._start_followup(satellite, connection, state, followup)
         except asyncio.CancelledError:
             self._drop_conversation(satellite.entity_id)
             raise
@@ -489,12 +504,67 @@ class KioskSatelliteAdapter:
         finally:
             self._tasks.pop(task, None)
 
+    def _start_followup(self, satellite, connection, state, payload):
+        """Report only this turn's failed feedback, after its native TTS finishes."""
+        from .action_followup import async_failure_followup
+
+        checks = payload.get("device_checks")
+        read = payload.get("followup_read")
+        reply = payload.get("failure_reply")
+        if checks is None or not checks.targets or not callable(read) or not callable(reply):
+            return
+        eid = satellite.entity_id
+        binding = self._bindings.get(eid)
+        connection_current = self._connection_checks.get(eid)
+        if binding is None or binding[0] is not connection or not callable(connection_current):
+            return
+
+        def current():
+            try:
+                return (
+                    not self._closed and self.entry.options is self._options
+                    and self._entity(eid) is satellite and satellite.available
+                    and self._bindings.get(eid) is binding
+                    and self._connection_checks.get(eid) is connection_current
+                    and connection_current(connection) is True
+                    and satellite.cli._connection is connection and connection.is_connected
+                    and self._followups.get(eid) is asyncio.current_task()
+                )
+            except Exception:
+                return False
+
+        def ready():
+            return (
+                not state.pending_speech and satellite.state == "idle"
+                and not any(entity is satellite for entity in self._tasks.values())
+            )
+
+        async def announce(text):
+            # This is the originating enrolled satellite, never an LLM destination.
+            await satellite.async_internal_announce(message=text, preannounce=False)
+
+        async def run():
+            try:
+                await async_failure_followup(
+                    observe=lambda: checks.observe(self.hass, read), reply=reply,
+                    current=current, ready=ready, announce=announce,
+                )
+            finally:
+                if self._followups.get(eid) is asyncio.current_task():
+                    self._followups.pop(eid, None)
+
+        self._followups[eid] = self.entry.async_create_background_task(
+            self.hass, run(), "codex-device-failure-followup", eager_start=False,
+        )
+
     def close(self):
         """Revoke first. Restore only our exact hook, never a newer peer's hook."""
         self._closed = True
         for eid in tuple(self._conversations):
             self._drop_conversation(eid)
         tasks = set(self._tasks)
+        tasks.update(self._followups.values())
+        self._followups.clear()
         tasks.update(self.ingress.close())
         for task in tasks:
             if task is not asyncio.current_task():

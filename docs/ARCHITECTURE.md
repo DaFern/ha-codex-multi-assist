@@ -376,13 +376,26 @@ only an existing authorised intent tool via ChatLog. Caller/exposure controls ar
 unchanged. Recognised device commands do not need model-generated success text.
 Both native and model-requested tools use paired current-round result checks;
 accepted/failed/partial/unconfirmed replies are integration-owned and do not claim
-physical completion. The prepared `action_verification.py` step retains exact native
-result target IDs internally and reads only currently exposed, caller-readable states
-within one bounded wait. The personality reply receives target names, per-target
-command results and projected reported-state/setting evidence, not raw arguments,
-arbitrary attributes, IDs or exceptions. Matching state is not proof of a transition
-or physical completion; unsupported postconditions stay unconfirmed. Generic replies
-omitting required target names fall back to device-specific facts. Native query results can feed an otherwise normal
+physical completion. The prepared receipt-first path uses `action_receipts.py` for
+short personality acknowledgements without action/target evidence. Only hashed
+style/model keys and generic receipts enter a bounded volatile cache. A cold style
+has a two-second tools-disabled generation deadline; failure falls back to “Okay.”
+No device-state verification blocks the receipt. Authorisation and normal command
+dispatch still run before it; no control is detached to gain response speed.
+
+`action_followup.py` owns failure-only background observation. Ordinary native
+result IDs use `action_verification.py` with fresh exposure/caller-read checks.
+Protected device results contain exact resolved IDs; `DeviceChecks` pins registry
+identity and reads fresh RBAC/native projections through a separate short-lived
+observer. It retains no execution admission or control tool. Guest-role/key changes,
+lost read permission or identity changes suppress details. Only the originating
+satellite can receive delayed speech, after its TTS/listening window ends and
+feedback is checked again. A newer request, unload or disconnect cancels/drops it;
+busy channels expire silently rather than being interrupted. Unavailable/mismatching
+feedback is uncertainty, not physical proof of failure. Unsupported postconditions
+do not trigger a false failure announcement. Phone/text has no delayed speech route.
+Timer acknowledgements and queries retain their existing specific information.
+Native query results can feed an otherwise normal
 model answer, with tools disabled to avoid executing the recognised request twice.
 Unknown sentences and unavailable intent tools retain the model path; this is not
 a universal intent or semantic truth classifier. No arbitrary service bridge or
@@ -447,7 +460,9 @@ retention does not implement the CLI's encrypted search-output or ref-ID protoco
 
 Known action results use the shared tools-disabled personality reply described in
 [ACTION_CONTROL.md](ACTION_CONTROL.md#personality-aware-acknowledgements). Outcome
-classification remains deterministic; the selected profile writes the entire reply
+classification remains deterministic. Accepted controls use the brief cached
+receipt path; failed/partial/unconfirmed results use the factual reply path.
+For that path, the selected profile writes the entire reply
 without a required stock sentence. Structural validation cannot prove the prose's
 meaning; instructions constrain it to the recorded outcome. No raw tool/exception payload is sent into this
 isolated request and no additional actions or search tools are available. Generation

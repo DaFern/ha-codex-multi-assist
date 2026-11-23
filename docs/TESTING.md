@@ -1,5 +1,37 @@
 # Testing
 
+## Receipt-first device acknowledgements — development only
+
+Routine accepted device controls now produce a short personality receipt rather
+than “command sent” or device-state narration. Native dispatch and protected
+controls retain permission checks, clarification and exactly-once/no-replay gates.
+No extra state read blocks the receipt. A bounded tools-disabled generator caches
+generic phrases by style/model/language; a cold timeout falls back neutrally.
+
+Read-only failure observers use exact native results or protected resolved IDs,
+fresh caller/RBAC projections and pinned registry/source identities. Background
+speech waits for the originating satellite to become idle, rechecks after wording
+generation, and drops stale/revoked/disconnected/newer-turn work. Unsupported
+postconditions do not become physical-failure claims. No phone/text follow-up
+destination is invented. Timer detail/query responses remain unchanged.
+
+Checks passed **1,110 fast tests plus 32 subtests**, **339 focused current-native**
+tests, and **184 focused minimum-native tests with five feature/module skips**.
+The focused tests include no-device-feedback receipt delivery, cached personality
+routing, failure-only speech, stale feedback, revocation, expiry/cancellation,
+native entry-owned scheduling and protected pinned-transport scheduling. They use
+synthetic external speech/model/device boundaries, not physical acceptance.
+
+The broader paired current-native selection passed 210 and failed 35: the separate
+RBAC checkout still asserts the former “Sent the … request” wording and the old
+number/positions of model requests. Those external test fixtures were left
+unchanged; no whole-paired-suite green result is claimed. Its transcript/call-count
+expectations need updating before qualification. Full native suites and exact-live
+HA-version/physical timing are not established by these selections.
+
+Nothing from this acknowledgement change was committed, pushed, deployed or
+restarted. Previously deployed timer commits remain a separate checkpoint.
+
 ## Remaining timer controls and cross-satellite alerts — development only
 
 The follow-up adds remaining-time/list, pause/resume, separate duration-selector

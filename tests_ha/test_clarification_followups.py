@@ -234,19 +234,14 @@ async def test_clarification_then_native_action_preserves_guidance_through_retry
             model_round(planned, [call_event("action-1", turn_on_tool, {
                 "name": "Test alpha", "domain": ["light"],
             }), COMPLETED])
-        model_round(planned, text_events(json.dumps({
-            "outcome": "accepted",
-            "reply": "Test alpha: request accepted; its state is unconfirmed.",
-        })) + [COMPLETED])
+        model_round(planned, text_events(json.dumps({"reply": "Understood."})) + [COMPLETED])
         followup = await conversation.async_converse(
             hass, followup_text, result.conversation_id, Context(),
             agent_id="conversation.codex_assist",
         )
     assert followup.conversation_id == result.conversation_id
     assert followup.continue_conversation is False
-    assert followup.response.speech["plain"]["speech"] == (
-        "Test alpha: request accepted; its state is unconfirmed."
-    )
+    assert followup.response.speech["plain"]["speech"] == "Understood."
     assert len(executed) == 1, requests[-1][1]["input"][-1]
     assert executed[0]["entity_id"] == ["light.test_alpha"]
     followup_requests = 3 if native_followup else 4
@@ -263,11 +258,12 @@ async def test_clarification_then_native_action_preserves_guidance_through_retry
     model_requests = [payload for path, payload in requests if path.endswith("/responses")]
     assert len(model_requests) == followup_requests + 1
     for payload in model_requests:
-        assert_clarification_guidance(payload["instructions"])
         is_reply = payload.get("text", {}).get("format", {}).get("name") == (
-            "action_acknowledgement"
+            "action_receipt"
         )
-        assert_search_speech_guidance(payload["instructions"], web_search and not is_reply)
+        if not is_reply:
+            assert_clarification_guidance(payload["instructions"])
+            assert_search_speech_guidance(payload["instructions"], web_search)
         if is_reply:
             assert payload.get("tools", []) == []
     assert model_requests[0]["instructions"] == model_requests[1]["instructions"]
@@ -356,19 +352,16 @@ async def test_native_control_uses_selected_personality_without_reexecuting_acti
         requests.append(kwargs)
         assert len(executed) == 1
         assert kwargs["tools"] == []
-        payload = json.loads(kwargs["input_items"][0]["content"])
-        assert payload["outcome"] == ("failed" if fails else "accepted")
-        if not fails:
-            assert payload["targets"][0]["name"] == "Test device"
-            assert payload["targets"][0]["verification"] not in {
-                "reported_requested_state", "reported_requested_setting",
-            }  # This fixture deliberately acknowledges without updating state.
-        yield CodexTextDelta(json.dumps({
-            "outcome": payload["outcome"], "reply": (
-                "Test device: alas, the request could not be carried out." if fails
-                else "Test device: request received, but its resulting state is unconfirmed."
-            ),
-        }))
+        if fails:
+            payload = json.loads(kwargs["input_items"][0]["content"])
+            assert payload["outcome"] == "failed"
+            yield CodexTextDelta(json.dumps({
+                "outcome": "failed",
+                "reply": "Test device: alas, the request could not be carried out.",
+            }))
+        else:
+            assert "targets" not in str(kwargs["input_items"])
+            yield CodexTextDelta(json.dumps({"reply": "Understood."}))
 
     monkeypatch.setattr(CodexClient, "stream_turn", styled_reply)
     result = await conversation.async_converse(
@@ -376,7 +369,7 @@ async def test_native_control_uses_selected_personality_without_reexecuting_acti
     )
     assert len(executed) == 1, result.response.as_dict()
     expected = ("Test device: alas, the request could not be carried out." if fails
-                else "Test device: request received, but its resulting state is unconfirmed.")
+                 else "Understood.")
     assert result.response.speech["plain"]["speech"] == expected
     assert len(requests) == 1
     selected = conversation.async_get_agent(hass, agent_id)
@@ -419,7 +412,7 @@ async def test_group_alias_without_area_executes_instead_of_text_only_false_succ
     assert callers == [hass_admin_user.id]
     assert executed[0]["entity_id"] == [entry.entity_id]
     assert hass.states.get(entry.entity_id).state == "off"
-    assert result.response.speech["plain"]["speech"] == "I've turned Study off."
+    assert result.response.speech["plain"]["speech"] == "Okay."
 
 
 @pytest.mark.parametrize("model_path", [False, True])
@@ -466,18 +459,9 @@ async def test_device_specific_reply_uses_exact_native_result_and_state_feedback
             ))
             return
         assert len(executed) == 1
-        payload = json.loads(kwargs["input_items"][0]["content"])
-        target, = payload["targets"]
-        assert target["name"] == "Test lamp" and target["domain"] == "light"
-        assert target["command_result"] == "accepted"
-        assert target["verification"] == "reported_requested_state"
-        assert target["reported_state"] == target["expected_state"] == "off"
-        assert target["reply_status"] == "success"
-        assert "entity_id" not in target
-        assert kwargs["instructions"].startswith("You are J.A.R.V.I.S.")
-        yield CodexTextDelta(json.dumps({
-            "outcome": "accepted", "reply": "I've turned Test lamp off. Sensibly economical.",
-        }))
+        assert "targets" not in str(kwargs["input_items"])
+        assert "You are J.A.R.V.I.S." in kwargs["instructions"]
+        yield CodexTextDelta(json.dumps({"reply": "Certainly, sir."}))
 
     monkeypatch.setattr(CodexClient, "stream_turn", model)
     if model_path:
@@ -494,11 +478,42 @@ async def test_device_specific_reply_uses_exact_native_result_and_state_feedback
     finally:
         await asyncio.gather(*updates)
     assert result.response.speech["plain"]["speech"] == (
-        "I've turned Test lamp off. Sensibly economical."
+        "Certainly, sir."
     )
     assert len(executed) == 1
     assert requests[-1]["tools"] == []
     assert len(requests) == (2 if model_path else 1)
+
+
+async def test_receipt_does_not_wait_for_device_state_verification(
+    hass, clarification_entry, monkeypatch,
+):
+    from custom_components.codex_assist import conversation as implementation
+    from custom_components.codex_assist.codex_client import CodexClient, CodexTextDelta
+
+    executed = []
+    hass.states.async_set("light.slow", "off", {"friendly_name": "Slow lamp"})
+    async_expose_entity(hass, "conversation", "light.slow", True)
+
+    async def turn_on(call):
+        executed.append(call)
+        # No device feedback ever arrives in this test.
+
+    async def forbidden_verification(*args, **kwargs):
+        raise AssertionError("Receipt must not depend on device-state verification")
+
+    async def receipt(*args, **kwargs):
+        yield CodexTextDelta(json.dumps({"reply": "Affirmative, sir."}))
+
+    hass.services.async_register("light", "turn_on", turn_on)
+    monkeypatch.setattr(implementation, "async_verify_action", forbidden_verification)
+    monkeypatch.setattr(CodexClient, "stream_turn", receipt)
+    result = await conversation.async_converse(
+        hass, "Turn on Slow lamp", None, Context(), agent_id="conversation.jarvis",
+    )
+    assert result.response.speech["plain"]["speech"] == "Affirmative, sir."
+    assert len(executed) == 1
+    assert hass.states.get("light.slow").state == "off"
 
 
 async def test_unexposed_target_cannot_be_controlled_by_native_or_model_path(

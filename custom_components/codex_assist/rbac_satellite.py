@@ -8,6 +8,7 @@ resolve free speech, call a model, or authenticate a self-declared satellite ID.
 import asyncio
 import hashlib
 import json
+import time
 from types import SimpleNamespace
 
 from homeassistant.components.homeassistant.exposed_entities import async_should_expose
@@ -246,6 +247,12 @@ class ProtectedSatelliteDispatcher:
             )
             if payload is None or not payload["tools"] or not authorization.valid():
                 return denied
+            # A separate, short-lived read-only observer. It retains no admission,
+            # PreparedRequest, tool or execution authorization after this turn.
+            payload["followup_read"] = self._followup_reader(
+                prepared.ha_user_id if matched else role_id, matched, candidates,
+                hashlib.sha256(key.encode()).digest(),
+            )
             # Stable continuity subject from this newly consumed, verified packet,
             # not a remembered account or a client/model conversation identifier.
             _clean, packet, _issued = decode(key, wire)
@@ -266,6 +273,30 @@ class ProtectedSatelliteDispatcher:
             self._tasks.discard(task)
             if prepared is not None:
                 self._scopes.pop(id(prepared), None)
+
+    def _followup_reader(self, subject, matched, candidates, key_digest):
+        from .guest_policy import async_guest_snapshot, async_speaker_snapshot
+
+        deadline = time.monotonic() + 25
+        snapshot = async_speaker_snapshot if matched else async_guest_snapshot
+
+        def current():
+            return (
+                not self._closed and time.monotonic() < deadline
+                and hashlib.sha256(self._key_provider().encode()).digest() == key_digest
+                and (matched or self._guest_role_provider() == subject)
+            )
+
+        async def read(ids):
+            try:
+                if not current() or any(eid not in candidates for eid in ids):
+                    return None
+                rows = await snapshot(self.hass, subject, ids)
+                return rows if current() else None
+            except Exception:
+                return None
+
+        return read
 
     async def async_dispatch(self, admission, *, transcript, command):
         """Accept only a same-task STT handoff and a bounded exact on/off proposal.

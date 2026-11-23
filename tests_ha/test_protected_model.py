@@ -160,7 +160,7 @@ async def test_compound_request_executes_all_completed_tool_calls_not_just_first
     ]])
     assert fixed.calls == [{"query": "first"}, {"query": "second"}]
     assert result == {"status": "completed", "completed": 2}
-    assert speech == "All requested commands were sent."
+    assert speech == "Okay."
 
 
 async def test_partial_compound_failure_reports_successful_count_without_replaying(hass, fixed):

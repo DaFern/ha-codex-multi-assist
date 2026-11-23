@@ -3,6 +3,7 @@
 import asyncio
 import json
 import sys
+from dataclasses import replace
 from types import ModuleType, SimpleNamespace
 
 import pytest
@@ -275,27 +276,28 @@ async def test_slow_account_check_is_bounded_and_cancellation_propagates(environ
 @pytest.mark.asyncio
 async def test_personality_receives_only_authorized_target_facts_and_factual_fallback(environment):
     env = environment
-    env.add(state="off")
+    env.add(state="on")
     outcome = await async_verify_action(
         env.hass, ActionOutcome("accepted"), contents(env.tool), [env.tool], None, timeout=0,
     )
+    outcome = replace(outcome, kind="unconfirmed")
     captured = []
 
     class Client:
         async def stream_turn(self, **kwargs):
             captured.append(kwargs)
             yield CodexTextDelta(json.dumps({
-                "outcome": "accepted", "reply": "Test device reports off. Most economical, sir.",
+                "outcome": "unconfirmed", "reply": "Test device is still on, sir.",
             }))
 
     reply = await async_action_reply(
         outcome, codex=Client(), model="test", instructions="Be dryly witty.",
         reasoning_effort="low", reasoning_summary="auto", text_verbosity="low",
     )
-    assert reply == "Test device reports off. Most economical, sir."
+    assert reply == "Test device is still on, sir."
     payload = json.loads(captured[0]["input_items"][0]["content"])
     assert payload["targets"][0]["name"] == "Test device"
-    assert payload["targets"][0]["verification"] == "reported_requested_state"
+    assert payload["targets"][0]["verification"] == "not_observed"
     assert "entity_id" not in payload["targets"][0]
     assert captured[0]["tools"] == []
     assert "Be dryly witty." in captured[0]["instructions"]
@@ -310,25 +312,26 @@ async def test_generic_or_broken_personality_reply_keeps_device_specific_facts(
 
     caplog.set_level(logging.INFO, logger="custom_components.codex_assist.action_control")
     env = environment
-    env.add(state="off")
+    env.add(state="on")
     outcome = await async_verify_action(
         env.hass, ActionOutcome("accepted"), contents(env.tool), [env.tool], None, timeout=0,
     )
+    outcome = replace(outcome, kind="unconfirmed")
 
     class Client:
         async def stream_turn(self, **kwargs):
             if response == "failure":
                 raise RuntimeError("synthetic")
             yield CodexTextDelta("bad JSON" if response == "invalid" else json.dumps({
-                "outcome": "accepted", "reply": "Home Assistant has accepted the request, sir.",
+                "outcome": "unconfirmed", "reply": "The response is uncertain, sir.",
             }))
 
     assert await async_action_reply(
         outcome, codex=Client(), model="test", instructions="Be witty.",
         reasoning_effort="low", reasoning_summary="auto", text_verbosity="low",
-    ) == "I've turned Test device off."
+    ) == outcome.speech
     reason = "missing_target" if response == "generic" else "generation_failed"
-    assert f"Action reply: result=fallback reason={reason} outcome=accepted" in caplog.text
+    assert f"Action reply: result=fallback reason={reason} outcome=unconfirmed" in caplog.text
     for private in ("Test device", "light.test", "Be witty.", "synthetic"):
         assert private not in caplog.text
 
@@ -341,7 +344,6 @@ async def test_generic_or_broken_personality_reply_keeps_device_specific_facts(
     ("Be plain and minimal; no jokes.", ""),
 ])
 @pytest.mark.parametrize("status,command,verification,state,body", [
-    ("success", "accepted", "reported_requested_state", "off", "I've turned Test lamp off."),
     ("unconfirmed", "accepted", "unavailable", "unavailable",
      "I sent the command to Test lamp, but can't confirm its response."),
     ("not_reached", "accepted", "not_observed", "on", "Test lamp is still on."),
@@ -352,7 +354,7 @@ async def test_conversational_outcomes_apply_to_any_profile_without_weakening_ev
 ):
     target = TargetEvidence("light.test", "Test lamp", "light", "turn_off", command,
                             verification=verification, reported_state=state, expected_state="off")
-    outcome = ActionOutcome("failed" if command == "failed" else "accepted", targets=(target,))
+    outcome = ActionOutcome("failed" if command == "failed" else "unconfirmed", targets=(target,))
     calls = []
     expected = body + (f" {flourish}" if flourish else "")
 

@@ -27,6 +27,15 @@ from custom_components.codex_assist.codex_client import (
 from tests.ha_fakes import install_homeassistant_fakes
 
 
+@pytest.fixture(autouse=True)
+def clear_receipt_cache():
+    from custom_components.codex_assist.action_receipts import _RECEIPTS
+
+    _RECEIPTS.clear()
+    yield
+    _RECEIPTS.clear()
+
+
 def evidence(data, *, wrapped=True, error=False, call_id="current", tool="TestTool"):
     call = SimpleNamespace(id=call_id, tool_name=tool, external=False)
     result = SimpleNamespace(role="tool_result", tool_call_id=call_id)
@@ -239,10 +248,10 @@ def test_fixed_partial_and_failure_replies_do_not_expose_raw_errors():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("profile,reply", [
-    ("Use dry British wit.", "Test lamp reports off. A triumph of restraint."),
-    ("Be warm and encouraging.", "Test lamp reports off. One less thing to worry about."),
-    ("Be theatrical and sarcastic.", "Test lamp reports off. Behold, civilisation advances."),
-    ("Be plain and minimal. No jokes.", "Test lamp reports off."),
+    ("Use dry British wit.", "Certainly, sir."),
+    ("Be warm and encouraging.", "Of course!"),
+    ("Be theatrical and sarcastic.", "As you wish."),
+    ("Be plain and minimal. No jokes.", "Okay."),
 ])
 async def test_reply_guidance_preserves_each_profile_without_forcing_one_character(
     profile, reply, caplog,
@@ -255,7 +264,7 @@ async def test_reply_guidance_preserves_each_profile_without_forcing_one_charact
     class Client:
         async def stream_turn(self, **kwargs):
             calls.append(kwargs)
-            yield CodexTextDelta(json.dumps({"outcome": "accepted", "reply": reply}))
+            yield CodexTextDelta(json.dumps({"reply": reply}))
 
     result = await async_action_reply(
         ActionOutcome("accepted"), codex=Client(), model="test", instructions=profile,
@@ -264,17 +273,15 @@ async def test_reply_guidance_preserves_each_profile_without_forcing_one_charact
     assert result == reply  # Scripted output proves routing, not real-model style.
     prompt = calls[0]["instructions"]
     assert prompt.startswith(profile)
-    assert "one brief characteristic flourish" in prompt
-    assert "do not force jokes" in prompt
-    assert "fallback reference, not a script to recite" in prompt
-    assert "not verified physical completion" in prompt
+    assert "ONLY if this personality calls for it" in prompt
+    assert "receipt, NOT an action or device-status report" in prompt
+    assert "at most eight words" in prompt
     assert calls[0]["tools"] == []
-    assert "Action reply: result=generated reason=valid outcome=accepted" in caplog.text
     assert profile not in caplog.text and reply not in caplog.text
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("kind", ["accepted", "failed", "partial", "unconfirmed"])
+@pytest.mark.parametrize("kind", ["failed", "partial", "unconfirmed"])
 @pytest.mark.parametrize("personality", ["Speak like a pirate.", "Use quiet scientific wit."])
 async def test_action_reply_uses_any_personality_but_preserves_authoritative_outcome(
     kind, personality,
@@ -318,22 +325,17 @@ async def test_action_reply_gets_only_sanitized_action_context():
         async def stream_turn(self, **kwargs):
             calls.append(kwargs)
             yield CodexTextDelta(json.dumps({
-                "outcome": "accepted", "reply": "The lights are having a quiet moment.",
+                "reply": "Understood.",
             }))
 
     outcome = ActionOutcome("accepted", ActionContext("turn_off", "light"))
     assert await async_action_reply(
         outcome, codex=Client(), model="test", instructions="Use dry wit.",
         reasoning_effort="low", reasoning_summary="auto", text_verbosity="low",
-    ) == "The lights are having a quiet moment."
-    payload = json.loads(calls[0]["input_items"][0]["content"])
-    assert payload == {
-        "outcome": "accepted",
-        "fact": outcome.speech,
-        "action": {"operation": "turn_off", "target_domain": "light"},
-    }
-    assert "office" not in str(payload)
-    assert "entity_id" not in str(payload)
+    ) == "Understood."
+    payload = calls[0]["input_items"]
+    assert payload == [{"role": "user", "content": "Acknowledge that you heard me."}]
+    assert "light" not in str(payload)
 
 
 @pytest.mark.asyncio
@@ -354,7 +356,7 @@ async def test_bad_styled_response_falls_back_without_publishing_partial_text(ba
     assert await async_action_reply(
         ActionOutcome("accepted"), codex=Client(), model="test", instructions="Custom persona",
         reasoning_effort="low", reasoning_summary="auto", text_verbosity="low",
-    ) == ActionOutcome("accepted").speech
+    ) == "Okay."
 
 
 @pytest.mark.asyncio

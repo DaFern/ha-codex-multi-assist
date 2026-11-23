@@ -155,6 +155,9 @@ class CodexAssistConversationEntity(
         user_input: conversation.ConversationInput,
         chat_log: conversation.ChatLog,
     ) -> conversation.ConversationResult:
+        from .action_followup import cancel_native_followup
+
+        cancel_native_followup(self.hass, getattr(user_input, "device_id", None))
         model = self.profile.model or "gpt-5.4"
         prompt = self.profile.prompt
         reasoning_effort = self.profile.reasoning_effort
@@ -443,22 +446,52 @@ class CodexAssistConversationEntity(
         )
 
         async def publish_action(outcome: ActionOutcome, client: CodexClient | None = None):
-            outcome = await async_verify_action(
-                self.hass, outcome, action_contents,
-                getattr(chat_log.llm_api, "tools", []), user_input.context,
-            )
-            text = outcome.speech
-            if client is not None:
-                text = await async_action_reply(
-                    outcome, codex=client, model=model,
-                    instructions=request_instructions(personal_instructions(
-                        _instructions_for_turn(chat_log, prompt, web_search=False),
-                        preferences, request_tag=prepared_request.diagnostic_tag,
-                        speaker_name=prepared_request.speaker_name,
-                    )) + f"\nUser language: {user_input.language}",
+            from .action_followup import failure_only, schedule_native_followup
+
+            reply_instructions = request_instructions(personal_instructions(
+                _instructions_for_turn(chat_log, prompt, web_search=False),
+                preferences, request_tag=prepared_request.diagnostic_tag,
+                speaker_name=prepared_request.speaker_name,
+            )) + f"\nUser language: {user_input.language}"
+
+            async def reply(result):
+                if client is None:
+                    return "Okay." if result.kind == "accepted" else result.speech
+                if result.kind == "accepted":
+                    return await async_action_reply(
+                        result, codex=client, model=model,
+                        instructions=f"Response style only: {self.profile.prompt}\n"
+                                     f"User language: {user_input.language}",
+                        reasoning_effort=reasoning_effort, reasoning_summary=reasoning_summary,
+                        text_verbosity=text_verbosity,
+                    )
+                return await async_action_reply(
+                    result, codex=client, model=model,
+                    instructions=reply_instructions,
                     reasoning_effort=reasoning_effort, reasoning_summary=reasoning_summary,
                     text_verbosity=text_verbosity,
                 )
+            if outcome.kind == "accepted":
+                # Do not hold the receipt behind polling or a device-state read.
+                text = await reply(outcome)
+                contents = tuple(action_contents)
+                tools = tuple(getattr(chat_log.llm_api, "tools", []))
+
+                async def observe():
+                    return failure_only(await async_verify_action(
+                        self.hass, outcome, contents, tools, user_input.context,
+                    ))
+
+                schedule_native_followup(
+                    self.hass, self.entry, getattr(user_input, "device_id", None),
+                    user_input.context, observe, reply,
+                )
+            else:
+                outcome = await async_verify_action(
+                    self.hass, outcome, action_contents,
+                    getattr(chat_log.llm_api, "tools", []), user_input.context, timeout=0,
+                )
+                text = await reply(outcome)
             chat_log.async_add_assistant_content_without_tools(conversation.AssistantContent(
                 agent_id=user_input.agent_id, content=text,
             ))

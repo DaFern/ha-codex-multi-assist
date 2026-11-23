@@ -81,6 +81,15 @@ async def async_action_reply(
     """
     from .codex_client import CodexResponseItemDelta, CodexTextDelta
 
+    if outcome.kind == "accepted":
+        from .action_receipts import async_receipt
+
+        return await async_receipt(
+            codex, model=model, instructions=instructions,
+            reasoning_effort=reasoning_effort, reasoning_summary=reasoning_summary,
+            text_verbosity=text_verbosity,
+        )
+
     fact = outcome.speech
     if fact is None:
         raise ValueError("An action outcome is required")

@@ -6,10 +6,12 @@ entity list. The shared action handler and personality replies are installed on 
 test system. Startup recovery is verified; real-model/device acceptance of the new
 full-personality wording remains pending. This is not a published release.
 
-**Prepared, not deployed:** device-specific readback adds the result/verification
-flow below. It requires separately approved installation and Core restart. Existing
-deployment statements elsewhere in this guide describe the older acknowledgement
-baseline, not this candidate's live acceptance.
+**Prepared, not deployed:** receipt-first acknowledgements replace routine device
+status narration. Authorised controls get a brief acknowledgement in the selected
+personality without waiting for device-state verification. Eligible satellites
+observe feedback separately and speak again only for a problem/uncertain response.
+Installation and restart need separate approval. Older deployment/test evidence
+below describes historical checkpoints, not this candidate's physical acceptance.
 
 ## Native-first control
 
@@ -69,7 +71,7 @@ the original caller's read permissions. It rechecks after waits and discards det
 if the account disappears/becomes inactive or exposure/read permission is revoked.
 Names and projected state values are bounded data, not instructions. Readback is
 limited to 16 targets and one two-second total deadline, not two seconds per device.
-Extra/withheld target details are identified as unavailable. No service refresh,
+Extra/withheld target details are not spoken in routine receipts. No service refresh,
 action retry, corrective action, arbitrary service bridge or broad state dump occurs.
 
 Supported postconditions include binary on/off states, lock/unlock, cover open/close
@@ -80,10 +82,8 @@ and timeouts are not successful verification. Toggle has no verifiable requested
 postcondition without a pre-action snapshot. Scripts, scenes and unsupported
 operations can be named and acknowledged but their completion is not inferred.
 
-A matching state permits an ordinary conversational completion confirmation such
-as “I've turned Test lamp off”, without narrating telemetry. This is confirmation
-based on HA state, **not** independent proof the device changed from another state,
-received a hardware acknowledgement or physically responded.
+A matching state keeps the background check silent. It does not produce another
+spoken success message or prove the device physically responded.
 A thermostat reporting its requested setpoint is not proof the room reached that
 temperature. Integration state can itself be optimistic even without advertising
 `assumed_state`; no physical-feedback guarantee is made. Partial/failed/unconfirmed
@@ -91,23 +91,27 @@ actions are never replayed to obtain a nicer reply.
 
 ## Personality-aware acknowledgements
 
-The prepared conversational-outcome refinement supplies a personality-independent
-`reply_status` for each target: `success`, `unconfirmed`, `not_reached` or `failed`.
-Success permits normal completed-action wording, not “reports as”; missing reliable
-feedback requires uncertainty, and feedback still disagreeing after the wait stays
-`not_reached`, distinct from command failure. Agents can express reluctance or
-non-cooperation figuratively in their own style without inventing a technical cause.
-No JARVIS-specific dialogue is embedded. Verification, permissions, no-retry behavior
-and the distinction between a setpoint and room temperature are unchanged. Named
-success fallbacks also use ordinary language. Unsupported/script/scene postconditions
-still cannot become completion claims. This refinement requires deployment separately.
+`action_receipts.py` produces a short “I heard you” receipt: at most eight words,
+using the saved profile's personality and requested language. JARVIS might say
+“Certainly, sir”; another personality must not inherit that character or address.
+No action results, resolved targets, device names or command history enter the
+receipt input. It is tools-disabled and cannot issue an action. Routine receipts
+never need required target names, “command sent” wording or telemetry explanations.
 
-The prepared wording refinement explicitly follows the saved profile's diction,
-rhythm and tone rather than merely adding a form of address to a status sentence.
-Witty/warm/theatrical profiles are asked for one brief characteristic flourish;
-plain or serious profiles are not forced to joke. This changes guidance, not the
-verification, target-name checks, factual fallback or tools-disabled boundary.
-Real-model personality compliance remains an acceptance test.
+Successful receipt generation is cached in a bounded, volatile 64-style/model cache.
+Language is included in the supplied style instructions. Keys are hashes; values
+are only generic phrases. Cold generation is limited to two seconds and uses the
+neutral “Okay.” fallback on timeout, malformed output or prohibited status wording.
+Fallbacks are not cached. Cancellation propagates. Structural/word checks do not
+prove semantic compliance in every language; real-model acceptance remains needed.
+No hard-coded personality or user-configurable permission bypass was added.
+
+Known failures/partial results are explained immediately. Later readback problems
+use the existing tools-disabled factual personality reply. Missing reliable
+feedback is uncertainty, not proven device failure; unsupported postconditions
+such as script/scene completion do not trigger an invented failure. Timers retain
+their specific duration/selection acknowledgements; state queries and necessary
+clarification retain useful answers instead of becoming generic receipts.
 
 Minimal INFO diagnostics on `custom_components.codex_assist.action_control` distinguish
 `result=generated reason=valid` from `result=fallback` with fixed reasons such as
@@ -118,17 +122,17 @@ generated reply had sufficient flair. No logging level is enabled by this change
 turning on targeted INFO requires separate approval. Earlier replies cannot be
 retrospectively classified from their wording alone.
 
-The tools-disabled step receives the outcome category, a factual fallback, optional
+The failure-only tools-disabled step receives the outcome category, a factual fallback, optional
 recognized operation/domain/requested label, and bounded per-target names, command
 results and verification evidence. Resolved IDs stay internal to readback; raw tool
 arguments/results, arbitrary attributes, exception strings and user command/history
 are not forwarded. Target labels are untrusted data, never instructions. Its system
-instructions use the current selected agent's rendered prompt and optional verified
+instructions use the current selected agent's prompt and optional verified
 Voice Match name/preferences, never a hard-coded character or another agent's prompt.
 The model writes the entire reply in that personality and the requested language;
 there is no mandatory stock sentence, prefix or suffix. The outcome explanation is
 input evidence, not a required spoken template. Instructions require preserving
-accepted, failed, partial and unconfirmed distinctions without inventing physical
+failed, partial and unconfirmed distinctions without inventing physical
 completion or treating partial/uncertain handling as full success.
 
 The structured result must carry the same outcome category, only the allowed fields,
@@ -144,13 +148,26 @@ is no speech-generation retry or extra tool execution. Authentication failure af
 a native action preserves its known result rather than reporting that action failed.
 Provider/authentication outages themselves still use local generic error guidance.
 
-This adds one model request and latency for action acknowledgements. The generation
-timeout excludes the existing credential resolution and bounded readback steps. No model-native state
-from this isolated reply is retained; the final delivered speech joins normal HA
-history. Outcome category/schema checks are structural, not semantic proof that
-free-form prose is truthful. Live acceptance must check the selected model follows
-the factual constraints while using each agent's personality. No semantic guarantee
-is made by the model's echoed category alone.
+Only a cold receipt needs an extra model request. Credential resolution, speech
+recognition, model planning and the original integration service call can still
+take time: this change does not detach control from its live permission scope.
+It removes the additional device-state wait from routine acknowledgement latency.
+
+Failure observation runs in entry-owned background tasks with a 25-second lifetime.
+It may poll state but never refresh devices or repeat control. Protected observers
+are separate from expired execution admissions, and obtain fresh native/RBAC
+projections for the original verified subject and exact executed targets.
+Registry replacement, key/guest-role change or lost permission suppresses speech.
+The original encrypted source transport is revalidated before reporting.
+
+Only an unambiguous originating satellite can receive a delayed announcement.
+It waits until the acknowledgement and listening pipeline finish, rechecks feedback
+after waiting and again after wording generation, and does not interrupt a newer
+request. New requests, disconnection and unload invalidate/cancel it. No source
+channel means no announcement elsewhere: phone/text has no supported second
+spoken-response channel. Background errors are not appended to a newer speaker's
+shared history. Live latency, voice/model style and physical feedback remain
+acceptance tests; no release qualification is implied.
 
 HA local intents that run before this integration still use HA's own responses.
 This feature does not silently change pipeline settings, affect unrelated agents,

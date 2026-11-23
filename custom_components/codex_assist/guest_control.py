@@ -208,7 +208,9 @@ class GuestOnOffTool(llm.Tool):
                 data={"error": "The requested device command could not be completed.",
                       "completed": result.completed}, error=True,
             )
-        return llm.ToolResult(data={"status": "accepted", "completed": result.completed})
+        return llm.ToolResult(data={
+            "status": "accepted", "completed": result.completed, "entity_ids": list(targets),
+        })
 
 
 @dataclass
