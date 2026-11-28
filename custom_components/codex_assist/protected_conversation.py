@@ -1,6 +1,8 @@
 """Volatile microphone window only; durable dialogue is separate from authority."""
 
+import re
 import time
+from zoneinfo import ZoneInfo
 
 LISTEN_SECONDS = 8
 STOP_PHRASES = frozenset({
@@ -9,8 +11,37 @@ STOP_PHRASES = frozenset({
 })
 
 
+def _normalise_stop_phrase(text):
+    return " ".join(text.casefold().replace("’", "'").strip().rstrip(".!?").split())
+
+
 def is_stop_phrase(text):
-    return " ".join(text.casefold().replace("’", "'").strip().rstrip(".!?").split()) in STOP_PHRASES
+    return _normalise_stop_phrase(text) in STOP_PHRASES
+
+
+def stop_phrase_reply(text):
+    """Acknowledge thanks locally before the native closing TTS, without new tools."""
+    return "You're welcome." if _normalise_stop_phrase(text) in {"thanks", "thank you"} else "Okay."
+
+
+def public_voice_reply(text, time_zone):
+    """Finite public replies only: no device data, history, tools or model."""
+    normal = _normalise_stop_phrase(text)
+    if normal in STOP_PHRASES:
+        return "closing", stop_phrase_reply(text)
+    if re.fullmatch(
+        r"(?:(?:could|can|would) you (?:please )?|please )?"
+        r"(?:tell me (?:what time it is|the (?:current )?time)"
+        r"|what(?:'s| is) the (?:current )?time|what time is it)"
+        r"(?: (?:right )?now)?(?: please)?",
+        normal,
+    ):
+        from homeassistant.util import dt as dt_util
+
+        local = dt_util.utcnow().astimezone(ZoneInfo(time_zone))
+        hour = local.hour % 12 or 12
+        return "time", f"It's {hour}:{local.minute:02d} {'am' if local.hour < 12 else 'pm'}."
+    return None
 
 
 def is_forget_phrase(text):

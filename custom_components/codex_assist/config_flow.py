@@ -269,9 +269,42 @@ class CodexAssistOptionsFlow(RoomMusicOptionsMixin, MCPOptionsMixin, config_entr
             return self.async_abort(reason="learning_reconfigure_required")
         menu = ["settings", "agents", "voice_match"]
         if satellite_tools_supported():
-            menu.extend(["music", "room_music_defaults", "guest"])
+            menu.extend(["music", "room_music_defaults", "guest", "questions"])
         menu.append("mcp")
         return self.async_show_menu(step_id="init", menu_options=menu)
+
+    async def async_step_questions(self, user_input=None):
+        """Choose unfiltered transcription only for HA-configured questions."""
+        if not satellite_tools_supported():
+            return self.async_abort(reason="satellite_requires_current_ha")
+        from .protected_pipeline import CONF_QUESTION_STT, question_stt_source
+
+        errors = {}
+        if user_input is not None:
+            selected = user_input.get(CONF_QUESTION_STT)
+            options = dict(self.config_entry.options)
+            if selected:
+                try:
+                    question_stt_source(self.hass, selected)
+                except ValueError:
+                    errors["base"] = "invalid_question_stt"
+                else:
+                    options[CONF_QUESTION_STT] = selected
+            else:
+                options.pop(CONF_QUESTION_STT, None)
+            if not errors:
+                return self.async_create_entry(title="", data=options)
+        return self.async_show_form(
+            step_id="questions",
+            data_schema=vol.Schema({
+                vol.Optional(CONF_QUESTION_STT, description={
+                    "suggested_value": self.config_entry.options.get(CONF_QUESTION_STT),
+                }): selector.EntitySelector(selector.EntitySelectorConfig(
+                    domain="stt", integration="wyoming",
+                )),
+            }),
+            errors=errors,
+        )
 
     async def async_step_guest(self, user_input=None):
         """Select an existing restricted role; its domain rules stay in RBAC."""

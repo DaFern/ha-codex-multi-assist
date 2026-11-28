@@ -203,6 +203,22 @@ class ProtectedSatelliteDispatcher:
                 key, transcript, [SimpleNamespace(role="user", content=transcript)],
                 None, "protected_guest_voice", packet_text=wire,
             )
+            from .protected_conversation import public_voice_reply
+
+            public = public_voice_reply(prepared.text, self.hass.config.time_zone)
+            if prepared.verified and public is not None:
+                # A signed request on the original encrypted transport may ask
+                # for these public constants even with no device/guest access.
+                # Never provide tools, personal context or historical identity.
+                result = await handler(
+                    {"public_reply": public[1], "public_kind": public[0]}, admission.context,
+                )
+                if (
+                    not self._closed and self._validator(admission) is True
+                    and admission.owner is asyncio.current_task() and self._key_provider() == key
+                ):
+                    return result
+                return denied
             matched = prepared.voice is not None
             role_id = None if matched else self._guest_role_provider()
             candidates = self._candidates() if callable(self._candidates) else self._candidates

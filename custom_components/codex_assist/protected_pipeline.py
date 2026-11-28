@@ -18,9 +18,109 @@ from homeassistant.components.assist_pipeline import (
     PipelineStage,
 )
 from homeassistant.helpers import chat_session
+from homeassistant.helpers import entity_registry as er
 
 DENIAL_SPEECH = "This voice request is not authorised."
 FAILURE_SPEECH = "I couldn't confirm that request."
+CONF_QUESTION_STT = "question_stt_engine"
+
+
+def question_stt_source(hass, entity_id):
+    """Resolve an explicitly selected ordinary Whisper provider, never Voice Match."""
+    if not isinstance(entity_id, str) or not entity_id.startswith("stt."):
+        raise ValueError("Select an ordinary Wyoming Whisper question engine")
+    registered = er.async_get(hass).async_get(entity_id)
+    source = stt.async_get_speech_to_text_entity(hass, entity_id)
+    if (
+        registered is None or registered.platform != "wyoming"
+        or registered.disabled_by is not None or source is None or not source.available
+        or source.platform is None or source.platform.platform_name != "wyoming"
+    ):
+        raise ValueError("Question Whisper engine is unavailable")
+    programs = getattr(getattr(getattr(source, "service", None), "info", None), "asr", None)
+    if not programs or any(
+        program.name not in {"faster-whisper", "whisper"} for program in programs
+    ):
+        raise ValueError("Question engine must be ordinary Whisper, not a voice filter")
+    return source
+
+
+async def async_run_question_pipeline(
+    hass, *, pipeline, context, audio_stream, event_callback, question, current,
+    device_id, satellite_id, tts_audio_output=None, wake_word_phrase=None,
+    silence_seconds=0.7,
+):
+    """Capture a configured HA question's reply; never dispatch an ordinary request.
+
+    The question and its consequences belong to the calling HA automation. The
+    answer does not require speaker/role authorisation. The caller still pins the
+    actual satellite connection and exact native future across audio awaits.
+    Buffer STT_END so a replaced/closed question cannot receive captured text.
+    """
+    text = None
+    stt_event = None
+    failed = False
+
+    def events(event):
+        nonlocal text, stt_event, failed
+        if event.type is PipelineEventType.STT_END:
+            text = (event.data or {}).get("stt_output", {}).get("text")
+            stt_event = event
+            return
+        if event.type is PipelineEventType.RUN_END:
+            return
+        if event.type is PipelineEventType.ERROR:
+            failed = True
+        if current() and not question.done():
+            event_callback(event)
+
+    try:
+        if not current() or question.done():
+            return
+        async with asyncio.timeout(30):
+            with chat_session.async_get_chat_session(hass) as session:
+                run = PipelineRun(
+                    hass=hass, context=context, pipeline=pipeline,
+                    event_callback=events, tts_audio_output=tts_audio_output,
+                    start_stage=PipelineStage.STT, end_stage=PipelineStage.STT,
+                    audio_settings=AudioSettings(silence_seconds=silence_seconds),
+                )
+                await PipelineInput(
+                    run=run, session=session, stt_metadata=stt.SpeechMetadata(
+                        language=pipeline.stt_language or pipeline.language,
+                        format=stt.AudioFormats.WAV, codec=stt.AudioCodecs.PCM,
+                        bit_rate=stt.AudioBitRates.BITRATE_16,
+                        sample_rate=stt.AudioSampleRates.SAMPLERATE_16000,
+                        channel=stt.AudioChannels.CHANNEL_MONO,
+                    ),
+                    stt_stream=audio_stream, wake_word_phrase=wake_word_phrase,
+                    device_id=device_id, satellite_id=satellite_id,
+                ).execute(validate=True)
+                if (
+                    not failed and isinstance(text, str) and 0 < len(text) <= 8192
+                    and stt_event is not None and current() and not question.done()
+                ):
+                    # Strip the private STT carrier's object identity. Native HA
+                    # owns answer matching; no voice packet, model or tools run.
+                    data = dict(stt_event.data)
+                    data["stt_output"] = {**data["stt_output"], "text": str(text)}
+                    event_callback(PipelineEvent(PipelineEventType.STT_END, data))
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        if current() and not question.done():
+            event_callback(PipelineEvent(PipelineEventType.ERROR, {
+                "code": "question-stt-failed", "message": "Could not capture the answer.",
+            }))
+    finally:
+        try:
+            if current():
+                event_callback(PipelineEvent(PipelineEventType.RUN_END))
+        finally:
+            # Settle only the captured future, never a newer question. Silence,
+            # disconnect, cancellation and failed STT are no answer, not an action.
+            if not question.done():
+                question.set_result(None)
 
 
 async def async_run_protected_pipeline(

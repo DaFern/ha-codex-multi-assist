@@ -39,8 +39,12 @@ def test_guidance_and_all_repair_flows_have_matching_translations():
     strings = json.loads((TRANSLATION.parent.parent / "strings.json").read_text())
     assert strings == json.loads(TRANSLATION.read_text())
     assert set(strings["options"]["step"]["init"]["menu_options"]) == {
-        "settings", "agents", "voice_match", "music", "room_music_defaults", "guest", "mcp",
+        "settings", "agents", "voice_match", "music", "room_music_defaults", "guest", "questions",
+        "mcp",
     }
+    question = strings["options"]["step"]["questions"]
+    assert question["data"]["question_stt_engine"] == "Question transcription engine"
+    assert "ordinary Jarvis commands" in question["description"]
     assert "voice_match_cleanup" not in strings["options"]["step"]
     for kind in ("bridge", "source", "entities", "pipeline", "launcher"):
         flow = strings["issues"]["voice_learning_" + kind]["fix_flow"]

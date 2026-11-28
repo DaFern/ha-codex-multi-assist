@@ -180,7 +180,11 @@ the existing end-conversation handling, like “that's all”. Case, trailing se
 punctuation and repeated whitespace are normalised. The current listening window
 ends without another model call or device action, and normal wake-word standby
 can resume. Conversation history is retained; this does not mute the microphone
-globally or forget the conversation. The existing short “Okay.” closing is unchanged.
+globally or forget the conversation. Standalone thanks now receives a fixed spoken
+“You're welcome.” through the existing native TTS stage before the pipeline ends.
+The continuation flag stays false, including after playback finishes. Other stop
+phrases keep their short “Okay.” reply. This acknowledgement requires no model
+call and grants no new authority.
 
 Only a complete matching utterance closes listening. “Thanks, turn off the light”,
 quoted phrases, song titles and longer requests still use normal authorised
@@ -191,6 +195,9 @@ passed 134 with 126 feature skips. Unsupported-feature skips do not establish
 protected-pipeline support on minimum HA. Polite-closing tests assert no new
 model/control calls, cancelled listening timers, unchanged history and a false
 native continuation flag; a compound thanks-plus-command still executes normally.
+The spoken-thanks follow-up adds explicit intent-speech/TTS-input assertions,
+TTS-before-run-end ordering and no reopening after the playback-finished callback.
+It remains a source-only change until separately deployed and restarted.
 
 Model response rounds are buffered to completion before any tool batch is
 dispatched. Pre-tool speech is dropped when a tool handoff exists. No-tool answers

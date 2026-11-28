@@ -10,6 +10,7 @@ from custom_components.codex_assist.protected_conversation import (
     ProtectedConversation,
     SpeechActivity,
     is_stop_phrase,
+    stop_phrase_reply,
 )
 
 
@@ -54,6 +55,16 @@ def test_clear_discards_only_microphone_state_and_timer():
 ])
 def test_explicit_stop_phrases(phrase):
     assert is_stop_phrase(phrase)
+
+
+@pytest.mark.parametrize("phrase", ["Thanks.", " THANKS! ", "Thank you", "thank   you!?"])
+def test_thanks_get_a_spoken_acknowledgement(phrase):
+    assert stop_phrase_reply(phrase) == "You're welcome."
+
+
+@pytest.mark.parametrize("phrase", ["That's all.", "STOP LISTENING", "goodbye!"])
+def test_other_stop_phrases_keep_the_existing_reply(phrase):
+    assert stop_phrase_reply(phrase) == "Okay."
 
 
 def test_music_stop_or_a_quoted_phrase_is_not_a_conversation_stop():

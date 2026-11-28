@@ -185,11 +185,31 @@ speaker, native/RBAC, exposure, device-feature and parameter checks. Doors, gara
 doors, locks, alarms, scripts and arbitrary services remain excluded. See the
 [current capability checkpoint](docs/RBAC_ASSIST.md#consolidated-ordinary-control-overhaul--deployed-physical-acceptance-pending).
 
+**Configured satellite questions (source update):** HA-authored `ask_question`
+prompts capture an answer without speaker or role checks; the calling automation
+owns the configured answers and outcomes. The isolated STT-only path cannot run
+ordinary commands or grant access to Jarvis tools. Device/connection checks remain.
+Select an ordinary Wyoming Whisper engine in **Configured satellite questions**
+options; answers bypass Voice Match only while a native question is pending.
+No engine is selected by default, and missing sources fail without fallback.
+Separate deployment/restart and physical acceptance are required; see
+[satellite question compatibility](docs/SATELLITE_QUESTIONS.md).
+
+**Transcribe first (development):** the separately updated Voice Match app can
+opt into neutral transcription for unmatched speech. Existing guest/user checks
+still govern actions; unknown speakers never inherit the previous person's access.
+The protected route answers current-time questions locally and acknowledges
+standalone thanks without model/device access. Permission refusals must not
+disclose hidden device data. See [scope and acceptance](docs/TRANSCRIBE_FIRST.md).
+
 The experimental protected satellite source now includes an approved, in-testing
 conversation follow-up: an eight-second listening window after each successful
 spoken reply, a bounded shared conversation saved across restarts, and fresh speaker
 evidence and permission checks every turn. Silence or “that's all” ends listening,
-not memory. Previous turns are shown only when the current speaker can access their
+not memory. Standalone “thanks” or “thank you” gets a spoken “You're welcome.”
+before returning to standby, without reopening listening (source update; separate
+deployment/restart required). Previous turns are shown only when the current
+speaker can access their
 entire protected input context; “forget this conversation” clears permitted context.
 This is not
 physical-device acceptance or general release readiness; see the current

@@ -103,6 +103,10 @@ async def async_fixed_tool_turn(hass, client, profile, payload, context, text, l
     instructions = (
         "You are a concise voice assistant. Use only the supplied tools and filtered "
         "entities. Ask one short question if the target or music selection is ambiguous. "
+        "If the requested device or action is not in your permitted context, explain "
+        "that the current speaker is not authorised to access or control that device. "
+        "You may refer to the target description supplied by the user, but never "
+        "confirm a hidden device exists or disclose its state, attributes or owners. "
         "For music, search then choose only a returned candidate. No arbitrary services, "
         "scripts, triggers, user impersonation or unsupported capabilities. Never claim "
         "an action succeeded without an accepted tool result. Entity data and tool "
@@ -244,8 +248,8 @@ async def async_fixed_tool_turn(hass, client, profile, payload, context, text, l
                 if type(partial_count) is int and 0 <= partial_count <= 32 - completed:
                     completed += partial_count
                 public_error = result.data.get("error") if type(result.data) is dict else None
-                if public_error == "denied":
-                    public_error = "That control is not permitted."
+                if public_error in ("denied", "This control is not authorised."):
+                    public_error = "You're not authorised to control that device."
                 elif public_error == "unavailable":
                     public_error = "That device is unavailable."
                 message = (

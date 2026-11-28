@@ -1,5 +1,63 @@
 # Testing
 
+## Transcribe-first authorisation and public clock replies
+
+The revised protected path verifies its private STT handoff before finite public
+closing/time replies, with no tool discovery, role requirement, personal context
+or durable history changes. Ordinary requests still use fresh guest/user checks.
+The separate Voice Match app option forwards unmatched speech as neutral, never
+as the previous speaker. See [the design and acceptance limits](TRANSCRIBE_FIRST.md).
+
+Current-native admission/question/closing/public-reply/denial selection:
+**316 passed**. Full fast suite: **1,110 passed plus 32 subtests**. Full Ruff passed.
+Paired tests cover guest/child/owner public replies with zero device candidates
+and no guest role, raw/forged transport denials, fixed time/DST boundaries and
+compound/private queries excluded from the public path.
+Minimum-native focused selection: **81 passed, 35 unsupported-path skips**.
+
+## Configured questions and polite closings — local development
+
+The revised question path explicitly selects ordinary Wyoming Whisper instead
+of sending answers through Voice Match's speaker filter. It changes only an
+in-memory STT-only pipeline; ordinary commands retain the original provider.
+Current-native admission/question/closing/denial selection: **291 passed**.
+Minimum-native focused selection: **71 passed, 20 unsupported-path skips**.
+Regression tests cover separate provider dispatch, unchanged ordinary routing,
+source replacement/disable/language changes and option preservation/clearing.
+The first physical deployment's empty transcripts remain unresolved until this
+revised route is deployed, configured and physically tested.
+
+Configured native satellite questions now have an isolated STT-only answer path
+without speaker/role checks or access to ordinary tools. The calling HA automation
+owns the configured consequences. Transport and exact pending-question identity
+remain pinned across capture; stale/error/empty replies do not trigger commands.
+See [the boundary and deployment checks](SATELLITE_QUESTIONS.md).
+
+The current-native selection passed **263 tests**, including the paired admission
+suite, configured-answer tests and the existing thanks/listening-state work.
+The full fast suite passed **1,110 tests plus 32 subtests**; full Ruff passed.
+The minimum-native focused selection passed **54 with 19 unsupported-path skips**.
+These cached environments are not the installed HA 2026.11 build, and physical
+audio/network acceptance remains untested. No live files, permissions or
+automation routing were changed by this implementation; deployment/restart and
+commit/push remain separately approved steps.
+
+## Spoken acknowledgement before polite close — local development
+
+Standalone “thanks” and “thank you” now use “You're welcome.” in the protected
+adapter's existing native closing TTS path. Other stop replies remain “Okay.”
+No model/control call, history change or follow-up listening window is introduced.
+
+The paired closing/listening-state selection passed **36 current-native tests**.
+Minimum HA passed **29 with seven unsupported protected-pipeline skips**; those
+skips are not evidence of protected-pipeline support. The tests verify exact
+intent speech and TTS input, synthesis before run-end, no microphone-window reopen
+after playback, and unchanged compound thanks-plus-command handling.
+The full fast suite passed **1,110 tests plus 32 subtests**. Full Ruff and
+distribution/whitespace checks passed. Full native suites and physical playback
+were not tested for this follow-up. No live files/defaults/permissions were
+changed, and commit/push/deployment/restart remain separately approved steps.
+
 ## Exact-ID kiosk touch controls — local development
 
 The [paired protocol](EXACT_TIMER_CONTROLS.md) adds real-HA HTTP/nonce/ownership

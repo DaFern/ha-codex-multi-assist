@@ -12,9 +12,16 @@ native_esphome_voice = paired.native_esphome_voice
 continuing_voice = paired.continuing_voice
 
 
-@pytest.mark.parametrize("closing", ["Thanks.", "THANKS!", "Thank you"])
+@pytest.mark.parametrize(("closing", "reply"), [
+    ("Thanks.", "You're welcome."),
+    ("THANKS!", "You're welcome."),
+    ("Thank you", "You're welcome."),
+    (" thank   you! ", "You're welcome."),
+    ("That's all.", "Okay."),
+    ("Stop listening", "Okay."),
+])
 async def test_polite_closing_ends_listening_without_model_or_control_and_keeps_history(
-    continuing_voice, closing,
+    continuing_voice, closing, reply,
 ):
     h = continuing_voice
     await h.run()
@@ -24,6 +31,8 @@ async def test_polite_closing_ends_listening_without_model_or_control_and_keeps_
     assert timer is not None
     before_calls = len(h.n.env.calls)
     before_model = len(h.n.state.model_calls)
+    before_tts = len(h.n.state.tts)
+    before_events = len(h.events)
     history = h.adapter._history._satellites[h.satellite.entity_id]["turns"]
     assert history
     h.n.state.text = closing
@@ -34,7 +43,13 @@ async def test_polite_closing_ends_listening_without_model_or_control_and_keeps_
     assert not state.pending_speech and state.deadline is None
     assert h.adapter._history._satellites[h.satellite.entity_id]["turns"] == history
     final = [event for event in h.events if event.type == "intent-end"][-1]
+    assert final.data["intent_output"]["response"]["speech"]["plain"]["speech"] == reply
     assert final.data["intent_output"]["continue_conversation"] is False
+    assert h.n.state.tts[before_tts:] == [reply]
+    closing_events = [event.type for event in h.events[before_events:]]
+    assert closing_events.index("tts-end") < closing_events.index("run-end")
+    h.satellite.tts_response_finished()
+    assert not state.pending_speech and state.deadline is None and state.timer is None
     assert not h.adapter.ingress._active and not h.adapter.ingress._pending
 
 

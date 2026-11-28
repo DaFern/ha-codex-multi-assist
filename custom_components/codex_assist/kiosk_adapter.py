@@ -7,6 +7,7 @@ denies the turn. This module never replaces an ESPHome entity or subscription.
 
 import asyncio
 import time
+from dataclasses import replace
 from importlib import import_module
 
 from homeassistant.components import conversation
@@ -27,9 +28,15 @@ from .protected_conversation import (
     SpeechActivity,
     is_forget_phrase,
     is_stop_phrase,
+    stop_phrase_reply,
 )
 from .protected_model import async_entry_voice_handler
-from .protected_pipeline import async_run_protected_pipeline
+from .protected_pipeline import (
+    CONF_QUESTION_STT,
+    async_run_protected_pipeline,
+    async_run_question_pipeline,
+    question_stt_source,
+)
 from .rbac_satellite import ProtectedSatelliteDispatcher
 
 CONF_PROTECTED_SATELLITES = "protected_satellite_ids"
@@ -352,10 +359,93 @@ class KioskSatelliteAdapter:
             raise ValueError("ESPHome session closed during registration")
         return binding
 
+    async def _answer_question(self, satellite, question, audio, start, end, wake_word, context):
+        """HA configured this question/outcome; capture without speaker/tool grants."""
+        if (
+            self._closed or start is not PipelineStage.STT or end is not PipelineStage.TTS
+            or not isinstance(question, asyncio.Future) or question.done()
+            or satellite._wake_word_intercept_future is not None
+            or any(task is not asyncio.current_task() and entity is satellite
+                   for task, entity in self._tasks.items())
+        ):
+            raise ValueError("Unsupported question capture")
+        self._binding(satellite)
+        eid = satellite.entity_id
+        binding = self._bindings[eid]
+        connection = binding[0]
+        connection_current = self._connection_checks[eid]
+        pipeline = async_get_pipeline(self.hass, satellite._resolve_pipeline())
+        agent = conversation.async_get_agent(self.hass, pipeline.conversation_engine)
+        registry = er.async_get(self.hass)
+        identity = registry.async_get(eid)
+        source = registry.async_get(pipeline.stt_engine)
+        if (
+            not isinstance(agent, self._agent_type) or agent.entry is not self.entry
+            or source is None or source.platform != "codex_assist"
+            or source.config_entry_id != self.entry.entry_id or source.disabled_by is not None
+        ):
+            raise ValueError("Question pipeline does not belong to this entry")
+        original = context if context is not None else Context()
+        if not isinstance(original, Context):
+            raise ValueError("Invalid original context")
+        question_source_id = self._options.get(CONF_QUESTION_STT)
+        question_source = question_stt_source(self.hass, question_source_id)
+        question_identity = registry.async_get(question_source_id)
+        question_entry = self.hass.config_entries.async_get_entry(question_identity.config_entry_id)
+        language = pipeline.stt_language or pipeline.language
+        if language not in question_source.supported_languages:
+            raise ValueError("Question engine does not support the pipeline language")
+        if question_entry is None or question_entry.disabled_by is not None:
+            raise ValueError("Question engine entry is unavailable")
+        question_pipeline = replace(pipeline, stt_engine=question_source_id, stt_language=language)
+        self._drop_conversation(eid, connection)
+
+        def current():
+            try:
+                return (
+                    not self._closed and self.entry.options is self._options
+                    and satellite.entity_id == eid and self._entity(eid) is satellite
+                    and satellite._ask_question_future is question
+                    and self._bindings.get(eid) is binding
+                    and self._connection_checks.get(eid) is connection_current
+                    and connection_current(connection) is True
+                    and registry.async_get(eid) is identity
+                    and self._registry_identity(identity) == self._enrollments[eid]
+                    and registry.async_get(pipeline.stt_engine) is source
+                    and source.disabled_by is None
+                    and registry.async_get(question_source_id) is question_identity
+                    and self.hass.config_entries.async_get_entry(
+                        question_identity.config_entry_id,
+                    ) is question_entry
+                    and question_entry.disabled_by is None
+                    and question_stt_source(self.hass, question_source_id) is question_source
+                    and language in question_source.supported_languages
+                    and async_get_pipeline(self.hass, satellite._resolve_pipeline()) == pipeline
+                    and conversation.async_get_agent(
+                        self.hass, pipeline.conversation_engine,
+                    ) is agent
+                )
+            except Exception:
+                return False
+
+        await async_run_question_pipeline(
+            self.hass, pipeline=question_pipeline, context=original, audio_stream=audio,
+            event_callback=satellite._internal_on_pipeline_event, question=question,
+            current=current, device_id=identity.device_id, satellite_id=eid,
+            tts_audio_output=satellite.tts_options, wake_word_phrase=wake_word,
+            silence_seconds=satellite._resolve_vad_sensitivity(),
+        )
+
     async def _accept(self, satellite, audio, start, end, wake_word, context):
         task = asyncio.current_task()
         self._tasks[task] = satellite
         try:
+            question = satellite._ask_question_future
+            if question is not None:
+                await self._answer_question(
+                    satellite, question, audio, start, end, wake_word, context,
+                )
+                return
             if (
                 self._closed or start is not PipelineStage.STT or end is not PipelineStage.TTS
                 or satellite._ask_question_future is not None
@@ -411,9 +501,12 @@ class KioskSatelliteAdapter:
                 if state.deadline is not None and time.monotonic() > state.deadline:
                     state.clear()
                     return {"status": "denied", "completed": 0}, "This listening window ended."
+                if "public_reply" in payload:
+                    pending = ("public", payload["public_kind"])
+                    return {"status": "completed", "completed": 0}, payload["public_reply"]
                 if is_stop_phrase(text):
                     state.clear()
-                    return {"status": "completed", "completed": 0}, "Okay."
+                    return {"status": "completed", "completed": 0}, stop_phrase_reply(text)
                 subject = payload.get("continuation_identity")
                 view = payload.get("continuation_view")
                 if not is_digest(subject):
@@ -454,7 +547,12 @@ class KioskSatelliteAdapter:
 
             async def accepted(result):
                 if result.get("status") == "completed" and pending is not None:
-                    if pending[0] == "forget":
+                    if pending[0] == "public":
+                        if pending[1] == "time":
+                            state.reply_ready()
+                        else:
+                            state.clear()
+                    elif pending[0] == "forget":
                         await self._history.async_forget(
                             satellite.entity_id, binding_id, channel, pending[1],
                         )

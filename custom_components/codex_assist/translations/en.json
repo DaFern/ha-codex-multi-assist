@@ -208,6 +208,7 @@
           "music": "Voice Match music access",
           "room_music_defaults": "Room music defaults",
           "guest": "Guest voice role (development preview)",
+          "questions": "Configured satellite questions",
           "mcp": "MCP servers (read-only preview)"
         }
       },
@@ -232,6 +233,12 @@
       "room_music_save": {
         "title": "Room defaults could not be saved",
         "description": "No draft changes were saved. If a room or player is no longer valid, restore it and retry, or close this dialog and start again. If settings changed elsewhere, close and reopen to review the latest defaults."
+      },
+      "questions": {
+        "title": "Configured satellite questions",
+        "description": "Choose ordinary Wyoming Whisper for answers to HA-configured questions. Anyone may answer; the calling automation owns the outcomes. This bypasses speaker filtering only for a pending question, never ordinary Jarvis commands. Leaving this unset disables question capture. Saving reloads this Codex entry.",
+        "data": {"question_stt_engine": "Question transcription engine"},
+        "errors": {"invalid_question_stt": "Select an available ordinary Wyoming Whisper engine, not Voice Match."}
       },
       "guest": {
         "title": "Guest voice role",
